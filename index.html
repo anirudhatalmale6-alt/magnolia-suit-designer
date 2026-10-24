@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Your Suit | Magnolia Bespoke</title>
+<meta name="description" content="Design your own custom suit with Magnolia Bespoke: choose the fabric, lapels, pockets, buttons and lining, then send your design to us.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lobster&family=Great+Vibes&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#" data-nav="design" aria-label="Magnolia Bespoke — Design Your Suit">
+    <img src="logo-white.png" alt="Magnolia Bespoke">
+  </a>
+  <nav class="topnav">
+    <a href="https://magnoliabespoke.com/" class="hide-sm">Home</a>
+    <a href="https://magnoliabespoke.com/about" class="hide-sm">About</a>
+    <a href="https://magnoliabespoke.com/contact" class="hide-sm">Contact</a>
+    <a href="#" data-nav="design" class="pill">Design Your Suit</a>
+    <a href="#admin" class="ghost">Admin</a>
+  </nav>
+</header>
+
+<div class="demo-ribbon">Demo preview — fabrics, prices and artwork are samples and will be replaced with Magnolia Bespoke's own.</div>
+
+<main id="app"></main>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <button class="modal-x" aria-label="Close">&times;</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="js/textures.js"></script>
+<script src="js/render.js"></script>
+<script src="js/data.js"></script>
+<script src="js/store.js"></script>
+<script src="js/designer.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
