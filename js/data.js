@@ -1,7 +1,7 @@
 /* Default catalogue for the demo. Everything here is editable in the admin dashboard.
  * Prices are sample placeholders only — Magnolia Bespoke sets the real ones. */
 window.DEFAULT_CATALOG = {
-  version: 3,
+  version: 4,
   settings: {
     currency: '$',
     jacketOnlyPct: 70,
@@ -9,6 +9,13 @@ window.DEFAULT_CATALOG = {
     notifyNote: 'New designs appear in the dashboard under Submissions.'
   },
   fabrics: [
+    // Real Bosinno swatch photos (26SS books), tiled seamlessly
+    { id: 'RMB20E708', name: 'RMB20E708', type: 'Grey Glen Check (real swatch)', price: 395, visible: true, img: 'swatches/RMB20E708.jpg', scale: 54 },
+    { id: 'RMB22G222', name: 'RMB22G222', type: 'Blue Check (real swatch)', price: 395, visible: true, img: 'swatches/RMB22G222.jpg', scale: 54 },
+    { id: 'RMB23E009', name: 'RMB23E009', type: 'Brown Chalk Stripe (real swatch)', price: 395, visible: true, img: 'swatches/RMB23E009.jpg', scale: 54 },
+    { id: 'RMB24E306', name: 'RMB24E306', type: 'Taupe Textured (real swatch)', price: 395, visible: true, img: 'swatches/RMB24E306.jpg', scale: 54 },
+    { id: 'RMB22G294', name: 'RMB22G294', type: 'Mid Grey (real swatch)', price: 395, visible: true, img: 'swatches/RMB22G294.jpg', scale: 54 },
+    { id: 'RMB4E526', name: 'RMB4E526', type: 'Blue Plaid (real swatch)', price: 395, visible: true, img: 'swatches/RMB4E526.jpg', scale: 54 },
     { id: 'f-navy', name: 'Midnight Navy', type: 'Solid', price: 695, visible: true, pattern: { kind: 'solid', base: '#1c2840' } },
     { id: 'f-charcoal', name: 'Charcoal Grey', type: 'Solid', price: 695, visible: true, pattern: { kind: 'solid', base: '#3a3d43' } },
     { id: 'f-black', name: 'Classic Black', type: 'Solid', price: 695, visible: true, pattern: { kind: 'solid', base: '#17171a' } },
@@ -172,7 +179,7 @@ window.DEFAULT_CATALOG = {
 
 window.DEFAULT_CONFIG = {
   piece: 'suit',
-  fabric: 'f-navy',
+  fabric: 'RMB20E708',
   frontButtons: 'sb2',
   lapelStyle: 'notch',
   lapelWidth: 'standard',
