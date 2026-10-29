@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jacket Preview | Magnolia Bespoke</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lobster&display=swap" rel="stylesheet">
+<style>
+  :root { --teal:#57b2b5; --teal-d:#1a6b6e; --mist:#e0f7f9; --ink:#1d1e20; --muted:#6b6e74; --line:#e4e0d7; --paper:#f7f5f0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, system-ui, sans-serif; color: var(--ink); background: var(--paper); }
+  [hidden] { display:none !important; }
+  header { background: var(--teal); color:#fff; padding: 14px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  header h1 { font-family: Lobster, cursive; font-weight:400; font-size: 28px; margin:0; }
+  header a { color:#fff; font-size:14px; }
+  .wrap { display:grid; grid-template-columns: minmax(0,1.15fr) minmax(320px,0.85fr); gap: 0; min-height: calc(100vh - 64px); }
+  .stage { position:relative; background: #ebe7e0; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .stage canvas { max-width: 100%; max-height: calc(100vh - 64px); height:auto; display:block; transition: transform .35s ease; transform-origin: 50% 30%; cursor: zoom-in; }
+  .stage.zoom canvas { transform: scale(2.1); cursor: zoom-out; }
+  .busy { position:absolute; top:14px; left:14px; background: rgba(255,255,255,.9); border-radius:999px; padding:6px 12px; font-size:13px; color: var(--muted); }
+  .hint { position:absolute; bottom:12px; left:0; right:0; text-align:center; font-size:12.5px; color: var(--muted); }
+  aside { background:#fff; border-left: 1px solid var(--line); padding: 22px 22px 40px; overflow-y:auto; max-height: calc(100vh - 64px); }
+  h2 { font-size: 13px; letter-spacing:.08em; text-transform: uppercase; color: var(--muted); margin: 22px 0 10px; font-weight:600; }
+  h2:first-child { margin-top: 0; }
+  .fabrics { display:grid; grid-template-columns: repeat(auto-fill, minmax(92px,1fr)); gap:10px; }
+  .fab { border:1px solid var(--line); background:#fff; border-radius: 12px; padding: 6px 6px 8px; cursor:pointer; text-align:center; font: inherit; }
+  .fab img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; display:block; }
+  .fab b { display:block; font-size: 11.5px; margin-top:5px; font-weight:600; }
+  .fab small { display:block; font-size: 11px; color: var(--muted); }
+  .fab.on, .seg button.on { border-color: var(--teal-d); box-shadow: 0 0 0 2px var(--teal-d) inset; }
+  .seg { display:flex; gap:8px; flex-wrap:wrap; }
+  .seg button { border:1px solid var(--line); background:#fff; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+  .dot { width:16px; height:16px; border-radius:50%; display:inline-block; box-shadow: inset 0 -3px 4px rgba(0,0,0,.35); }
+  .upload { display:block; border: 1.5px dashed #c9c4b8; border-radius: 12px; padding: 14px; text-align:center; cursor:pointer; color: var(--muted); font-size: 14px; }
+  .upload input { display:none; }
+  .note { font-size: 13px; color: var(--muted); line-height: 1.5; margin-top: 18px; }
+  .current { font-size: 14px; margin-top: 4px; }
+  @media (max-width: 900px) {
+    .wrap { display:block; }
+    .stage { height: 62vh; }
+    .stage canvas { max-height: 62vh; }
+    aside { max-height:none; border-left:0; border-top:1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<header><h1>Magnolia Bespoke</h1><a href="../">Back to the full demo</a></header>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <canvas id="cv" width="1000" height="1340" aria-label="Jacket preview"></canvas>
+    <div class="busy" id="busy">Loading…</div>
+    <div class="hint">Tap the jacket to zoom in on the cloth</div>
+  </div>
+  <aside>
+    <h2>Fabric (your Bosinno swatches)</h2>
+    <div class="fabrics" id="fabrics"></div>
+    <div class="current" id="current"></div>
+    <h2>Lapel</h2>
+    <div class="seg" id="lapels">
+      <button data-lapel="notch" class="on">Notch</button>
+      <button data-lapel="peak">Peak</button>
+    </div>
+    <h2>Buttons</h2>
+    <div class="seg" id="buttons">
+      <button data-btn="darkhorn" class="on"><span class="dot" style="background:#3a2819"></span>Dark horn</button>
+      <button data-btn="lighthorn"><span class="dot" style="background:#96704a"></span>Light horn</button>
+      <button data-btn="black"><span class="dot" style="background:#18181a"></span>Black</button>
+    </div>
+    <h2>Try any swatch photo</h2>
+    <label class="upload">Upload a fabric photo from your phone or computer<input type="file" accept="image/*" id="upload"></label>
+    <p class="note">Every fabric is applied live in your browser from a single swatch photo: the cloth follows the folds, the light and the shadows of the jacket, and stripes and checks bend with the drape. Adding a new fabric in the admin is just uploading its photo.</p>
+  </aside>
+</div>
+<script>
+(function () {
+  const W = 1000, H = 1340, TILE = 512, TILE_PX = 210;   // a 512px tile covers 210px of jacket (2 swatches across)
+  const SC = TILE / TILE_PX;
+  const FABRICS = [
+    ['RMB22G294', 'Mid grey'], ['RMB18114', 'Navy'], ['RMB24E306', 'Taupe textured'], ['RMB23E009', 'Brown chalk stripe'],
+    ['RMB20E708', 'Grey glen check'], ['RMB4E526', 'Blue plaid'], ['RMB22G222', 'Blue check'], ['RMB20E028', 'Grey windowpane'],
+    ['RMB24E036', 'Grey check'], ['RMB22G066', 'Grey overcheck']
+  ];
+  const ANG = new Float32Array(16); ANG[2] = 0.28; ANG[3] = -0.28; ANG[7] = 0.05; ANG[8] = -0.05;
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { willReadFrequently: true });
+  const busy = document.getElementById('busy');
+  const state = { lapel: 'notch', btn: 'darkhorn', fabric: FABRICS[0][0], tile: null };
+  const styles = {};
+  const tiles = {};
+
+  const loadImg = src => new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = src; });
+  function pixels(img) {
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+    return x.getImageData(0, 0, img.width, img.height).data;
+  }
+
+  async function loadStyle(name) {
+    if (styles[name]) return styles[name];
+    const [base, shade, warp, ...ovs] = await Promise.all(['base', 'shade', 'warp', 'overlay_darkhorn', 'overlay_lighthorn', 'overlay_black']
+      .map(n => loadImg(`maps/${name}/${n}.png`)));
+    const B = pixels(base), S = pixels(shade), Wp = pixels(warp);
+    // precompute the texture coordinate of every cloth pixel once per style
+    const n = W * H, U = new Float32Array(n), V = new Float32Array(n), F = new Uint8Array(n), SH = new Float32Array(n);
+    const cx = W / 2, cy = H * 0.4;
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      const a = B[p + 3];
+      if (a === 255) continue;
+      const x = i % W, y = (i / W) | 0;
+      const u = x + (Wp[p] - 128), v = y + (Wp[p + 1] - 128);
+      const t = ANG[Wp[p + 2]] || 0, c = Math.cos(t), s = Math.sin(t);
+      U[i] = ((u - cx) * c - (v - cy) * s + cx) * SC;
+      V[i] = ((u - cx) * s + (v - cy) * c + cy) * SC;
+      F[i] = 255 - a;
+      SH[i] = S[p] / 128;
+    }
+    styles[name] = { B, U, V, F, SH, ov: { darkhorn: ovs[0], lighthorn: ovs[1], black: ovs[2] } };
+    return styles[name];
+  }
+
+  async function loadTile(code) {
+    if (tiles[code]) return tiles[code];
+    tiles[code] = pixels(await loadImg(`tiles/${code}.jpg`));
+    return tiles[code];
+  }
+
+  function draw() {
+    const st = styles[state.lapel], T = state.tile;
+    if (!st || !T) return;
+    const out = ctx.createImageData(W, H), O = out.data, B = st.B;
+    const n = W * H;
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      const f = st.F[i];
+      if (!f) { O[p] = B[p]; O[p + 1] = B[p + 1]; O[p + 2] = B[p + 2]; O[p + 3] = 255; continue; }
+      // bilinear sample of the seamless tile
+      let u = st.U[i] % TILE, v = st.V[i] % TILE;
+      if (u < 0) u += TILE; if (v < 0) v += TILE;
+      const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0;
+      const x1 = (x0 + 1) % TILE, y1 = (y0 + 1) % TILE;
+      const a = (y0 * TILE + x0) * 4, b = (y0 * TILE + x1) * 4, c = (y1 * TILE + x0) * 4, d = (y1 * TILE + x1) * 4;
+      const sh = st.SH[i], k = f / 255;
+      for (let ch = 0; ch < 3; ch++) {
+        const top = T[a + ch] + (T[b + ch] - T[a + ch]) * fx, bot = T[c + ch] + (T[d + ch] - T[c + ch]) * fx;
+        const col = (top + (bot - top) * fy) * sh;
+        O[p + ch] = B[p + ch] * (1 - k) + col * k;
+      }
+      O[p + 3] = 255;
+    }
+    ctx.putImageData(out, 0, 0);
+    ctx.drawImage(st.ov[state.btn], 0, 0);
+  }
+
+  async function update() {
+    busy.hidden = false; busy.textContent = 'Updating…';
+    await loadStyle(state.lapel);
+    if (!state.customTile) state.tile = await loadTile(state.fabric);
+    requestAnimationFrame(() => { draw(); busy.hidden = true; });
+    const f = FABRICS.find(x => x[0] === state.fabric);
+    document.getElementById('current').textContent = state.customTile ? 'Your uploaded swatch' : (f ? `${f[0]}: ${f[1]}` : '');
+  }
+
+  // fabric chips
+  const fabEl = document.getElementById('fabrics');
+  fabEl.innerHTML = FABRICS.map(([c, n]) => `<button class="fab" data-fab="${c}"><img src="tiles/${c}_sw.jpg" alt=""><b>${c}</b><small>${n}</small></button>`).join('');
+  fabEl.onclick = e => {
+    const b = e.target.closest('[data-fab]'); if (!b) return;
+    state.fabric = b.dataset.fab; state.customTile = false;
+    fabEl.querySelectorAll('.fab').forEach(x => x.classList.toggle('on', x === b));
+    update();
+  };
+  fabEl.querySelector('.fab').classList.add('on');
+  const seg = (id, key) => document.getElementById(id).onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    state[key] = b.dataset[key === 'lapel' ? 'lapel' : 'btn'];
+    document.querySelectorAll(`#${id} button`).forEach(x => x.classList.toggle('on', x === b));
+    update();
+  };
+  seg('lapels', 'lapel'); seg('buttons', 'btn');
+
+  // any swatch photo: centre-crop, mirror into a seamless 2x2 tile
+  document.getElementById('upload').onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(img.width, img.height), c = document.createElement('canvas'); c.width = c.height = TILE;
+      const x = c.getContext('2d', { willReadFrequently: true }), h = TILE / 2;
+      const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+      const quad = (fx, fy, dx, dy) => { x.save(); x.translate(dx + (fx < 0 ? h : 0), dy + (fy < 0 ? h : 0)); x.scale(fx, fy); x.drawImage(img, sx, sy, s, s, 0, 0, h, h); x.restore(); };
+      quad(1, 1, 0, 0); quad(-1, 1, h, 0); quad(1, -1, 0, h); quad(-1, -1, h, h);
+      state.tile = x.getImageData(0, 0, TILE, TILE).data; state.customTile = true;
+      fabEl.querySelectorAll('.fab').forEach(b => b.classList.remove('on'));
+      URL.revokeObjectURL(img.src); update();
+    };
+    img.src = URL.createObjectURL(file);
+  };
+
+  document.getElementById('stage').onclick = e => {
+    if (e.target !== cv) return;
+    const st = document.getElementById('stage'), r = cv.getBoundingClientRect();
+    cv.style.transformOrigin = `${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`;
+    st.classList.toggle('zoom');
+  };
+  update();
+})();
+</script>
+</body>
+</html>
