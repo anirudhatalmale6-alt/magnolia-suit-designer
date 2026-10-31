@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design Your Jacket | Magnolia Bespoke</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lobster&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/designer.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./" aria-label="Magnolia Bespoke"><img src="logo-white.png" alt="Magnolia Bespoke"></a>
+  <div class="top-right">
+    <span class="staff-badge" id="staffBadge" hidden>Staff view</span>
+    <button class="ghost" id="staffBtn" type="button">Staff</button>
+  </div>
+</header>
+<div class="ribbon">Preview (Phase 1): live fabric and style switching. Prices, more options and ordering come in the next phases.</div>
+
+<div class="wrap">
+  <section class="stage" id="stage">
+    <canvas id="cv" width="1024" height="1536" aria-label="Jacket preview"></canvas>
+    <div class="busy" id="busy">Loading…</div>
+    <div class="angle-note" id="angleNote" hidden>This angle is shown with a notch lapel for now.</div>
+    <div class="views" id="views" role="group" aria-label="View">
+      <button type="button" data-view="front" class="on">Front</button>
+      <button type="button" data-view="three4">Three-quarter</button>
+      <button type="button" data-view="side">Side</button>
+      <button type="button" data-view="back">Back</button>
+    </div>
+    <div class="zoom-hint">Tap the jacket to zoom into the cloth</div>
+  </section>
+
+  <aside class="panel">
+    <nav class="tabs" role="tablist">
+      <button type="button" role="tab" data-tab="fabric" class="on"><span>1</span>Fabric</button>
+      <button type="button" role="tab" data-tab="style"><span>2</span>Style</button>
+      <button type="button" role="tab" data-tab="summary"><span>3</span>Summary</button>
+    </nav>
+
+    <div class="chosen" id="chosen"></div>
+
+    <section class="tab" data-pane="fabric">
+      <input class="search" id="q" type="search" placeholder="Search by number, colour or cloth (e.g. 1042, navy, cashmere)" autocomplete="off">
+      <div class="filters">
+        <div class="chips" id="colours" aria-label="Colour"></div>
+        <div class="selects">
+          <label>Pattern<select id="fPattern"><option value="">All</option></select></label>
+          <label>Cloth<select id="fCloth"><option value="">All</option></select></label>
+          <label>Weight<select id="fWeight"><option value="">All</option><option value="light">Light (under 270 g)</option><option value="mid">Medium (270 to 320 g)</option><option value="heavy">Heavy (over 320 g)</option></select></label>
+          <label>For<select id="fUse"><option value="">Suits and blazers</option><option value="Suit">Suits</option><option value="Blazer">Blazers only</option></select></label>
+        </div>
+        <label class="check"><input type="checkbox" id="fItaly"> Italian cloth only</label>
+      </div>
+      <div class="count"><span id="count"></span> <button type="button" class="link" id="clear">Clear filters</button></div>
+      <div class="grid" id="grid"></div>
+      <div class="staff-only upload-box" hidden>
+        <h3>Try a swatch photo</h3>
+        <label class="upload">Upload any fabric photo to see it on the jacket<input type="file" accept="image/*" id="upload"></label>
+      </div>
+    </section>
+
+    <section class="tab" data-pane="style" hidden>
+      <h3>Lapel</h3>
+      <div class="seg" id="lapel">
+        <button type="button" data-v="notch" class="on">Notch</button>
+        <button type="button" data-v="peak">Peak</button>
+      </div>
+      <h3>Front</h3>
+      <div class="seg" id="closure">
+        <button type="button" data-v="sb" class="on">Single-breasted, 2 buttons</button>
+        <button type="button" data-v="db">Double-breasted, 6 buttons</button>
+      </div>
+      <p class="hint" id="styleHint">Double-breasted jackets are shown with a peak lapel.</p>
+      <p class="hint">Pockets, vents, buttons, lining and the trousers and vest are added in the next phase.</p>
+    </section>
+
+    <section class="tab" data-pane="summary" hidden>
+      <h3>Your jacket</h3>
+      <dl class="summary" id="summary"></dl>
+      <p class="hint">In the full version this is where the customer reviews the price, adds measurements and sends the order. The order sheet will carry the factory codes for every choice.</p>
+    </section>
+  </aside>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <form class="modal-card" id="staffForm">
+    <h3>Staff view</h3>
+    <p class="hint">Shows the factory code and price band for every fabric. Enter the staff password.</p>
+    <input type="password" id="pw" autocomplete="current-password" placeholder="Password" required>
+    <p class="err" id="pwErr" hidden>That password did not work.</p>
+    <div class="modal-actions"><button type="button" class="ghost dark" id="pwCancel">Cancel</button><button type="submit" class="primary">Open</button></div>
+  </form>
+</div>
+
+<script src="js/designer.js"></script>
+</body>
+</html>
