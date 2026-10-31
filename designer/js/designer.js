@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512;
+  const W = 1024, H = 1536, TILE = 512, VER = '2';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -11,7 +11,7 @@
 
   const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
   const cv = $('#cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), busy = $('#busy');
-  const state = { view: 'front', lapel: 'notch', closure: 'sb', fabric: null, tile: null, sc: 1, custom: false };
+  const state = { view: 'front', lapel: 'notch', closure: 'sb', fabric: null, tile: null, custom: false };
   const views = {}, tiles = {};
   let FABRICS = [], STAFF = null;
 
@@ -24,7 +24,29 @@
     const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
     return x.getImageData(0, 0, img.width, img.height).data;
   }
-  function linearTile(px) { const t = new Float32Array(TILE * TILE * 3); for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { t[j] = LIN[px[i]]; t[j + 1] = LIN[px[i + 1]]; t[j + 2] = LIN[px[i + 2]]; } return t; }
+  // Tile in linear light, area-averaged down to its real size on the jacket (n px). Sampling the 512 px tile
+  // directly at ~7x minification aliases fine weaves into moire waves.
+  function linearTile(px, n) {
+    const src = new Float32Array(TILE * TILE * 3);
+    for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { src[j] = LIN[px[i]]; src[j + 1] = LIN[px[i + 1]]; src[j + 2] = LIN[px[i + 2]]; }
+    n = Math.max(8, Math.min(TILE, Math.round(n)));
+    const t = new Float32Array(n * n * 3), r = TILE / n;
+    for (let y = 0; y < n; y++) {
+      const y0 = y * r, y1 = y0 + r;
+      for (let x = 0; x < n; x++) {
+        const x0 = x * r, x1 = x0 + r; let R = 0, G = 0, Bc = 0, wsum = 0;
+        for (let sy = Math.floor(y0); sy < Math.ceil(y1); sy++) {
+          const wy = Math.min(y1, sy + 1) - Math.max(y0, sy);
+          for (let sx = Math.floor(x0); sx < Math.ceil(x1); sx++) {
+            const w = wy * (Math.min(x1, sx + 1) - Math.max(x0, sx)), k = (sy * TILE + sx) * 3;
+            R += src[k] * w; G += src[k + 1] * w; Bc += src[k + 2] * w; wsum += w;
+          }
+        }
+        const o = (y * n + x) * 3; t[o] = R / wsum; t[o + 1] = G / wsum; t[o + 2] = Bc / wsum;
+      }
+    }
+    return { T: t, n };
+  }
 
   // ---------- which photo to show ----------
   function mapName() {
@@ -36,7 +58,7 @@
 
   async function loadView(name) {
     if (views[name]) return views[name];
-    const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp`)));
+    const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
     const B = pixels(base), S = pixels(shade), Wp = pixels(warp);
     const n = W * H, U = new Float32Array(n), V = new Float32Array(n), A = new Float32Array(n), SH = new Float32Array(n);
     const cx = W / 2, cy = H * 0.35;
@@ -50,17 +72,18 @@
     }
     return (views[name] = { B, U, V, A, SH, ov });
   }
-  async function loadTile(id) { return tiles[id] || (tiles[id] = linearTile(pixels(await loadImg(`tiles/${id}.jpg`)))); }
+  async function loadTile(f) { return tiles[f.id] || (tiles[f.id] = linearTile(pixels(await loadImg(`tiles/${f.id}.jpg?v=${VER}`)), f.tcm * PX_PER_CM)); }
 
   function draw(st) {
-    const T = state.tile, sc = state.sc; if (!st || !T) return;
+    if (!st || !state.tile) return;
+    const T = state.tile.T, N = state.tile.n;
     const out = ctx.createImageData(W, H), O = out.data, B = st.B, n = W * H;
     for (let i = 0, p = 0; i < n; i++, p += 4) {
       const k = st.A[i];
       if (!k) { O[p] = B[p]; O[p + 1] = B[p + 1]; O[p + 2] = B[p + 2]; O[p + 3] = 255; continue; }
-      let u = (st.U[i] * sc) % TILE, v = (st.V[i] * sc) % TILE; if (u < 0) u += TILE; if (v < 0) v += TILE;
-      const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0, x1 = (x0 + 1) % TILE, y1 = (y0 + 1) % TILE;
-      const a = (y0 * TILE + x0) * 3, b = (y0 * TILE + x1) * 3, c = (y1 * TILE + x0) * 3, d = (y1 * TILE + x1) * 3, sh = st.SH[i];
+      let u = st.U[i] % N, v = st.V[i] % N; if (u < 0) u += N; if (v < 0) v += N;
+      const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0, x1 = (x0 + 1) % N, y1 = (y0 + 1) % N;
+      const a = (y0 * N + x0) * 3, b = (y0 * N + x1) * 3, c = (y1 * N + x0) * 3, d = (y1 * N + x1) * 3, sh = st.SH[i];
       for (let ch = 0; ch < 3; ch++) {
         const top = T[a + ch] + (T[b + ch] - T[a + ch]) * fx, bot = T[c + ch] + (T[d + ch] - T[c + ch]) * fx;
         let lin = (top + (bot - top) * fy) * sh; if (lin > 1) lin = 1;
@@ -80,8 +103,7 @@
       const st = await loadView(m.name);
       if (!state.custom) {
         const f = state.fabric;
-        state.tile = await loadTile(f.id);
-        state.sc = TILE / (f.tcm * PX_PER_CM);
+        state.tile = await loadTile(f);
       }
       if (my !== ticket) return;                    // a newer choice arrived while loading
       requestAnimationFrame(() => { draw(st); if (my === ticket) busy.hidden = true; });
@@ -124,7 +146,7 @@
     $('#grid').innerHTML = list.length ? list.map(f => {
       const s = STAFF && STAFF[f.id];
       return `<button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
-        <img src="thumbs/${f.id}.jpg" alt="" loading="lazy" width="160" height="160"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)} · ${esc(s.band)}</small>` : ''}</button>`;
+        <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)} · ${esc(s.band)}</small>` : ''}</button>`;
     }).join('') : '<p class="empty">No fabric matches these filters.</p>';
   }
   function paintChosen() {
@@ -132,7 +154,7 @@
     if (state.custom) { el.innerHTML = '<div><b>Your uploaded swatch</b><small>Only on this screen, not saved.</small></div>'; return; }
     const f = state.fabric; if (!f) return;
     const s = STAFF && STAFF[f.id];
-    el.innerHTML = `<img src="thumbs/${f.id}.jpg" alt=""><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? '<span class="tag">Italian cloth</span>' : ''}</b>
+    el.innerHTML = `<img src="thumbs/${f.id}.jpg?v=${VER}" alt=""><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? '<span class="tag">Italian cloth</span>' : ''}</b>
       <small>${esc(f.composition)}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : 'Suit cloth'}</small>
       ${s ? `<small class="staffline">Factory code ${esc(s.code)} · Band ${esc(s.band)}${s.origin ? ` · ${esc(s.origin)}` : ''}</small>` : ''}</div>`;
   }
@@ -238,7 +260,7 @@
       const x = c.getContext('2d', { willReadFrequently: true }), h = TILE / 2, sx = (img.width - s) / 2, sy = (img.height - s) / 2;
       const quad = (fx, fy, dx, dy) => { x.save(); x.translate(dx + (fx < 0 ? h : 0), dy + (fy < 0 ? h : 0)); x.scale(fx, fy); x.drawImage(img, sx, sy, s, s, 0, 0, h, h); x.restore(); };
       quad(1, 1, 0, 0); quad(-1, 1, h, 0); quad(1, -1, 0, h); quad(-1, -1, h, h);
-      state.tile = linearTile(x.getImageData(0, 0, TILE, TILE).data); state.sc = TILE / 150; state.custom = true;
+      state.tile = linearTile(x.getImageData(0, 0, TILE, TILE).data, 150); state.custom = true;
       $$('#grid .fab').forEach(b => b.classList.remove('on')); URL.revokeObjectURL(img.src); render();
     };
     img.src = URL.createObjectURL(file);
@@ -247,7 +269,7 @@
   // ---------- start ----------
   (async function init() {
     try {
-      FABRICS = await (await fetch('fabrics.json')).json();
+      FABRICS = await (await fetch(`fabrics.json?v=${VER}`)).json();
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
