@@ -1,13 +1,14 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '2';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '4';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
   const OUTN = 4096, GAM = new Uint8Array(OUTN + 1); for (let i = 0; i <= OUTN; i++) GAM[i] = Math.round(255 * Math.pow(i / OUTN, 1 / 2.2));
   const COLOURS = { navy: '#1f2a44', black: '#111', charcoal: '#3b3d42', grey: '#7d7f84', 'light grey': '#c4c5c8', blue: '#3c5a8a',
-    brown: '#5a3f2c', tan: '#b49a7e', burgundy: '#5c1f2a', green: '#3f4a36', cream: '#ece6da' };
+    brown: '#5a3f2c', tan: '#b49a7e', burgundy: '#5c1f2a', red: '#c4545e', green: '#4f5e52', cream: '#ece6da' };
+  const SEASONS = { '26FW': 'Autumn / Winter', '26SS': 'Spring / Summer' };
   const PATTERNS = { solid: 'Plain', textured: 'Textured', herringbone: 'Herringbone', stripe: 'Stripe', check: 'Check', corduroy: 'Corduroy' };
-  const CLOTH = { wool: '100% wool', cashmere: 'Wool and cashmere', silk: 'Wool and silk', blend: 'Wool blend', other: 'Other blends' };
+  const CLOTH = { wool: '100% wool', cashmere: 'Wool and cashmere', silk: 'Wool and silk', blend: 'Wool blend', other: 'Other blends', unknown: 'Composition to follow' };
 
   const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
   const cv = $('#cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), busy = $('#busy');
@@ -51,7 +52,10 @@
   // ---------- which photo to show ----------
   function mapName() {
     if (state.view === 'back') return { name: 'back', note: false };
-    if (state.view === 'three4' || state.view === 'side') return { name: state.view, note: state.lapel !== 'notch' || state.closure !== 'sb' };
+    if (state.view === 'three4' || state.view === 'side') {
+      if (state.closure === 'db') return { name: `${state.view}_peak_db`, note: false };
+      return { name: state.lapel === 'peak' ? `${state.view}_peak_sb` : state.view, note: false };
+    }
     if (state.closure === 'db') return { name: 'front_peak_db', note: false };
     return { name: state.lapel === 'peak' ? 'front_peak_sb' : 'front_notch_sb', note: false };
   }
@@ -116,26 +120,28 @@
   // ---------- catalogue ----------
   function clothOf(f) {
     const c = f.composition.toLowerCase();
+    if (!c) return 'unknown';
     if (/^100% wool$/.test(c)) return 'wool';
     if (c.includes('cashmere')) return 'cashmere';
     if (c.includes('silk') && c.includes('wool')) return 'silk';
     const w = c.match(/([\d.]+)% wool/);
     return w && parseFloat(w[1]) >= 50 ? 'blend' : 'other';
   }
-  function weightOf(f) { return !f.weight ? '' : f.weight < 270 ? 'light' : f.weight <= 320 ? 'mid' : 'heavy'; }
+  function weightOf(f) { return !f.weight ? 'unknown' : f.weight < 270 ? 'light' : f.weight <= 320 ? 'mid' : 'heavy'; }
   const num = f => f.id.replace('MB-', '');
 
-  const filt = { q: '', colours: new Set(), pattern: '', cloth: '', weight: '', use: '', italy: false };
+  const filt = { q: '', colours: new Set(), pattern: '', cloth: '', weight: '', use: '', season: '', italy: false };
   function matches(f) {
     if (filt.colours.size && !filt.colours.has(f.colour)) return false;
     if (filt.pattern && f.pattern !== filt.pattern) return false;
     if (filt.cloth && f._cloth !== filt.cloth) return false;
     if (filt.weight && f._weight !== filt.weight) return false;
     if (filt.use && f.use !== filt.use) return false;
+    if (filt.season && f.season !== filt.season) return false;
     if (filt.italy && !f.italian) return false;
     if (filt.q) {
       const s = STAFF && STAFF[f.id] ? ` ${STAFF[f.id].code} ${STAFF[f.id].band}` : '';
-      const hay = `${f.id} ${num(f)} ${f.name} ${f.colour} ${PATTERNS[f.pattern]} ${f.composition} ${f.use} ${f.italian ? 'italian italy' : ''}${s}`.toLowerCase();
+      const hay = `${f.id} ${num(f)} ${f.name} ${f.colour} ${PATTERNS[f.pattern]} ${f.composition} ${f.use} ${SEASONS[f.season] || ''} ${f.italian ? 'italian italy' : ''}${s}`.toLowerCase();
       if (!filt.q.split(/\s+/).every(w => hay.includes(w))) return false;
     }
     return true;
@@ -146,7 +152,7 @@
     $('#grid').innerHTML = list.length ? list.map(f => {
       const s = STAFF && STAFF[f.id];
       return `<button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
-        <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)} · ${esc(s.band)}</small>` : ''}</button>`;
+        <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)}${s.band ? ` · ${esc(s.band)}` : ''}</small>` : ''}</button>`;
     }).join('') : '<p class="empty">No fabric matches these filters.</p>';
   }
   function paintChosen() {
@@ -155,18 +161,18 @@
     const f = state.fabric; if (!f) return;
     const s = STAFF && STAFF[f.id];
     el.innerHTML = `<img src="thumbs/${f.id}.jpg?v=${VER}" alt=""><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? '<span class="tag">Italian cloth</span>' : ''}</b>
-      <small>${esc(f.composition)}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : 'Suit cloth'}</small>
-      ${s ? `<small class="staffline">Factory code ${esc(s.code)} · Band ${esc(s.band)}${s.origin ? ` · ${esc(s.origin)}` : ''}</small>` : ''}</div>`;
+      <small>${f.composition ? esc(f.composition) : 'Composition to follow'}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : 'Suit cloth'} · ${SEASONS[f.season] || ''}</small>
+      ${s ? `<small class="staffline">Factory code ${esc(s.code)} · Band ${esc(s.band || 'not set yet')}${s.origin ? ` · ${esc(s.origin)}` : ''} · ${esc(s.book || '')}</small>` : ''}</div>`;
   }
   function paintSummary() {
     const f = state.fabric, s = f && STAFF && STAFF[f.id];
     const rows = [
       ['Fabric', state.custom ? 'Uploaded swatch' : `No. ${num(f)}, ${f.name}`],
-      ['Cloth', state.custom ? '' : `${f.composition}${f.weight ? `, ${f.weight} g` : ''}`],
+      ['Cloth', state.custom ? '' : `${f.composition || 'Composition to follow'}${f.weight ? `, ${f.weight} g` : ''}`],
       ['Lapel', state.closure === 'db' ? 'Peak' : state.lapel === 'peak' ? 'Peak' : 'Notch'],
       ['Front', state.closure === 'db' ? 'Double-breasted, 6 buttons' : 'Single-breasted, 2 buttons']
     ];
-    if (s && !state.custom) rows.push(['Factory code', `${s.code} (band ${s.band})`]);
+    if (s && !state.custom) rows.push(['Factory code', `${s.code} (band ${s.band || 'not set yet'})`]);
     $('#summary').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
   }
 
@@ -183,10 +189,11 @@
     $('#fCloth').onchange = e => { filt.cloth = e.target.value; paintGrid(); };
     $('#fWeight').onchange = e => { filt.weight = e.target.value; paintGrid(); };
     $('#fUse').onchange = e => { filt.use = e.target.value; paintGrid(); };
+    $('#fSeason').onchange = e => { filt.season = e.target.value; paintGrid(); };
     $('#fItaly').onchange = e => { filt.italy = e.target.checked; paintGrid(); };
     $('#clear').onclick = () => {
-      Object.assign(filt, { q: '', pattern: '', cloth: '', weight: '', use: '', italy: false }); filt.colours.clear();
-      $('#q').value = ''; ['#fPattern', '#fCloth', '#fWeight', '#fUse'].forEach(s => { $(s).value = ''; }); $('#fItaly').checked = false;
+      Object.assign(filt, { q: '', pattern: '', cloth: '', weight: '', use: '', season: '', italy: false }); filt.colours.clear();
+      $('#q').value = ''; ['#fPattern', '#fCloth', '#fWeight', '#fUse', '#fSeason'].forEach(s => { $(s).value = ''; }); $('#fItaly').checked = false;
       $$('#colours .chip').forEach(b => b.classList.remove('on')); paintGrid();
     };
     $('#grid').onclick = e => {

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lobster&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=2">
+<link rel="stylesheet" href="css/designer.css?v=4">
 </head>
 <body>
 <header class="topbar">
@@ -50,8 +50,9 @@
         <div class="selects">
           <label>Pattern<select id="fPattern"><option value="">All</option></select></label>
           <label>Cloth<select id="fCloth"><option value="">All</option></select></label>
-          <label>Weight<select id="fWeight"><option value="">All</option><option value="light">Light (under 270 g)</option><option value="mid">Medium (270 to 320 g)</option><option value="heavy">Heavy (over 320 g)</option></select></label>
+          <label>Weight<select id="fWeight"><option value="">All</option><option value="light">Light (under 270 g)</option><option value="mid">Medium (270 to 320 g)</option><option value="heavy">Heavy (over 320 g)</option><option value="unknown">Weight to follow</option></select></label>
           <label>For<select id="fUse"><option value="">Suits and blazers</option><option value="Suit">Suits</option><option value="Blazer">Blazers only</option></select></label>
+          <label>Season<select id="fSeason"><option value="">All seasons</option><option value="26FW">Autumn / Winter</option><option value="26SS">Spring / Summer</option></select></label>
         </div>
         <label class="check"><input type="checkbox" id="fItaly"> Italian cloth only</label>
       </div>
@@ -96,6 +97,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=2"></script>
+<script src="js/designer.js?v=4"></script>
 </body>
 </html>
