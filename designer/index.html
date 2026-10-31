@@ -8,7 +8,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lobster&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=4">
+<script>
+  /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
+  (function () {
+    var V = '5';
+    try {
+      fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
+      }).catch(function () {});
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="css/designer.css?v=5">
 </head>
 <body>
 <header class="topbar">
@@ -97,6 +108,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=4"></script>
+<script src="js/designer.js?v=5"></script>
 </body>
 </html>

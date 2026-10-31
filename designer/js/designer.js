@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '4';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '5';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
