@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '6';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '7';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -12,7 +12,7 @@
 
   const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
   const cv = $('#cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), busy = $('#busy');
-  const state = { view: 'front', lapel: 'notch', closure: 'sb', fabric: null, tile: null, custom: false };
+  const state = { view: 'front', lapel: 'notch', closure: 'sb', fabric: null, tile: null, custom: false, zoom: null };
   const views = {}, tiles = {};
   let FABRICS = [], STAFF = null;
 
@@ -74,9 +74,15 @@
       U[i] = (u - cx) * c - (v - cy) * s + cx; V[i] = (u - cx) * s + (v - cy) * c + cy;
       A[i] = 1 - a / 255; SH[i] = S[p] / 128;
     }
-    return (views[name] = { B, U, V, A, SH, ov });
+    return (views[name] = { B, S, Wp, U, V, A, SH, ov });
   }
-  async function loadTile(f) { return tiles[f.id] || (tiles[f.id] = linearTile(pixels(await loadImg(`tiles/${f.id}.jpg?v=${VER}`)), f.tcm * PX_PER_CM)); }
+  const tilePx = {};
+  async function loadTile(f, z = 1) {
+    const key = f.id + '@' + z;
+    if (tiles[key]) return tiles[key];
+    const px = tilePx[f.id] || (tilePx[f.id] = pixels(await loadImg(`tiles/${f.id}.jpg?v=${VER}`)));
+    return (tiles[key] = linearTile(px, f.tcm * PX_PER_CM * z));
+  }
 
   function draw(st) {
     if (!st || !state.tile) return;
@@ -98,6 +104,48 @@
     ctx.putImageData(out, 0, 0); ctx.drawImage(st.ov, 0, 0);
   }
 
+  // Zoomed view: redraw only the tapped area at ZOOM x the resolution, sampling the maps between pixels and a
+  // finer copy of the fabric, so the weave shows real detail instead of enlarged pixels.
+  const ZOOM = 3;
+  function drawZoom(st, tile, zx, zy) {
+    const T = tile.T, N = tile.n, Z = ZOOM, cx = W / 2, cy = H * 0.35;
+    const out = ctx.createImageData(W, H), O = out.data, B = st.B, S = st.S, Wp = st.Wp;
+    for (let oy = 0, p = 0; oy < H; oy++) {
+      const by = Math.min(zy + oy / Z, H - 1.001), y0 = by | 0, fy = by - y0, y1 = y0 + 1;
+      for (let ox = 0; ox < W; ox++, p += 4) {
+        const bx = Math.min(zx + ox / Z, W - 1.001), x0 = bx | 0, fx = bx - x0;
+        // the 4 neighbouring map pixels and their weights
+        const i00 = (y0 * W + x0) * 4, i01 = i00 + 4, i10 = i00 + W * 4, i11 = i10 + 4;
+        const w00 = (1 - fx) * (1 - fy), w01 = fx * (1 - fy), w10 = (1 - fx) * fy, w11 = fx * fy;
+        const a00 = B[i00 + 3], a01 = B[i01 + 3], a10 = B[i10 + 3], a11 = B[i11 + 3];
+        const alpha = (a00 * w00 + a01 * w01 + a10 * w10 + a11 * w11) / 255, k = 1 - alpha;
+        // photo part, premultiplied so the transparent cloth pixels do not darken the edges
+        let r = (B[i00] * a00 * w00 + B[i01] * a01 * w01 + B[i10] * a10 * w10 + B[i11] * a11 * w11) / 255;
+        let g = (B[i00 + 1] * a00 * w00 + B[i01 + 1] * a01 * w01 + B[i10 + 1] * a10 * w10 + B[i11 + 1] * a11 * w11) / 255;
+        let bl = (B[i00 + 2] * a00 * w00 + B[i01 + 2] * a01 * w01 + B[i10 + 2] * a10 * w10 + B[i11 + 2] * a11 * w11) / 255;
+        if (k > 0.002) {
+          const ni = (fx < 0.5 ? (fy < 0.5 ? i00 : i10) : (fy < 0.5 ? i01 : i11)), t = ANG[Wp[ni + 2]] || 0, cs = Math.cos(t), sn = Math.sin(t);
+          const u0 = bx + (Wp[i00] * w00 + Wp[i01] * w01 + Wp[i10] * w10 + Wp[i11] * w11) - 128;
+          const v0 = by + (Wp[i00 + 1] * w00 + Wp[i01 + 1] * w01 + Wp[i10 + 1] * w10 + Wp[i11 + 1] * w11) - 128;
+          let u = (((u0 - cx) * cs - (v0 - cy) * sn + cx) * Z) % N, v = (((u0 - cx) * sn + (v0 - cy) * cs + cy) * Z) % N;
+          if (u < 0) u += N; if (v < 0) v += N;
+          const tx0 = u | 0, ty0 = v | 0, tfx = u - tx0, tfy = v - ty0, tx1 = (tx0 + 1) % N, ty1 = (ty0 + 1) % N;
+          const a = (ty0 * N + tx0) * 3, b = (ty0 * N + tx1) * 3, c = (ty1 * N + tx0) * 3, d = (ty1 * N + tx1) * 3;
+          const sh = (S[i00] * w00 + S[i01] * w01 + S[i10] * w10 + S[i11] * w11) / 128;
+          const f = ch => {
+            const top = T[a + ch] + (T[b + ch] - T[a + ch]) * tfx, bot = T[c + ch] + (T[d + ch] - T[c + ch]) * tfx;
+            let lin = (top + (bot - top) * tfy) * sh; if (lin > 1) lin = 1;
+            return GAM[(lin * OUTN) | 0] * k;
+          };
+          r += f(0); g += f(1); bl += f(2);
+        }
+        O[p] = r; O[p + 1] = g; O[p + 2] = bl; O[p + 3] = 255;
+      }
+    }
+    ctx.putImageData(out, 0, 0);
+    ctx.drawImage(st.ov, zx, zy, W / Z, H / Z, 0, 0, W, H);
+  }
+
   let ticket = 0;
   async function render() {
     const my = ++ticket, m = mapName();
@@ -108,9 +156,16 @@
       if (!state.custom) {
         const f = state.fabric;
         state.tile = await loadTile(f);
+        if (state.zoom) state.ztile = await loadTile(f, ZOOM);
       }
       if (my !== ticket) return;                    // a newer choice arrived while loading
-      requestAnimationFrame(() => { draw(st); if (my === ticket) busy.hidden = true; });
+      if (state.zoom) busy.textContent = 'Zooming in…';
+      requestAnimationFrame(() => setTimeout(() => {
+        if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy); else draw(st);
+        $('#stage').classList.toggle('zoom', !!state.zoom);
+        $('#zoomHint').textContent = state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
+        if (my === ticket) busy.hidden = true;
+      }, 0));
     } catch (e) {
       busy.textContent = 'Could not load the preview. Please refresh the page.';
     }
@@ -160,8 +215,9 @@
     if (state.custom) { el.innerHTML = '<div><b>Your uploaded swatch</b><small>Only on this screen, not saved.</small></div>'; return; }
     const f = state.fabric; if (!f) return;
     const s = STAFF && STAFF[f.id];
-    el.innerHTML = `<img src="thumbs/${f.id}.jpg?v=${VER}" alt=""><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? '<span class="tag">Italian cloth</span>' : ''}</b>
+    el.innerHTML = `<button type="button" class="sw-open" title="See the swatch photo"><img src="thumbs/${f.id}.jpg?v=${VER}" alt="Swatch"></button><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? '<span class="tag">Italian cloth</span>' : ''}</b>
       <small>${f.composition ? esc(f.composition) : 'Composition to follow'}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : 'Suit cloth'} · ${SEASONS[f.season] || ''}</small>
+      <button type="button" class="sw-link">See the real swatch photo</button>
       ${s ? `<small class="staffline">Factory code ${esc(s.code)} · ${s.band ? `Band ${esc(s.band)}` : (s.usd ? `Cost $${esc(s.usd)}/m (band not set yet)` : 'Band not set yet')}${s.origin ? ` · ${esc(s.origin)}` : ''} · ${esc(s.book || '')}</small>` : ''}</div>`;
   }
   function paintSummary() {
@@ -220,11 +276,22 @@
     $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
     $$('.tab').forEach(p => { p.hidden = p.dataset.pane !== b.dataset.tab; });
   });
+  function openSwatch() {
+    const f = state.fabric; if (!f || state.custom) return;
+    $('#swImg').src = `swatch/${f.id}.jpg?v=${VER}`;
+    $('#swCap').textContent = `No. ${num(f)} · ${f.name}. Actual swatch photo, about 5 × 5 cm of cloth.`;
+    $('#swModal').hidden = false;
+  }
+  $('#chosen').onclick = e => { if (e.target.closest('.sw-open, .sw-link')) openSwatch(); };
+  $('#swClose').onclick = () => { $('#swModal').hidden = true; };
+  $('#swModal').onclick = e => { if (e.target.id === 'swModal') $('#swModal').hidden = true; };
   $('#stage').onclick = e => {
     if (e.target !== cv) return;
-    const r = cv.getBoundingClientRect();
-    cv.style.transformOrigin = `${((e.clientX - r.left) / r.width) * 100}% ${((e.clientY - r.top) / r.height) * 100}%`;
-    $('#stage').classList.toggle('zoom');
+    if (state.zoom) { state.zoom = null; render(); return; }
+    const r = cv.getBoundingClientRect(), Z = ZOOM;
+    const bx = (e.clientX - r.left) / r.width * W, by = (e.clientY - r.top) / r.height * H;
+    state.zoom = { zx: Math.max(0, Math.min(W - W / Z, bx - W / Z / 2)), zy: Math.max(0, Math.min(H - H / Z, by - H / Z / 2)) };
+    render();
   };
 
   // ---------- staff view (codes are encrypted in the published files) ----------
@@ -267,7 +334,8 @@
       const x = c.getContext('2d', { willReadFrequently: true }), h = TILE / 2, sx = (img.width - s) / 2, sy = (img.height - s) / 2;
       const quad = (fx, fy, dx, dy) => { x.save(); x.translate(dx + (fx < 0 ? h : 0), dy + (fy < 0 ? h : 0)); x.scale(fx, fy); x.drawImage(img, sx, sy, s, s, 0, 0, h, h); x.restore(); };
       quad(1, 1, 0, 0); quad(-1, 1, h, 0); quad(1, -1, 0, h); quad(-1, -1, h, h);
-      state.tile = linearTile(x.getImageData(0, 0, TILE, TILE).data, 150); state.custom = true;
+      const up = x.getImageData(0, 0, TILE, TILE).data;
+      state.tile = linearTile(up, 150); state.ctile = linearTile(up, 150 * ZOOM); state.custom = true;
       $$('#grid .fab').forEach(b => b.classList.remove('on')); URL.revokeObjectURL(img.src); render();
     };
     img.src = URL.createObjectURL(file);

@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '6';
+    var V = '7';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=6">
+<link rel="stylesheet" href="css/designer.css?v=7">
 </head>
 <body>
 <header class="topbar">
@@ -42,7 +42,7 @@
       <button type="button" data-view="side">Side</button>
       <button type="button" data-view="back">Back</button>
     </div>
-    <div class="zoom-hint">Tap the jacket to zoom into the cloth</div>
+    <div class="zoom-hint" id="zoomHint">Tap the jacket to zoom into the cloth</div>
   </section>
 
   <aside class="panel">
@@ -98,6 +98,14 @@
   </aside>
 </div>
 
+<div class="modal" id="swModal" hidden>
+  <div class="modal-card sw-card">
+    <img id="swImg" alt="Swatch photo">
+    <p class="hint" id="swCap"></p>
+    <div class="modal-actions"><button type="button" class="primary" id="swClose">Close</button></div>
+  </div>
+</div>
+
 <div class="modal" id="modal" hidden>
   <form class="modal-card" id="staffForm">
     <h3>Staff view</h3>
@@ -108,6 +116,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=6"></script>
+<script src="js/designer.js?v=7"></script>
 </body>
 </html>
