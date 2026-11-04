@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '12';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '13';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -14,9 +14,9 @@
   const cv = $('#cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), busy = $('#busy');
   const state = { view: 'front', fabric: null, tile: null, custom: false, zoom: null,
     opts: {}, button: null, sleeveSame: true, sleeveButton: null, thread: { button: null, lapel: null, front: null, sleeve: [] },
-    lining: null, gorge: 'standard', lapelExact: null, holeSel: 0 };
+    lining: null, gorge: 'standard', lapelExact: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null };
   const views = {}, tiles = {};
-  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], LININGS = [], THREADS = [];
+  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], LININGS = [], THREADS = [], CONTRAST = [];
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
                   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
@@ -358,6 +358,11 @@
     rows.push(['Sleeve buttonholes', sl.some(Boolean) ? Array.from({ length: n }, (_, i) => `${i + 1}: ${sl[i] ? threadName(sl[i]) + (trimCode('threads', sl[i]) ? ` (${trimCode('threads', sl[i])})` : '') : 'match'}`).join(', ') : 'Matching the cloth', '']);
     const lo = LININGS.find(l => l.id === ln);
     rows.push(['Lining', lo ? `${lo.name || liningName(ln)}${lo.book ? '' : ' (reach out for availability)'}` : 'Matching (to be chosen)', trimCode('linings', ln) || '']);
+    const G = STAFF && STAFF._trims ? STAFF._trims.groups : null;
+    rows.push(['Undercollar', state.undercollar ? contrastName(state.undercollar) : 'Matching the cloth',
+      G ? `${G.undercollar} ${state.undercollar ? trimCode('contrast', state.undercollar) : G.undercollarMatch}` : '']);
+    rows.push(['Elbow patches', state.elbow ? `${state.elbow === 'A' ? 'Round elbow patch' : 'Round sleeve patch'}, ${contrastName(state.elbowFabric)}` : 'None',
+      G && state.elbow ? `${G.elbow} ${state.elbow} · ${G.elbowFabric} ${trimCode('contrast', state.elbowFabric)}` : '']);
     $('#summary').innerHTML = rows.map(([k, v, code, head]) => head ? `<dt class="sum-h">${k}</dt><dd></dd>` :
       `<dt>${k}</dt><dd>${esc(v || '')}${STAFF && code ? ` <span class="code">${esc(code)}</span>` : ''}</dd>`).join('');
   }
@@ -501,6 +506,26 @@
   }
   $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); };
 
+  // ---------- contrast fabrics (undercollar melton, elbow patch suede) ----------
+  const contrastName = id => { const c = CONTRAST.find(x => x.id === id); if (!c) return '';
+    return `${c.kind === 'melton' ? 'Melton' : 'Suede'} ${CONTRAST.filter(x => x.kind === c.kind).indexOf(c) + 1}`; };
+  function cTiles(kind, cur, none) {
+    return (none ? `<button type="button" class="fab${!cur ? ' on' : ''}" data-c=""><span class="ph">Same cloth</span><b>${none}</b></button>` : '') +
+      CONTRAST.filter(c => c.kind === kind).map(c => { const code = trimCode('contrast', c.id);
+        return `<button type="button" class="fab${c.id === cur ? ' on' : ''}" data-c="${c.id}"><img src="contrast/${c.id}.jpg?v=${VER}" alt="" loading="lazy" width="150" height="105"><b>${contrastName(c.id)}</b>${code ? `<small class="code">${esc(code)}</small>` : ''}</button>`; }).join('');
+  }
+  function paintContrast() {
+    $('#ucGrid').innerHTML = cTiles('melton', state.undercollar, 'Matching the cloth');
+    $$('#elbowSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === state.elbow));
+    $('#elbowGrid').hidden = !state.elbow;
+    if (state.elbow) $('#elbowGrid').innerHTML = cTiles('suede', state.elbowFabric);
+  }
+  $('#ucGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.undercollar = b.dataset.c || null; paintContrast(); paintSummary(); };
+  $('#elbowSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.elbow = b.dataset.v;
+    if (state.elbow && !state.elbowFabric) state.elbowFabric = (CONTRAST.find(c => c.kind === 'suede') || {}).id || null;
+    paintContrast(); paintSummary(); };
+  $('#elbowGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.elbowFabric = b.dataset.c; paintContrast(); paintSummary(); };
+
   // ---------- views / tabs ----------
   $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   $$('.tabs button').forEach(b => b.onclick = () => {
@@ -540,7 +565,7 @@
     $('#staffBadge').hidden = false; $('#staffBtn').textContent = 'Exit staff';
     $$('.staff-only').forEach(x => { x.hidden = false; });
     $('#q').placeholder = 'Search by number, colour, cloth or factory code';
-    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle();
+    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast();
   }
   function staffOff() {
     STAFF = null; store.set('mb_staff', '');
@@ -548,7 +573,7 @@
     $$('.staff-only').forEach(x => { x.hidden = true; });
     $('#q').placeholder = 'Search by number, colour or cloth (e.g. 1042, navy, cashmere)';
     if (state.custom) { state.custom = false; render(); }
-    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle();
+    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast();
   }
   $('#staffBtn').onclick = () => { if (STAFF) return staffOff(); $('#pwErr').hidden = true; $('#modal').hidden = false; $('#pw').value = ''; $('#pw').focus(); };
   $('#pwCancel').onclick = () => { $('#modal').hidden = true; };
@@ -576,11 +601,11 @@
   (async function init() {
     try {
       const get = async n => (await fetch(`${n}?v=${VER}`)).json();
-      [FABRICS, OPTS, BUTTONS, LININGS, THREADS] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'linings.json', 'threads.json'].map(get));
+      [FABRICS, OPTS, BUTTONS, LININGS, THREADS, CONTRAST] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'linings.json', 'threads.json', 'contrast.json'].map(get));
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
-    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); render();
+    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); render();
     const pw = store.get('mb_staff');
     if (pw) { try { staffOn(await unlock(pw), pw); } catch (e) { store.set('mb_staff', ''); } }
   })();

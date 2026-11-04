@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '12';
+    var V = '13';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=12">
+<link rel="stylesheet" href="css/designer.css?v=13">
 </head>
 <body>
 <header class="topbar">
@@ -99,6 +99,13 @@
 
       <h3>Lining</h3>
       <div class="grid lin-grid" id="linGrid"></div>
+
+      <h3>Contrast fabric</h3>
+      <p class="hint">Shown on the order sheet. The picture keeps the jacket cloth for these parts.</p>
+      <div class="thread-row"><b>Undercollar</b><div class="grid lin-grid" id="ucGrid"></div></div>
+      <div class="thread-row"><b>Elbow patches</b>
+        <div class="seg" id="elbowSeg"><button type="button" data-v="" class="on">None</button><button type="button" data-v="A">Round elbow patch</button><button type="button" data-v="D">Round sleeve patch</button></div>
+        <div class="grid lin-grid" id="elbowGrid" hidden></div></div>
     </section>
 
     <section class="tab" data-pane="summary" hidden>
@@ -127,6 +134,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=12"></script>
+<script src="js/designer.js?v=13"></script>
 </body>
 </html>
