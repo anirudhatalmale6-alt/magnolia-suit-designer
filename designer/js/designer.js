@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '10';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '11';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -69,11 +69,15 @@
   const PHOTOS = {
     front: [['notch', '2', 'flap', '', 'front_notch_sb'], ['notch', '2', 'slant', '', 'front_notch_sb_slant'], ['notch', '2', 'patch', '', 'front_notch_sb_patch'],
       ['notch', '2', 'jet', '', 'front_notch_sb_jet'], ['notch', '2', 'flap', 'jet', 'front_notch_sb_tjet'], ['notch', '2', 'flap', 'flap', 'front_notch_sb_tflap'],
-      ['notch', '3', 'flap', '', 'front_notch_sb3'], ['notch', '3', 'patch', '', 'front_notch_sb3_patch'], ['shawl', '1', 'flap', '', 'front_shawl_sb1'],
-      ['peak', '2', 'flap', '', 'front_peak_sb'], ['peak', '3', 'flap', '', 'front_peak_sb3'], ['peak', 'db', 'flap', '', 'front_peak_db']],
+      ['notch', '3', 'flap', '', 'front_notch_sb3'], ['notch', '3', 'patch', '', 'front_notch_sb3_patch'], ['notch', '3', 'jet', 'jet', 'front_notch_sb3_jet_tjet'],
+      ['notch', '5', 'flap', '', 'front_notch_sb3r2'], ['notch', '1', 'flap', '', 'front_notch_sb1'],
+      ['shawl', '1', 'flap', '', 'front_shawl_sb1'], ['shawl', '3', 'jet', 'jet', 'front_shawl_sb3_jet_tjet'],
+      ['peak', '2', 'flap', '', 'front_peak_sb'], ['peak', '3', 'flap', '', 'front_peak_sb3'], ['peak', '3', 'jet', 'jet', 'front_peak_sb3_jet_tjet'],
+      ['peak', 'db', 'flap', '', 'front_peak_db'], ['peak', 'db4', 'flap', '', 'front_peak_db4']],
     three4: [['notch', '2', 'flap', '', 'three4'], ['notch', '2', 'slant', '', 'three4_slant'], ['notch', '2', 'patch', '', 'three4_patch'],
       ['notch', '2', 'jet', '', 'three4_jet'], ['notch', '2', 'jet', 'jet', 'three4_jet_tjet'], ['notch', '2', 'flap', 'flap', 'three4_tflap'],
-      ['peak', '2', 'flap', '', 'three4_peak_sb'], ['peak', 'db', 'flap', '', 'three4_peak_db']],
+      ['notch', '3', 'flap', '', 'three4_notch_sb3'], ['shawl', '1', 'flap', '', 'three4_shawl_sb1'],
+      ['peak', '2', 'flap', '', 'three4_peak_sb'], ['peak', '3', 'flap', '', 'three4_peak_sb3'], ['peak', 'db', 'flap', '', 'three4_peak_db']],
     side: [['notch', '2', 'flap', '', 'side'], ['peak', '2', 'flap', '', 'side_peak_sb'], ['peak', 'db', 'flap', '', 'side_peak_db']]
   };
   function mapName() {
@@ -82,12 +86,12 @@
       const v = state.opts.vent || 'C';
       return { name: v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : 'back', note: '' };
     }
-    const want = { lapel: s.lapel, front: s.db ? 'db' : s.front,
+    const want = { lapel: s.lapel, front: s.db ? (['8', '9', '11'].includes(s.front) ? 'db4' : 'db') : s.front,
       pocket: pocketLook(state.opts.lowerPocket || 'B'), ticket: ticketLook(state.opts.ticket || 'D') };
     // the lapel and closure matter most, then the pocket shape, then the ticket pocket
     let best = null, bestScore = -1;
     for (const [l, f, p, t, name] of PHOTOS[state.view]) {
-      const sc = (l === want.lapel) * 100 + (f === want.front) * 60 + ((f === 'db') === (want.front === 'db')) * 50 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
+      const sc = (l === want.lapel) * 100 + (f === want.front) * 60 + (f.startsWith('db') === want.front.startsWith('db')) * 50 + (f.startsWith('db') && want.front.startsWith('db')) * 20 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
       if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name }; }
     }
     const miss = [];
@@ -300,7 +304,7 @@
     if (filt.season && f.season !== filt.season) return false;
     if (filt.italy && !f.italian) return false;
     if (filt.q) {
-      const s = STAFF && STAFF[f.id] ? ` ${STAFF[f.id].code} ${STAFF[f.id].band}` : '';
+      const s = STAFF && STAFF[f.id] ? ` ${STAFF[f.id].code} ${STAFF[f.id].band} ${STAFF[f.id].factory || ''}` : '';
       const hay = `${f.id} ${num(f)} ${f.name} ${f.colour} ${PATTERNS[f.pattern]} ${f.composition} ${f.use} ${SEASONS[f.season] || ''} ${f.italian ? 'italian italy' : ''}${s}`.toLowerCase();
       if (!filt.q.split(/\s+/).every(w => hay.includes(w))) return false;
     }
