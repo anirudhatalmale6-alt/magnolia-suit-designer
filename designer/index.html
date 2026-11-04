@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '8';
+    var V = '9';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=8">
+<link rel="stylesheet" href="css/designer.css?v=9">
 </head>
 <body>
 <header class="topbar">
@@ -127,6 +127,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=8"></script>
+<script src="js/designer.js?v=9"></script>
 </body>
 </html>

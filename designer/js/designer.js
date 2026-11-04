@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '8';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '9';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -60,21 +60,43 @@
     const front = state.opts.front || '2';
     return { lapel, db: DB_FRONTS.includes(front), front };
   }
+  // factory pocket / vent codes grouped by the look we have a photo for
+  const POCKET = { slant: 'G H I 9 10 23 25Y O Q R 13 14 24', jet: 'D E F K L N P T U V Y J S',
+    patch: '15 18 19 20 233 234 235 236 237 238 5 6 7 BE DJ HMD M S1' };
+  const pocketLook = c => Object.keys(POCKET).find(k => POCKET[k].split(' ').includes(c)) || 'flap';
+  const ticketLook = c => c === 'D' ? '' : 'F G H I J'.split(' ').includes(c) ? 'flap' : 'jet';
+  // photos by angle: [lapel, front, lower pocket look, ticket look] -> map folder
+  const PHOTOS = {
+    front: [['notch', '2', 'flap', '', 'front_notch_sb'], ['notch', '2', 'slant', '', 'front_notch_sb_slant'], ['notch', '2', 'patch', '', 'front_notch_sb_patch'],
+      ['notch', '2', 'jet', '', 'front_notch_sb_jet'], ['notch', '2', 'flap', 'jet', 'front_notch_sb_tjet'], ['notch', '2', 'flap', 'flap', 'front_notch_sb_tflap'],
+      ['notch', '3', 'flap', '', 'front_notch_sb3'], ['notch', '3', 'patch', '', 'front_notch_sb3_patch'], ['shawl', '1', 'flap', '', 'front_shawl_sb1'],
+      ['peak', '2', 'flap', '', 'front_peak_sb'], ['peak', '3', 'flap', '', 'front_peak_sb3'], ['peak', 'db', 'flap', '', 'front_peak_db']],
+    three4: [['notch', '2', 'flap', '', 'three4'], ['notch', '2', 'slant', '', 'three4_slant'], ['notch', '2', 'patch', '', 'three4_patch'],
+      ['notch', '2', 'jet', '', 'three4_jet'], ['notch', '2', 'jet', 'jet', 'three4_jet_tjet'], ['notch', '2', 'flap', 'flap', 'three4_tflap'],
+      ['peak', '2', 'flap', '', 'three4_peak_sb'], ['peak', 'db', 'flap', '', 'three4_peak_db']],
+    side: [['notch', '2', 'flap', '', 'side'], ['peak', '2', 'flap', '', 'side_peak_sb'], ['peak', 'db', 'flap', '', 'side_peak_db']]
+  };
   function mapName() {
-    const s = styleOf(), notes = [];
-    if (s.lapel === 'shawl') notes.push('shawl lapel');
-    if (!['2', '12'].includes(s.front)) notes.push((choiceOf('front') || {}).label || 'this front');
-    const note = notes.length ? `The photo for the ${notes.join(' and ').toLowerCase()} is coming. Shown with the closest style for now.` : '';
-    if (state.view === 'back') return { name: 'back', note: '' };
-    const peak = s.lapel === 'peak' || s.db;
-    if (state.view === 'three4' || state.view === 'side') {
-      if (s.db) return { name: `${state.view}_peak_db`, note };
-      return { name: peak ? `${state.view}_peak_sb` : state.view, note };
+    const s = styleOf();
+    if (state.view === 'back') {
+      const v = state.opts.vent || 'C';
+      return { name: v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : 'back', note: '' };
     }
-    if (s.db) return { name: 'front_peak_db', note };
-    return { name: peak ? 'front_peak_sb' : 'front_notch_sb', note };
+    const want = { lapel: s.lapel, front: s.db ? 'db' : s.front,
+      pocket: pocketLook(state.opts.lowerPocket || 'B'), ticket: ticketLook(state.opts.ticket || 'D') };
+    // the lapel and closure matter most, then the pocket shape, then the ticket pocket
+    let best = null, bestScore = -1;
+    for (const [l, f, p, t, name] of PHOTOS[state.view]) {
+      const sc = (l === want.lapel) * 100 + (f === want.front) * 60 + ((f === 'db') === (want.front === 'db')) * 50 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
+      if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name }; }
+    }
+    const miss = [];
+    if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
+    if (best.f !== want.front) miss.push('this button front');
+    if (best.p !== want.pocket || best.t !== want.ticket) miss.push('these pockets');
+    const note = miss.length ? `A photo with ${miss.join(' and ')} is not in yet, so the closest one is shown. Your choice still goes on the order.` : '';
+    return { name: best.name, note };
   }
-
   async function loadView(name) {
     if (views[name]) return views[name];
     const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
@@ -372,9 +394,9 @@
     return l;
   }
   const sleeveHoles = () => +((choiceOf('cuffButtons') || {}).code || 4) || 4;
-  const STYLE_HINT = { lowerPocket: 'Pictures of other pocket styles are coming; your choice goes on the order sheet now.',
-    chestPocket: 'Pictures of other pocket styles are coming; your choice goes on the order sheet now.',
-    vent: 'The back view shows side vents for now; your choice goes on the order sheet.' };
+  const STYLE_HINT = { lowerPocket: 'Flap, slanted, patch and jetted pockets show in the picture. Every style goes on the order sheet.',
+    chestPocket: 'The picture shows the standard chest pocket. Your choice goes on the order sheet.',
+    vent: 'See it in the Back view.' };
   function paintStyle() {
     let sec = '', html = '';
     for (const o of OPTS) {
@@ -396,7 +418,7 @@
     state.opts[id] = v;
     if (id === 'front' && DB_FRONTS.includes(v) && (state.opts.lapel || 'BK') === 'BK') { state.opts.lapel = '20'; paintStyle(); }   // double-breasted comes with a peak lapel
     if (id === 'cuffButtons') paintThreads();
-    if (id === 'front' || id === 'lapel') render(); else paintSummary();
+    if (['front', 'lapel', 'lowerPocket', 'ticket', 'vent'].includes(id)) render(); else paintSummary();
   }
   $('#styleSteps').onclick = e => {
     const b = e.target.closest('.seg [data-v]'); if (!b) return;
