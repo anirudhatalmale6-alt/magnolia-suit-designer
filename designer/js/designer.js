@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '7';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '8';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -12,9 +12,11 @@
 
   const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s);
   const cv = $('#cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), busy = $('#busy');
-  const state = { view: 'front', lapel: 'notch', closure: 'sb', fabric: null, tile: null, custom: false, zoom: null };
+  const state = { view: 'front', fabric: null, tile: null, custom: false, zoom: null,
+    opts: {}, button: null, sleeveSame: true, sleeveButton: null, thread: { button: null, lapel: null, front: null, sleeve: [] },
+    lining: null, gorge: 'standard', lapelExact: null, holeSel: 0 };
   const views = {}, tiles = {};
-  let FABRICS = [], STAFF = null;
+  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], LININGS = [], THREADS = [];
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
                   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
@@ -50,20 +52,37 @@
   }
 
   // ---------- which photo to show ----------
+  // what the customer picked, reduced to the photos we have
+  const DB_FRONTS = ['8', '9', '10', '11', '12', '13'];
+  function styleOf() {
+    const lap = OPTS.length ? (choiceOf('lapel') || {}).label || '' : 'Notch';
+    const lapel = /shawl/i.test(lap) ? 'shawl' : /peak/i.test(lap) ? 'peak' : 'notch';
+    const front = state.opts.front || '2';
+    return { lapel, db: DB_FRONTS.includes(front), front };
+  }
   function mapName() {
-    if (state.view === 'back') return { name: 'back', note: false };
+    const s = styleOf(), notes = [];
+    if (s.lapel === 'shawl') notes.push('shawl lapel');
+    if (!['2', '12'].includes(s.front)) notes.push((choiceOf('front') || {}).label || 'this front');
+    const note = notes.length ? `The photo for the ${notes.join(' and ').toLowerCase()} is coming. Shown with the closest style for now.` : '';
+    if (state.view === 'back') return { name: 'back', note: '' };
+    const peak = s.lapel === 'peak' || s.db;
     if (state.view === 'three4' || state.view === 'side') {
-      if (state.closure === 'db') return { name: `${state.view}_peak_db`, note: false };
-      return { name: state.lapel === 'peak' ? `${state.view}_peak_sb` : state.view, note: false };
+      if (s.db) return { name: `${state.view}_peak_db`, note };
+      return { name: peak ? `${state.view}_peak_sb` : state.view, note };
     }
-    if (state.closure === 'db') return { name: 'front_peak_db', note: false };
-    return { name: state.lapel === 'peak' ? 'front_peak_sb' : 'front_notch_sb', note: false };
+    if (s.db) return { name: 'front_peak_db', note };
+    return { name: peak ? 'front_peak_sb' : 'front_notch_sb', note };
   }
 
   async function loadView(name) {
     if (views[name]) return views[name];
     const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
-    const B = pixels(base), S = pixels(shade), Wp = pixels(warp);
+    const B = pixels(base), S = pixels(shade), Wp = pixels(warp), OVP = pixels(ov);
+    let meta = { frontal: [] };
+    try { meta = await (await fetch(`maps/${name}/buttons.json?v=${VER}`)).json(); } catch (e) { /* no frontal buttons */ }
+    let lsum = 0, lcnt = 0;
+    for (let p = 0; p < OVP.length; p += 4) if (OVP[p + 3] > 128) { lsum += 0.299 * OVP[p] + 0.587 * OVP[p + 1] + 0.114 * OVP[p + 2]; lcnt++; }
     const n = W * H, U = new Float32Array(n), V = new Float32Array(n), A = new Float32Array(n), SH = new Float32Array(n);
     const cx = W / 2, cy = H * 0.35;
     for (let i = 0, p = 0; i < n; i++, p += 4) {
@@ -74,7 +93,7 @@
       U[i] = (u - cx) * c - (v - cy) * s + cx; V[i] = (u - cx) * s + (v - cy) * c + cy;
       A[i] = 1 - a / 255; SH[i] = S[p] / 128;
     }
-    return (views[name] = { B, S, Wp, U, V, A, SH, ov });
+    return (views[name] = { B, S, Wp, U, V, A, SH, ov, OVP, meta, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
   }
   const tilePx = {};
   async function loadTile(f, z = 1) {
@@ -101,7 +120,7 @@
       }
       O[p + 3] = 255;
     }
-    ctx.putImageData(out, 0, 0); ctx.drawImage(st.ov, 0, 0);
+    ctx.putImageData(out, 0, 0); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1);
   }
 
   // Zoomed view: redraw only the tapped area at ZOOM x the resolution, sampling the maps between pixels and a
@@ -143,14 +162,77 @@
       }
     }
     ctx.putImageData(out, 0, 0);
-    ctx.drawImage(st.ov, zx, zy, W / Z, H / Z, 0, 0, W, H);
+    ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z);
+  }
+
+  // ---------- buttons on the jacket ----------
+  // The photo's own buttons stay in the overlay (light, shadow, thread holes); their colour is moved to the
+  // chosen button's colour. Buttons seen straight from the front are replaced by the real catalogue photo.
+  const btnImgs = {};
+  const btnByCode = id => BUTTONS.find(b => b.id === id);
+  const trimCode = (kind, id) => STAFF && STAFF._trims && id ? STAFF._trims[kind][id] : null;
+  const sleeveBtn = () => state.sleeveSame ? state.button : (state.sleeveButton || state.button);
+  function threadRGB(key) { const t = state.thread[key]; return t ? (THREADS.find(x => x.id === t) || {}).rgb : null; }
+  const threadName = id => `Colour ${parseInt(id.slice(1), 10)}`;
+  function overlayFor(st) {
+    const fb = state.button && btnByCode(state.button), sb = btnByCode(sleeveBtn());
+    if (!fb && !sb) return st.ov;
+    const key = (fb ? fb.id : '-') + '|' + (sb ? sb.id : '-');
+    if (st.ovCache[key]) return st.ovCache[key];
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d'), img = x.createImageData(W, H), O = img.data, P = st.OVP, Lo = st.Lo;
+    const body = new Uint8Array(W * H);             // 1 = pixel belongs to a button on the jacket body
+    for (const [bx, by, r] of st.meta.body || []) {
+      const R = r + 5;
+      for (let y = Math.max(0, by - R); y <= Math.min(H - 1, by + R); y++)
+        for (let x2 = Math.max(0, bx - R); x2 <= Math.min(W - 1, bx + R); x2++)
+          if ((x2 - bx) ** 2 + (y - by) ** 2 <= R * R) body[y * W + x2] = 1;
+    }
+    for (let p = 0, i = 0; p < P.length; p += 4, i++) {
+      const a = P[p + 3]; if (!a) continue;
+      const b = body[i] ? fb : sb;
+      if (!b) { O[p] = P[p]; O[p + 1] = P[p + 1]; O[p + 2] = P[p + 2]; O[p + 3] = a; continue; }
+      const L = (0.299 * P[p] + 0.587 * P[p + 1] + 0.114 * P[p + 2]) / Lo;
+      O[p] = Math.min(255, b.rgb[0] * L); O[p + 1] = Math.min(255, b.rgb[1] * L); O[p + 2] = Math.min(255, b.rgb[2] * L); O[p + 3] = a;
+    }
+    x.putImageData(img, 0, 0);
+    return (st.ovCache[key] = c);
+  }
+  async function loadBtn(code) {
+    const key = code + '|' + (state.thread.button || '');
+    if (btnImgs[key]) return btnImgs[key];
+    const im = await loadImg(`buttons/${code}.png?v=${VER}`);
+    const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0);
+    const t = threadRGB('button') || (btnByCode(code) || {}).rgb.map(v => v * 0.8);
+    const d = x.getImageData(0, 0, c.width, c.height), D = d.data;
+    for (let p = 0; p < D.length; p += 4) {        // the catalogue sews every button with white thread
+      const mx = Math.max(D[p], D[p + 1], D[p + 2]), mn = Math.min(D[p], D[p + 1], D[p + 2]);
+      if (D[p + 3] > 0 && mn > 170 && mx - mn < 40) { const k = mn / 255; D[p] = t[0] * k; D[p + 1] = t[1] * k; D[p + 2] = t[2] * k; }
+    }
+    x.putImageData(d, 0, 0);
+    return (btnImgs[key] = c);
+  }
+  function drawDiscs(st, zx, zy, Z) {
+    const img = state.button && btnImgs[state.button + '|' + (state.thread.button || '')];
+    if (!img || !st.meta.frontal.length) return;
+    for (const [bx, by, r] of st.meta.frontal) {
+      const cx = (bx - zx) * Z, cy = (by - zy) * Z, R = r * Z * 0.97;
+      if (cx < -R || cy < -R || cx > W + R || cy > H + R) continue;
+      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+      ctx.drawImage(img, cx - R, cy - R, 2 * R, 2 * R);
+      const g = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.3, R * 0.2, cx, cy, R);   // soft light like the photo
+      g.addColorStop(0, 'rgba(255,255,255,0.06)'); g.addColorStop(0.75, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.35)');
+      ctx.fillStyle = g; ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+      ctx.restore();
+    }
   }
 
   let ticket = 0;
   async function render() {
     const my = ++ticket, m = mapName();
     busy.hidden = false; busy.textContent = 'Updating…';
-    $('#angleNote').hidden = !m.note;
+    $('#angleNote').hidden = !m.note; $('#angleNote').textContent = m.note || '';
     try {
       const st = await loadView(m.name);
       if (!state.custom) {
@@ -158,6 +240,7 @@
         state.tile = await loadTile(f);
         if (state.zoom) state.ztile = await loadTile(f, ZOOM);
       }
+      if (state.button) await loadBtn(state.button);
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
@@ -223,13 +306,33 @@
   function paintSummary() {
     const f = state.fabric, s = f && STAFF && STAFF[f.id];
     const rows = [
-      ['Fabric', state.custom ? 'Uploaded swatch' : `No. ${num(f)}, ${f.name}`],
-      ['Cloth', state.custom ? '' : `${f.composition || 'Composition to follow'}${f.weight ? `, ${f.weight} g` : ''}`],
-      ['Lapel', state.closure === 'db' ? 'Peak' : state.lapel === 'peak' ? 'Peak' : 'Notch'],
-      ['Front', state.closure === 'db' ? 'Double-breasted, 6 buttons' : 'Single-breasted, 2 buttons']
+      ['Fabric', state.custom ? 'Uploaded swatch' : `No. ${num(f)}, ${f.name}`, s && !state.custom ? `${s.code} · band ${s.band || 'not set yet'}` : ''],
+      ['Cloth', state.custom ? '' : `${f.composition || 'Composition to follow'}${f.weight ? `, ${f.weight} g` : ''}`, '']
     ];
-    if (s && !state.custom) rows.push(['Factory code', `${s.code} (band ${s.band || 'not set yet'})`]);
-    $('#summary').innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
+    let sec = '';
+    for (const o of OPTS) {
+      const c = choiceOf(o.id) || {};
+      const g = STAFF && STAFF._opts ? STAFF._opts[o.id].group : '';
+      let code = g && `${g} ${c.code}`, val = c.label;
+      if (o.id === 'lapel') { const lc = lapelCode(); code = g && `${g} ${lc}`; if (state.gorge !== 'standard') val += `, ${state.gorge} gorge`; }
+      if (o.section !== sec) { sec = o.section; rows.push([`<b>${sec}</b>`, '', '', true]); }
+      rows.push([o.label, val, code]);
+    }
+    const bt = btnByCode(state.button), sbt = btnByCode(sleeveBtn()), ln = state.lining;
+    const bc = trimCode('buttons', bt && bt.id), sc = trimCode('buttons', sbt && sbt.id);
+    rows.push(['<b>Trims</b>', '', '', true]);
+    rows.push(['Front buttons', bt ? `${MAT[bt.mat] || 'Button'}, No. ${parseInt(bt.id.slice(1), 10)}` : 'As pictured (to be chosen)', bc ? bc.code : '']);
+    rows.push(['Sleeve buttons', state.sleeveSame ? 'Same as the front' : (sbt ? `${MAT[sbt.mat] || 'Button'}, No. ${parseInt(sbt.id.slice(1), 10)}` : 'As pictured'),
+      sc ? (sc.sleeve || sc.code) : '']);
+    const tn = k => state.thread[k] ? threadName(state.thread[k]) : 'Matching the cloth', tc = k => trimCode('threads', state.thread[k]) || '';
+    rows.push(['Button thread', tn('button'), tc('button')]);
+    rows.push(['Lapel buttonhole', tn('lapel'), tc('lapel')]);
+    rows.push(['Front buttonholes', tn('front'), tc('front')]);
+    const n = sleeveHoles(), sl = state.thread.sleeve.slice(0, n);
+    rows.push(['Sleeve buttonholes', sl.some(Boolean) ? Array.from({ length: n }, (_, i) => `${i + 1}: ${sl[i] ? threadName(sl[i]) + (trimCode('threads', sl[i]) ? ` (${trimCode('threads', sl[i])})` : '') : 'match'}`).join(', ') : 'Matching the cloth', '']);
+    rows.push(['Lining', ln ? liningName(ln) : 'Matching (to be chosen)', trimCode('linings', ln) || '']);
+    $('#summary').innerHTML = rows.map(([k, v, code, head]) => head ? `<dt class="sum-h">${k}</dt><dd></dd>` :
+      `<dt>${k}</dt><dd>${esc(v || '')}${STAFF && code ? ` <span class="code">${esc(code)}</span>` : ''}</dd>`).join('');
   }
 
   function setupFilters() {
@@ -259,18 +362,109 @@
     };
   }
 
-  // ---------- style / views / tabs ----------
-  function seg(sel, key, after) {
-    $(sel).onclick = e => {
-      const b = e.target.closest('[data-v]'); if (!b) return; state[key] = b.dataset.v;
-      $$(`${sel} button`).forEach(x => x.classList.toggle('on', x === b)); after && after(); render();
-    };
+  // ---------- style (factory options) ----------
+  const optOf = id => OPTS.find(o => o.id === id);
+  function choiceOf(id) { const o = optOf(id); return o && o.choices.find(c => c.code === (state.opts[id] || o.default)); }
+  function lapelCode() {                           // exact factory lapel for the order sheet
+    if (state.lapelExact) return state.lapelExact;
+    const l = state.opts.lapel || 'BK';
+    if (state.gorge === 'low') return l === 'BK' ? 'BL' : l === '20' ? '17' : l;
+    return l;
   }
-  function syncLapel() {                           // double-breasted is offered with a peak lapel
-    const db = state.closure === 'db';
-    $$('#lapel button').forEach(b => { b.disabled = db && b.dataset.v === 'notch'; b.classList.toggle('on', db ? b.dataset.v === 'peak' : b.dataset.v === state.lapel); });
+  const sleeveHoles = () => +((choiceOf('cuffButtons') || {}).code || 4) || 4;
+  const STYLE_HINT = { lowerPocket: 'Pictures of other pocket styles are coming; your choice goes on the order sheet now.',
+    chestPocket: 'Pictures of other pocket styles are coming; your choice goes on the order sheet now.',
+    vent: 'The back view shows side vents for now; your choice goes on the order sheet.' };
+  function paintStyle() {
+    let sec = '', html = '';
+    for (const o of OPTS) {
+      if (o.section !== sec) { sec = o.section; html += `<p class="sec-title">${esc(sec)}</p>`; }
+      const cur = state.opts[o.id] || o.default;
+      const list = o.show.map(code => o.choices.find(c => c.code === code)).filter(Boolean);
+      html += `<div class="step" data-step="${o.id}"><h3>${esc(o.label)}</h3>`;
+      if (list.length <= 6) html += `<div class="seg">${list.map(c => `<button type="button" data-v="${esc(c.code)}" class="${c.code === cur ? 'on' : ''}">${esc(c.label)}</button>`).join('')}</div>`;
+      else html += `<select data-sel="${o.id}">${list.slice().sort((a, b) => a.label.localeCompare(b.label)).map(c => `<option value="${esc(c.code)}"${c.code === cur ? ' selected' : ''}>${esc(c.label)}</option>`).join('')}</select>`;
+      if (STYLE_HINT[o.id]) html += `<p class="hint">${STYLE_HINT[o.id]}</p>`;
+      html += '</div>';
+    }
+    $('#styleSteps').innerHTML = html;
+    const names = STAFF && STAFF._opts ? STAFF._opts.lapel.names : {};
+    $('#lapelExact').innerHTML = '<option value="">Follow the lapel above</option>' +
+      Object.keys(names).filter(c => c !== 'Z998').map(c => `<option value="${esc(c)}"${c === state.lapelExact ? ' selected' : ''}>${esc(c)} · ${esc(names[c])}</option>`).join('');
   }
-  seg('#lapel', 'lapel'); seg('#closure', 'closure', syncLapel);
+  function setOpt(id, v) {
+    state.opts[id] = v;
+    if (id === 'front' && DB_FRONTS.includes(v) && (state.opts.lapel || 'BK') === 'BK') { state.opts.lapel = '20'; paintStyle(); }   // double-breasted comes with a peak lapel
+    if (id === 'cuffButtons') paintThreads();
+    if (id === 'front' || id === 'lapel') render(); else paintSummary();
+  }
+  $('#styleSteps').onclick = e => {
+    const b = e.target.closest('.seg [data-v]'); if (!b) return;
+    b.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    setOpt(b.closest('[data-step]').dataset.step, b.dataset.v);
+  };
+  $('#styleSteps').onchange = e => { const s = e.target.closest('[data-sel]'); if (s) setOpt(s.dataset.sel, s.value); };
+  $('#gorge').onchange = e => { state.gorge = e.target.value; paintSummary(); };
+  $('#lapelExact').onchange = e => { state.lapelExact = e.target.value || null; paintSummary(); };
+
+  // ---------- trims: buttons, thread colours, lining ----------
+  const MAT = { Horn: 'Horn', Shell: 'Shell', Metal: 'Metal', Pes: 'Polyester', Bone: 'Bone', Fabric: 'Covered', '': 'Button' };
+  let btnFilter = '';
+  function btnTiles(list, cur) {
+    return `<button type="button" class="fab${!cur ? ' on' : ''}" data-b=""><span class="ph round">Standard</span><b>As pictured</b></button>` +
+      list.map(b => `<button type="button" class="fab${b.id === cur ? ' on' : ''}" data-b="${b.id}"><img src="buttons/${b.id}.png?v=${VER}" alt="" loading="lazy" width="96" height="96"><b>${esc(MAT[b.mat] || 'Button')}</b>${trimCode('buttons', b.id) ? `<small class="code">${esc(trimCode('buttons', b.id).code)}</small>` : ''}</button>`).join('');
+  }
+  function paintButtons() {
+    const mats = Object.keys(MAT).filter(m => BUTTONS.some(b => b.mat === m));
+    $('#btnMat').innerHTML = ['<button type="button" class="chip' + (!btnFilter ? ' on' : '') + '" data-m="">All</button>']
+      .concat(mats.map(m => `<button type="button" class="chip${btnFilter === m ? ' on' : ''}" data-m="${m}">${m ? MAT[m] : 'Other'}</button>`)).join('');
+    const list = BUTTONS.filter(b => !btnFilter || b.mat === btnFilter);
+    $('#btnGrid').innerHTML = btnTiles(list, state.button);
+    $('#sleeveBtnBox').hidden = state.sleeveSame;
+    if (!state.sleeveSame) $('#sleeveGrid').innerHTML = btnTiles(BUTTONS.filter(b => b.sleeve), state.sleeveButton);
+  }
+  $('#btnMat').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; btnFilter = b.dataset.m; paintButtons(); };
+  $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); render(); };
+  $('#sleeveGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.sleeveButton = b.dataset.b || null; paintButtons(); render(); };
+  $('#sleeveSame').onchange = e => { state.sleeveSame = e.target.checked; paintButtons(); render(); };
+
+  const rgbCss = c => `rgb(${c.join(',')})`;
+  function palette(cur, key) {
+    return `<div class="pal" data-t="${key}"><button type="button" class="match${!cur ? ' on' : ''}" data-c="">Match the cloth</button>` +
+      THREADS.map(t => `<button type="button" data-c="${t.id}" title="${threadName(t.id)}${trimCode('threads', t.id) ? ' · ' + trimCode('threads', t.id) : ''}" style="background:${rgbCss(t.rgb)}" class="${t.id === cur ? 'on' : ''}"></button>`).join('') + '</div>';
+  }
+  function paintThreads() {
+    const n = sleeveHoles(), sel = Math.min(state.holeSel, n);
+    const dot = c => { const t = THREADS.find(x => x.id === c); return `<i style="background:${t ? rgbCss(t.rgb) : 'transparent'}"></i>`; };
+    const holes = `<div class="sleeve-holes"><button type="button" data-h="0" class="${sel === 0 ? 'on' : ''}">All holes</button>` +
+      Array.from({ length: n }, (_, i) => `<button type="button" data-h="${i + 1}" class="${sel === i + 1 ? 'on' : ''}">${dot(state.thread.sleeve[i])}Hole ${i + 1}</button>`).join('') + '</div>';
+    const cur = sel ? state.thread.sleeve[sel - 1] : (state.thread.sleeve.slice(0, n).every(c => c === state.thread.sleeve[0]) ? state.thread.sleeve[0] : undefined);
+    $('#threadRows').innerHTML =
+      `<div class="thread-row"><b>Button thread</b>${palette(state.thread.button, 'button')}</div>` +
+      `<div class="thread-row"><b>Lapel buttonhole</b>${palette(state.thread.lapel, 'lapel')}</div>` +
+      `<div class="thread-row"><b>Front buttonholes</b>${palette(state.thread.front, 'front')}</div>` +
+      `<div class="thread-row"><b>Sleeve buttonholes</b><p class="hint">Pick a colour for all holes, or choose a hole first to give it its own colour.</p>${holes}${palette(cur, 'sleeve')}</div>`;
+  }
+  $('#threadRows').onclick = e => {
+    const h = e.target.closest('[data-h]');
+    if (h) { state.holeSel = +h.dataset.h; paintThreads(); return; }
+    const c = e.target.closest('[data-c]'); if (!c) return;
+    const key = c.closest('[data-t]').dataset.t, v = c.dataset.c || null;
+    if (key === 'sleeve') {
+      if (state.holeSel) state.thread.sleeve[state.holeSel - 1] = v;
+      else state.thread.sleeve = Array.from({ length: 6 }, () => v);
+    } else state.thread[key] = v;
+    paintThreads();
+    if (key === 'button') render(); else paintSummary();
+  };
+  const liningName = id => `Lining ${parseInt(id.slice(1), 10)}`;
+  function paintLinings() {
+    $('#linGrid').innerHTML = `<button type="button" class="fab${!state.lining ? ' on' : ''}" data-l=""><span class="ph">Tone on tone</span><b>Matching</b><small>We choose a tone to suit the cloth</small></button>` +
+      LININGS.filter(l => l.body).map(l => `<button type="button" class="fab${l.id === state.lining ? ' on' : ''}" data-l="${l.id}"><img src="linings/${l.id}.jpg?v=${VER}" alt="" loading="lazy" width="150" height="105"><b>${liningName(l.id)}</b>${trimCode('linings', l.id) ? `<small class="code">${esc(trimCode('linings', l.id))}</small>` : ''}</button>`).join('');
+  }
+  $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); };
+
+  // ---------- views / tabs ----------
   $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   $$('.tabs button').forEach(b => b.onclick = () => {
     $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
@@ -309,7 +503,7 @@
     $('#staffBadge').hidden = false; $('#staffBtn').textContent = 'Exit staff';
     $$('.staff-only').forEach(x => { x.hidden = false; });
     $('#q').placeholder = 'Search by number, colour, cloth or factory code';
-    paintGrid(); paintChosen(); paintSummary();
+    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle();
   }
   function staffOff() {
     STAFF = null; store.set('mb_staff', '');
@@ -317,7 +511,7 @@
     $$('.staff-only').forEach(x => { x.hidden = true; });
     $('#q').placeholder = 'Search by number, colour or cloth (e.g. 1042, navy, cashmere)';
     if (state.custom) { state.custom = false; render(); }
-    paintGrid(); paintChosen(); paintSummary();
+    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle();
   }
   $('#staffBtn').onclick = () => { if (STAFF) return staffOff(); $('#pwErr').hidden = true; $('#modal').hidden = false; $('#pw').value = ''; $('#pw').focus(); };
   $('#pwCancel').onclick = () => { $('#modal').hidden = true; };
@@ -344,11 +538,12 @@
   // ---------- start ----------
   (async function init() {
     try {
-      FABRICS = await (await fetch(`fabrics.json?v=${VER}`)).json();
+      const get = async n => (await fetch(`${n}?v=${VER}`)).json();
+      [FABRICS, OPTS, BUTTONS, LININGS, THREADS] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'linings.json', 'threads.json'].map(get));
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
-    setupFilters(); paintGrid(); syncLapel(); render();
+    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); render();
     const pw = store.get('mb_staff');
     if (pw) { try { staffOn(await unlock(pw), pw); } catch (e) { store.set('mb_staff', ''); } }
   })();

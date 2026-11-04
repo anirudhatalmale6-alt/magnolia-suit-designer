@@ -1,0 +1,812 @@
+[
+{
+"id": "front",
+"label": "Front",
+"section": "Jacket",
+"default": "2",
+"show": [
+"1",
+"2",
+"3",
+"5",
+"12",
+"11"
+],
+"choices": [
+{
+"code": "1",
+"label": "Single-breasted, 1 button"
+},
+{
+"code": "11",
+"label": "Double-breasted, 4 buttons"
+},
+{
+"code": "12",
+"label": "Double-breasted, 6 buttons"
+},
+{
+"code": "2",
+"label": "Single-breasted, 2 buttons"
+},
+{
+"code": "3",
+"label": "Single-breasted, 3 buttons"
+},
+{
+"code": "5",
+"label": "Single-breasted, 3 roll 2"
+}
+]
+},
+{
+"id": "lapel",
+"label": "Lapel",
+"section": "Jacket",
+"default": "BK",
+"show": [
+"BK",
+"20",
+"D"
+],
+"choices": [
+{
+"code": "20",
+"label": "Peak"
+},
+{
+"code": "BK",
+"label": "Notch"
+},
+{
+"code": "D",
+"label": "Shawl"
+}
+]
+},
+{
+"id": "lapelWidth",
+"label": "Lapel width",
+"section": "Jacket",
+"default": "D",
+"show": [
+"C",
+"D",
+"E",
+"F"
+],
+"choices": [
+{
+"code": "C",
+"label": "Slim (6 cm)"
+},
+{
+"code": "D",
+"label": "Standard (7 cm)"
+},
+{
+"code": "E",
+"label": "Wide (8 cm)"
+},
+{
+"code": "F",
+"label": "Extra wide (9 cm)"
+}
+]
+},
+{
+"id": "chestPocket",
+"label": "Chest pocket",
+"section": "Pockets",
+"default": "B",
+"show": [
+"233",
+"234",
+"235",
+"237",
+"238",
+"A",
+"B",
+"BC",
+"BE",
+"C",
+"C1",
+"D",
+"E",
+"F",
+"G",
+"H",
+"HXD",
+"I",
+"J",
+"R"
+],
+"choices": [
+{
+"code": "233",
+"label": "Tulip shape patch chest pocket"
+},
+{
+"code": "234",
+"label": "Two inverted pleated chest pocket with basic flaps"
+},
+{
+"code": "235",
+"label": "Inverted pleated chest pocket with basic flap"
+},
+{
+"code": "237",
+"label": "Boat-shaped bag (rounded corners) width 3 cm"
+},
+{
+"code": "238",
+"label": "Boat-shaped bag (rounded corners) width 2.8 cm"
+},
+{
+"code": "A",
+"label": "Straight welt chest pocket in 2.3 cm"
+},
+{
+"code": "B",
+"label": "Straight welt chest pocket in 2.5 cm"
+},
+{
+"code": "BC",
+"label": "Jetted chest pocket"
+},
+{
+"code": "BE",
+"label": "Angled box pleat chest patch pocket"
+},
+{
+"code": "C",
+"label": "Straight welt chest pocket in 2.7 cm"
+},
+{
+"code": "C1",
+"label": "Multi-pleated chest patch pocket"
+},
+{
+"code": "D",
+"label": "Curved welt chest pocket in 2.3 cm"
+},
+{
+"code": "E",
+"label": "Curved welt chest pocket in 2.5 cm"
+},
+{
+"code": "F",
+"label": "Curved welt chest pocket in 2.7 cm"
+},
+{
+"code": "G",
+"label": "Patch chest pocket"
+},
+{
+"code": "H",
+"label": "None"
+},
+{
+"code": "HXD",
+"label": "Round patch chest pocket"
+},
+{
+"code": "I",
+"label": "Boat chest pocket"
+},
+{
+"code": "J",
+"label": "Curved welt chest pocket in 2.9 cm"
+},
+{
+"code": "R",
+"label": "Trapezoid chest pocket"
+}
+]
+},
+{
+"id": "lowerPocket",
+"label": "Lower pockets",
+"section": "Pockets",
+"default": "B",
+"show": [
+"10",
+"11",
+"12",
+"13",
+"14",
+"15",
+"18",
+"19",
+"2",
+"20",
+"22",
+"23",
+"233",
+"234",
+"235",
+"236",
+"237",
+"238",
+"24",
+"25Y",
+"5",
+"6",
+"7",
+"A",
+"B",
+"BE",
+"C",
+"D",
+"DJ",
+"E",
+"F",
+"G",
+"H",
+"HMD",
+"I",
+"J",
+"M",
+"N",
+"O",
+"Q",
+"R",
+"S",
+"S1",
+"SA",
+"Y"
+],
+"choices": [
+{
+"code": "10",
+"label": "Regular slanted flap in 6 cm"
+},
+{
+"code": "11",
+"label": "Straight jetted flap in 5.5 cm"
+},
+{
+"code": "12",
+"label": "Straight jetted flap in 6 cm"
+},
+{
+"code": "13",
+"label": "Large slanted flap in 5.5 cm"
+},
+{
+"code": "14",
+"label": "Large slanted flap in 6 cm"
+},
+{
+"code": "15",
+"label": "Large slanted patch"
+},
+{
+"code": "18",
+"label": "Patch with basic flap"
+},
+{
+"code": "19",
+"label": "Inverted pleated with angled flap & button"
+},
+{
+"code": "2",
+"label": "Jetted with button tab"
+},
+{
+"code": "20",
+"label": "Inverted pleated with basic flap"
+},
+{
+"code": "22",
+"label": "Straight jetted flap in 6.5 cm"
+},
+{
+"code": "23",
+"label": "Regular slanted flap in 6.5 cm"
+},
+{
+"code": "233",
+"label": "Tulip shape patch pocket"
+},
+{
+"code": "234",
+"label": "Box patch pocket with flap"
+},
+{
+"code": "235",
+"label": "New water-drop shape patch"
+},
+{
+"code": "236",
+"label": "Inverted pleated with basic flap & button"
+},
+{
+"code": "237",
+"label": "Patch with basic flap & button"
+},
+{
+"code": "238",
+"label": "Round patch pocket with top stitch 2 cm to opening"
+},
+{
+"code": "24",
+"label": "Large slanted flap in 6.5 cm"
+},
+{
+"code": "25Y",
+"label": "Regular slanted flap in 5.5 cm"
+},
+{
+"code": "5",
+"label": "Patch pocket with angled button tab"
+},
+{
+"code": "6",
+"label": "Patch pocket with straight button tab"
+},
+{
+"code": "7",
+"label": "Patch pocket with rounded button tab"
+},
+{
+"code": "A",
+"label": "Straight jetted flap in 4 cm"
+},
+{
+"code": "B",
+"label": "Straight jetted flap in 4.5 cm"
+},
+{
+"code": "BE",
+"label": "Angled box pleat patch pocket"
+},
+{
+"code": "C",
+"label": "Straight jetted flap in 5 cm"
+},
+{
+"code": "D",
+"label": "Straight jetted pocket"
+},
+{
+"code": "DJ",
+"label": "Diagonal patch pocket with flap"
+},
+{
+"code": "E",
+"label": "Straight welt pocket in 1.2 cm"
+},
+{
+"code": "F",
+"label": "Straight welt pocket in 1.5 cm"
+},
+{
+"code": "G",
+"label": "Regular slanted flap in 4 cm"
+},
+{
+"code": "H",
+"label": "Regular slanted flap in 4.5 cm"
+},
+{
+"code": "HMD",
+"label": "Water-drop shape patch"
+},
+{
+"code": "I",
+"label": "Regular slanted flap in 5 cm"
+},
+{
+"code": "J",
+"label": "Slanted jetted pocket"
+},
+{
+"code": "M",
+"label": "Rounded patch pocket"
+},
+{
+"code": "N",
+"label": "Straight welt pocket in 1 cm"
+},
+{
+"code": "O",
+"label": "Large slanted flap in 4 cm"
+},
+{
+"code": "Q",
+"label": "Large slanted flap in 4.5 cm"
+},
+{
+"code": "R",
+"label": "Large slanted flap in 5 cm"
+},
+{
+"code": "S",
+"label": "Large slanted jetted pocket"
+},
+{
+"code": "S1",
+"label": "Multi-pleat patch pocket"
+},
+{
+"code": "SA",
+"label": "Flat dress pocket 5.5 cm"
+},
+{
+"code": "Y",
+"label": "Jetted pocket 4"
+}
+]
+},
+{
+"id": "ticket",
+"label": "Ticket pocket",
+"section": "Pockets",
+"default": "D",
+"show": [
+"25K",
+"25Q",
+"B",
+"C",
+"D",
+"EG",
+"F",
+"G",
+"H",
+"I",
+"J",
+"YK"
+],
+"choices": [
+{
+"code": "25K",
+"label": "Italian card slot (1 cm narrower than pocket)"
+},
+{
+"code": "25Q",
+"label": "Formal card slot (1 cm narrower than pocket)"
+},
+{
+"code": "B",
+"label": "Jetted ticket pocket"
+},
+{
+"code": "C",
+"label": "Welt ticket pocket"
+},
+{
+"code": "D",
+"label": "None"
+},
+{
+"code": "EG",
+"label": "Card pocket (1 cm narrower)"
+},
+{
+"code": "F",
+"label": "Ticket pocket with flap 4.5 cm"
+},
+{
+"code": "G",
+"label": "Ticket pocket with flap 5 cm"
+},
+{
+"code": "H",
+"label": "Ticket pocket with flap 5.5 cm"
+},
+{
+"code": "I",
+"label": "Ticket pocket with flap 6 cm"
+},
+{
+"code": "J",
+"label": "Ticket pocket with flap 4 cm"
+},
+{
+"code": "YK",
+"label": "Italian card pocket"
+}
+]
+},
+{
+"id": "vent",
+"label": "Back vents",
+"section": "Back",
+"default": "C",
+"show": [
+"A",
+"B",
+"C",
+"D",
+"F"
+],
+"choices": [
+{
+"code": "A",
+"label": "None"
+},
+{
+"code": "B",
+"label": "Centre vent"
+},
+{
+"code": "C",
+"label": "Side vents"
+},
+{
+"code": "D",
+"label": "Side vents with inner belt"
+},
+{
+"code": "F",
+"label": "Side vents with fixed belt"
+}
+]
+},
+{
+"id": "cuffButtons",
+"label": "Sleeve buttons",
+"section": "Sleeves",
+"default": "4",
+"show": [
+"3",
+"4"
+],
+"choices": [
+{
+"code": "3",
+"label": "Three"
+},
+{
+"code": "4",
+"label": "Four"
+}
+]
+},
+{
+"id": "kissing",
+"label": "Sleeve button spacing",
+"section": "Sleeves",
+"default": "B",
+"show": [
+"B",
+"A"
+],
+"choices": [
+{
+"code": "A",
+"label": "Kissing"
+},
+{
+"code": "B",
+"label": "No kissing"
+}
+]
+},
+{
+"id": "sleeveVent",
+"label": "Sleeve buttonholes",
+"section": "Sleeves",
+"default": "A",
+"show": [
+"A",
+"B"
+],
+"choices": [
+{
+"code": "A",
+"label": "Functional"
+},
+{
+"code": "B",
+"label": "Mock"
+}
+]
+},
+{
+"id": "cuff",
+"label": "Sleeve cuff",
+"section": "Sleeves",
+"default": "A",
+"show": [
+"A",
+"B",
+"C",
+"C2",
+"C3",
+"X"
+],
+"choices": [
+{
+"code": "A",
+"label": "Square sleeve cuff"
+},
+{
+"code": "B",
+"label": "Round sleeve cuff"
+},
+{
+"code": "C",
+"label": "British turn-up cuff"
+},
+{
+"code": "C2",
+"label": "Turn-back cuff 3.5 cm"
+},
+{
+"code": "C3",
+"label": "Turn-back cuff 4 cm"
+},
+{
+"code": "X",
+"label": "Angled vent cuff"
+}
+]
+},
+{
+"id": "lapelHole",
+"label": "Lapel buttonhole",
+"section": "Details",
+"default": "A",
+"show": [
+"A",
+"B",
+"C",
+"D",
+"E",
+"Z"
+],
+"choices": [
+{
+"code": "A",
+"label": "Left"
+},
+{
+"code": "B",
+"label": "Right"
+},
+{
+"code": "C",
+"label": "Left double"
+},
+{
+"code": "D",
+"label": "Both sides"
+},
+{
+"code": "E",
+"label": "Each side double"
+},
+{
+"code": "Z",
+"label": "None"
+}
+]
+},
+{
+"id": "holes",
+"label": "Buttonholes made",
+"section": "Details",
+"default": "A",
+"show": [
+"A",
+"H"
+],
+"choices": [
+{
+"code": "A",
+"label": "By machine"
+},
+{
+"code": "H",
+"label": "By hand"
+}
+]
+},
+{
+"id": "pick",
+"label": "Pick stitching",
+"section": "Details",
+"default": "C",
+"show": [
+"A",
+"C",
+"E"
+],
+"choices": [
+{
+"code": "A",
+"label": "None"
+},
+{
+"code": "C",
+"label": "0.6 cm edge, by machine"
+},
+{
+"code": "E",
+"label": "0.6 cm edge, by hand"
+}
+]
+},
+{
+"id": "shoulder",
+"label": "Shoulder",
+"section": "Details",
+"default": "B",
+"show": [
+"B",
+"A",
+"D",
+"C"
+],
+"choices": [
+{
+"code": "A",
+"label": "Natural"
+},
+{
+"code": "B",
+"label": "Regular"
+},
+{
+"code": "C",
+"label": "Con rollino"
+},
+{
+"code": "D",
+"label": "Neapolitan"
+}
+]
+},
+{
+"id": "canvas",
+"label": "Construction",
+"section": "Details",
+"default": "A",
+"show": [
+"A",
+"B",
+"C"
+],
+"choices": [
+{
+"code": "A",
+"label": "Fused"
+},
+{
+"code": "B",
+"label": "Half canvas"
+},
+{
+"code": "C",
+"label": "Full canvas (3 extra working days)"
+}
+]
+},
+{
+"id": "liningStyle",
+"label": "Lining style",
+"section": "Lining",
+"default": "A",
+"show": [
+"A",
+"B",
+"C"
+],
+"choices": [
+{
+"code": "A",
+"label": "Full lining"
+},
+{
+"code": "B",
+"label": "Half lining"
+},
+{
+"code": "C",
+"label": "No lining"
+}
+]
+}
+]

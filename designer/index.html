@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '7';
+    var V = '8';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=7">
+<link rel="stylesheet" href="css/designer.css?v=8">
 </head>
 <body>
 <header class="topbar">
@@ -29,7 +29,7 @@
     <button class="ghost" id="staffBtn" type="button">Staff</button>
   </div>
 </header>
-<div class="ribbon">Preview (Phase 1): live fabric and style switching. Prices, more options and ordering come in the next phases.</div>
+<div class="ribbon">Preview (Phase 2): fabrics, style options, buttons, thread colours and linings. Prices and ordering come in the next phases.</div>
 
 <div class="wrap">
   <section class="stage" id="stage">
@@ -49,7 +49,8 @@
     <nav class="tabs" role="tablist">
       <button type="button" role="tab" data-tab="fabric" class="on"><span>1</span>Fabric</button>
       <button type="button" role="tab" data-tab="style"><span>2</span>Style</button>
-      <button type="button" role="tab" data-tab="summary"><span>3</span>Summary</button>
+      <button type="button" role="tab" data-tab="trims"><span>3</span>Trims</button>
+      <button type="button" role="tab" data-tab="summary"><span>4</span>Summary</button>
     </nav>
 
     <div class="chosen" id="chosen"></div>
@@ -76,18 +77,28 @@
     </section>
 
     <section class="tab" data-pane="style" hidden>
-      <h3>Lapel</h3>
-      <div class="seg" id="lapel">
-        <button type="button" data-v="notch" class="on">Notch</button>
-        <button type="button" data-v="peak">Peak</button>
+      <div id="styleSteps"></div>
+      <div class="staff-only adv" hidden>
+        <h3>Advanced (staff)</h3>
+        <label class="adv-row">Gorge height
+          <select id="gorge"><option value="standard">Standard</option><option value="low">Low</option><option value="high">High</option></select></label>
+        <label class="adv-row">Exact lapel (all factory lapels)<select id="lapelExact"></select></label>
+        <p class="hint">Gorge and the exact lapel go on the order sheet. The picture keeps the standard gorge.</p>
       </div>
-      <h3>Front</h3>
-      <div class="seg" id="closure">
-        <button type="button" data-v="sb" class="on">Single-breasted, 2 buttons</button>
-        <button type="button" data-v="db">Double-breasted, 6 buttons</button>
-      </div>
-      <p class="hint" id="styleHint">Double-breasted jackets are shown with a peak lapel.</p>
-      <p class="hint">Pockets, vents, buttons, lining and the trousers and vest are added in the next phase.</p>
+    </section>
+
+    <section class="tab" data-pane="trims" hidden>
+      <h3>Buttons</h3>
+      <div class="chips" id="btnMat"></div>
+      <div class="grid btn-grid" id="btnGrid"></div>
+      <label class="check"><input type="checkbox" id="sleeveSame" checked> Sleeve buttons the same as the front</label>
+      <div id="sleeveBtnBox" hidden><p class="hint">Choose the sleeve buttons:</p><div class="grid btn-grid" id="sleeveGrid"></div></div>
+
+      <h3>Thread colours</h3>
+      <div id="threadRows"></div>
+
+      <h3>Lining</h3>
+      <div class="grid lin-grid" id="linGrid"></div>
     </section>
 
     <section class="tab" data-pane="summary" hidden>
@@ -116,6 +127,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=7"></script>
+<script src="js/designer.js?v=8"></script>
 </body>
 </html>
