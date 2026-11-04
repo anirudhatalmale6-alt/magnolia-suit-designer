@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '14';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '15';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -14,7 +14,7 @@
   const cv = $('#cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), busy = $('#busy');
   const state = { view: 'front', fabric: null, tile: null, custom: false, zoom: null,
     opts: {}, button: null, sleeveSame: true, sleeveButton: null, thread: { button: null, lapel: null, front: null, sleeve: [] },
-    lining: null, gorge: 'standard', lapelExact: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null, satin: '', satinFabric: null };
+    lining: null, sleeveLinSame: true, sleeveLining: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null, hid: {} };
   const views = {}, tiles = {};
   let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], LININGS = [], THREADS = [], CONTRAST = [];
 
@@ -338,9 +338,8 @@
     let sec = '';
     for (const o of OPTS) {
       const c = choiceOf(o.id) || {};
-      const g = STAFF && STAFF._opts ? STAFF._opts[o.id].group : '';
-      let code = g && `${g} ${c.code}`, val = c.label;
-      if (o.id === 'lapel') { const lc = lapelCode(); code = g && `${g} ${lc}`; if (state.gorge !== 'standard') val += `, ${state.gorge} gorge`; }
+      const so = STAFF && STAFF._opts ? STAFF._opts[o.id] : null;
+      const code = so ? `${so.names[c.code] || c.code}${so.group ? ` · ${so.group} ${c.code}` : ''}` : '', val = c.label;
       if (o.section !== sec) { sec = o.section; rows.push([`<b>${sec}</b>`, '', '', true]); }
       rows.push([o.label, val, code]);
     }
@@ -353,18 +352,26 @@
     const tn = k => state.thread[k] ? threadName(state.thread[k]) : 'Matching the cloth', tc = k => trimCode('threads', state.thread[k]) || '';
     rows.push(['Button thread', tn('button'), tc('button')]);
     rows.push(['Lapel buttonhole', tn('lapel'), tc('lapel')]);
-    rows.push(['Front buttonholes', tn('front'), tc('front')]);
     const n = sleeveHoles(), sl = state.thread.sleeve.slice(0, n);
-    rows.push(['Sleeve buttonholes', sl.some(Boolean) ? Array.from({ length: n }, (_, i) => `${i + 1}: ${sl[i] ? threadName(sl[i]) + (trimCode('threads', sl[i]) ? ` (${trimCode('threads', sl[i])})` : '') : 'match'}`).join(', ') : 'Matching the cloth', '']);
+    if (STAFF) rows.push(['Front buttonholes', tn('front'), tc('front')]);
+    if (STAFF) rows.push(['Sleeve buttonholes', sl.some(Boolean) ? Array.from({ length: n }, (_, i) => `${i + 1}: ${sl[i] ? threadName(sl[i]) + (trimCode('threads', sl[i]) ? ` (${trimCode('threads', sl[i])})` : '') : 'match'}`).join(', ') : 'Matching the cloth', '']);
     const lo = LININGS.find(l => l.id === ln);
-    rows.push(['Lining', lo ? `${lo.name || liningName(ln)}${lo.book ? '' : ' (reach out for availability)'}` : 'Matching (to be chosen)', trimCode('linings', ln) || '']);
+    rows.push(['Body lining', lo ? `${lo.name || liningName(ln)}${lo.book ? '' : ' (reach out for availability)'}` : 'Matching (to be chosen)', trimCode('linings', ln) || '']);
+    const sln = state.sleeveLinSame ? null : state.sleeveLining, slo = LININGS.find(l => l.id === sln);
+    rows.push(['Sleeve lining', state.sleeveLinSame ? 'Same as the body' : (slo ? `${slo.name || liningName(sln)}${slo.book ? '' : ' (reach out for availability)'}` : 'Matching (to be chosen)'),
+      sln ? trimCode('linings', sln) || '' : '']);
     const G = STAFF && STAFF._trims ? STAFF._trims.groups : null;
-    rows.push(['Undercollar', state.undercollar ? contrastName(state.undercollar) : 'Matching the cloth',
+    if (STAFF) rows.push(['Undercollar', state.undercollar ? contrastName(state.undercollar) : 'Matching the cloth',
       G ? `${G.undercollar} ${state.undercollar ? trimCode('contrast', state.undercollar) : G.undercollarMatch}` : '']);
-    rows.push(['Elbow patches', state.elbow ? `${state.elbow === 'A' ? 'Round elbow patch' : 'Round sleeve patch'}, ${contrastName(state.elbowFabric)}` : 'None',
+    if (STAFF) rows.push(['Elbow patches', state.elbow ? `${state.elbow === 'A' ? 'Round elbow patch' : 'Round sleeve patch'}, ${contrastName(state.elbowFabric)}` : 'None',
       G && state.elbow ? `${G.elbow} ${state.elbow} · ${G.elbowFabric} ${trimCode('contrast', state.elbowFabric)}` : '']);
-    rows.push(['Satin on lapel', state.satin ? `1 cm trim, ${contrastName(state.satinFabric)}` : 'None',
-      STAFF && state.satin ? `Contrast position: 1cm satin splicing on lapel · ${trimCode('contrast', state.satinFabric)}` : '']);
+    if (STAFF && STAFF._opts._hidden) {                 // every hidden factory option, so the order sheet is complete
+      rows.push(['<b>Staff only</b>', '', '', true]);
+      for (const h of STAFF._opts._hidden) {
+        const v = state.hid[h.title] || h.default, oc = (h.options.find(x => x.name === v) || {}).code;
+        rows.push([h.title, v ? (state.hid[h.title] ? v : `${v} (default)`) : 'Not set', h.group && oc ? `${h.group} ${oc}` : '']);
+      }
+    }
     $('#summary').innerHTML = rows.map(([k, v, code, head]) => head ? `<dt class="sum-h">${k}</dt><dd></dd>` :
       `<dt>${k}</dt><dd>${esc(v || '')}${STAFF && code ? ` <span class="code">${esc(code)}</span>` : ''}</dd>`).join('');
   }
@@ -399,12 +406,6 @@
   // ---------- style (factory options) ----------
   const optOf = id => OPTS.find(o => o.id === id);
   function choiceOf(id) { const o = optOf(id); return o && o.choices.find(c => c.code === (state.opts[id] || o.default)); }
-  function lapelCode() {                           // exact factory lapel for the order sheet
-    if (state.lapelExact) return state.lapelExact;
-    const l = state.opts.lapel || 'BK';
-    if (state.gorge === 'low') return l === 'BK' ? 'BL' : l === '20' ? '17' : l;
-    return l;
-  }
   const sleeveHoles = () => +((choiceOf('cuffButtons') || {}).code || 4) || 4;
   const STYLE_HINT = { lowerPocket: 'Flap, slanted, patch and jetted pockets show in the picture. Every style goes on the order sheet.',
     chestPocket: 'The picture shows the standard chest pocket. Your choice goes on the order sheet.',
@@ -417,15 +418,24 @@
       const list = o.show.map(code => o.choices.find(c => c.code === code)).filter(Boolean);
       html += `<div class="step" data-step="${o.id}"><h3>${esc(o.label)}</h3>`;
       if (list.length <= 6) html += `<div class="seg">${list.map(c => `<button type="button" data-v="${esc(c.code)}" class="${c.code === cur ? 'on' : ''}">${esc(c.label)}</button>`).join('')}</div>`;
-      else html += `<select data-sel="${o.id}">${list.slice().sort((a, b) => a.label.localeCompare(b.label)).map(c => `<option value="${esc(c.code)}"${c.code === cur ? ' selected' : ''}>${esc(c.label)}</option>`).join('')}</select>`;
+      else html += `<select data-sel="${o.id}">${list.map(c => `<option value="${esc(c.code)}"${c.code === cur ? ' selected' : ''}>${esc(c.label)}</option>`).join('')}</select>`;
       if (STYLE_HINT[o.id]) html += `<p class="hint">${STYLE_HINT[o.id]}</p>`;
       html += '</div>';
     }
     $('#styleSteps').innerHTML = html;
-    const names = STAFF && STAFF._opts ? STAFF._opts.lapel.names : {};
-    $('#lapelExact').innerHTML = '<option value="">Follow the lapel above</option>' +
-      Object.keys(names).filter(c => c !== 'Z998').map(c => `<option value="${esc(c)}"${c === state.lapelExact ? ' selected' : ''}>${esc(c)} · ${esc(names[c])}</option>`).join('');
+    paintHidden();
   }
+  // staff only: the factory options the order screen hides (shoulder pad, gorge, contrast, labels, inner pockets ...)
+  function paintHidden() {
+    const H = STAFF && STAFF._opts && STAFF._opts._hidden;
+    $('#staffHidden').innerHTML = !H ? '' : H.map((h, i) => {
+      const cur = state.hid[h.title] || '';
+      return `<label class="adv-row">${esc(h.title)}<select data-hid="${i}"><option value="">${h.default ? `Default: ${esc(h.default)}` : 'Not set'}</option>` +
+        h.options.map(o => `<option value="${esc(o.name)}"${o.name === cur ? ' selected' : ''}>${esc(o.name)}</option>`).join('') + '</select></label>';
+    }).join('');
+  }
+  $('#staffHidden').onchange = e => { const s = e.target.closest('[data-hid]'); if (!s) return;
+    const h = STAFF._opts._hidden[+s.dataset.hid]; if (s.value) state.hid[h.title] = s.value; else delete state.hid[h.title]; paintSummary(); };
   function setOpt(id, v) {
     state.opts[id] = v;
     if (id === 'front' && DB_FRONTS.includes(v) && (state.opts.lapel || 'BK') === 'BK') { state.opts.lapel = '20'; paintStyle(); }   // double-breasted comes with a peak lapel
@@ -438,8 +448,6 @@
     setOpt(b.closest('[data-step]').dataset.step, b.dataset.v);
   };
   $('#styleSteps').onchange = e => { const s = e.target.closest('[data-sel]'); if (s) setOpt(s.dataset.sel, s.value); };
-  $('#gorge').onchange = e => { state.gorge = e.target.value; paintSummary(); };
-  $('#lapelExact').onchange = e => { state.lapelExact = e.target.value || null; paintSummary(); };
 
   // ---------- trims: buttons, thread colours, lining ----------
   const MAT = { Horn: 'Horn', Shell: 'Shell', Metal: 'Metal', Pes: 'Polyester', Bone: 'Bone', Fabric: 'Covered', '': 'Button' };
@@ -476,8 +484,8 @@
     $('#threadRows').innerHTML =
       `<div class="thread-row"><b>Button thread</b>${palette(state.thread.button, 'button')}</div>` +
       `<div class="thread-row"><b>Lapel buttonhole</b>${palette(state.thread.lapel, 'lapel')}</div>` +
-      `<div class="thread-row"><b>Front buttonholes</b>${palette(state.thread.front, 'front')}</div>` +
-      `<div class="thread-row"><b>Sleeve buttonholes</b><p class="hint">Pick a colour for all holes, or choose a hole first to give it its own colour.</p>${holes}${palette(cur, 'sleeve')}</div>`;
+      (STAFF ? `<div class="thread-row adv"><b>Staff only: front buttonholes</b>${palette(state.thread.front, 'front')}</div>` +
+      `<div class="thread-row adv"><b>Staff only: sleeve buttonholes</b><p class="hint">Pick a colour for all holes, or choose a hole first to give it its own colour.</p>${holes}${palette(cur, 'sleeve')}</div>` : '');
   }
   $('#threadRows').onclick = e => {
     const h = e.target.closest('[data-h]');
@@ -495,17 +503,26 @@
   const LIN_GROUPS = [['Plain', l => l.book && (l.kind === 'plain' || l.kind === 'bemberg')], ['Printed', l => l.book && l.kind === 'printed'],
     ['Picture linings', l => l.book && l.kind === 'positional', 'One printed scene across the back. Only with double vents or no vent.'],
     ['Reach out for availability', l => !l.book, 'Not in our books. Please ask us before choosing one of these.']];
-  function linTile(l) {
+  function linTile(l, cur = state.lining) {
     const code = trimCode('linings', l.id);
-    return `<button type="button" class="fab${l.id === state.lining ? ' on' : ''}" data-l="${l.id}"><img src="linings/${l.id}.jpg?v=${VER}" alt="" loading="lazy" width="150" height="105"><b>${l.name ? esc(l.name) : liningName(l.id)}</b>${code ? `<small class="code">${esc(code)}</small>` : ''}</button>`;
+    return `<button type="button" class="fab${l.id === cur ? ' on' : ''}" data-l="${l.id}"><img src="linings/${l.id}.jpg?v=${VER}" alt="" loading="lazy" width="150" height="105"><b>${l.name ? esc(l.name) : liningName(l.id)}</b>${code ? `<small class="code">${esc(code)}</small>` : ''}</button>`;
   }
   function paintLinings() {
     $('#linGrid').innerHTML = `<button type="button" class="fab${!state.lining ? ' on' : ''}" data-l=""><span class="ph">Tone on tone</span><b>Matching</b><small>We choose a tone to suit the cloth</small></button>` +
       LIN_GROUPS.map(([title, test, hint]) => {
         const list = LININGS.filter(test);
-        return list.length ? `<p class="lin-h${hint && hint.startsWith('Not in') ? ' warn' : ''}">${esc(title)}</p>${hint ? `<p class="hint lin-hint">${esc(hint)}</p>` : ''}${list.map(linTile).join('')}` : '';
+        return list.length ? `<p class="lin-h${hint && hint.startsWith('Not in') ? ' warn' : ''}">${esc(title)}</p>${hint ? `<p class="hint lin-hint">${esc(hint)}</p>` : ''}${list.map(l => linTile(l)).join('')}` : '';
       }).join('');
+    $('#sleeveLinBox').hidden = state.sleeveLinSame;
+    if (!state.sleeveLinSame) {
+      const sl = LININGS.filter(l => l.kind !== 'positional');      // picture linings are cut for the back only
+      $('#sleeveLinGrid').innerHTML = `<button type="button" class="fab${!state.sleeveLining ? ' on' : ''}" data-l=""><span class="ph">Tone on tone</span><b>Matching</b></button>` +
+        sl.filter(l => l.book).map(l => linTile(l, state.sleeveLining)).join('') +
+        (sl.some(l => !l.book) ? `<p class="lin-h warn">Reach out for availability</p>` + sl.filter(l => !l.book).map(l => linTile(l, state.sleeveLining)).join('') : '');
+    }
   }
+  $('#sleeveLinSame').onchange = e => { state.sleeveLinSame = e.target.checked; paintLinings(); paintSummary(); };
+  $('#sleeveLinGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.sleeveLining = b.dataset.l || null; paintLinings(); paintSummary(); };
   $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); };
 
   // ---------- contrast fabrics (undercollar melton, elbow patch suede) ----------
@@ -522,14 +539,7 @@
     $$('#elbowSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === state.elbow));
     $('#elbowGrid').hidden = !state.elbow;
     if (state.elbow) $('#elbowGrid').innerHTML = cTiles('suede', state.elbowFabric);
-    $$('#satinSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === state.satin));
-    $('#satinGrid').hidden = !state.satin;
-    if (state.satin) $('#satinGrid').innerHTML = cTiles('satin', state.satinFabric);
   }
-  $('#satinSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.satin = b.dataset.v;
-    if (state.satin && !state.satinFabric) state.satinFabric = (CONTRAST.find(c => c.kind === 'satin') || {}).id || null;
-    paintContrast(); paintSummary(); };
-  $('#satinGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.satinFabric = b.dataset.c; paintContrast(); paintSummary(); };
   $('#ucGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.undercollar = b.dataset.c || null; paintContrast(); paintSummary(); };
   $('#elbowSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.elbow = b.dataset.v;
     if (state.elbow && !state.elbowFabric) state.elbowFabric = (CONTRAST.find(c => c.kind === 'suede') || {}).id || null;

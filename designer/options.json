@@ -8,22 +8,23 @@
 "1",
 "2",
 "3",
+"4",
 "5",
+"6",
+"8",
+"9",
+"11",
+"10",
 "12",
-"11"
+"13",
+"Z998",
+"26",
+"27"
 ],
 "choices": [
 {
 "code": "1",
 "label": "Single-breasted, 1 button"
-},
-{
-"code": "11",
-"label": "Double-breasted, 4 buttons"
-},
-{
-"code": "12",
-"label": "Double-breasted, 6 buttons"
 },
 {
 "code": "2",
@@ -34,8 +35,52 @@
 "label": "Single-breasted, 3 buttons"
 },
 {
+"code": "4",
+"label": "Single-breasted, 4 buttons"
+},
+{
 "code": "5",
 "label": "Single-breasted, 3 roll 2"
+},
+{
+"code": "6",
+"label": "Single-breasted, 4 roll 3"
+},
+{
+"code": "8",
+"label": "Double-breasted, 2 buttons (1 to close)"
+},
+{
+"code": "9",
+"label": "Double-breasted, 4 buttons (1 to close)"
+},
+{
+"code": "11",
+"label": "Double-breasted, 4 buttons"
+},
+{
+"code": "10",
+"label": "Double-breasted, 6 buttons (1 to close)"
+},
+{
+"code": "12",
+"label": "Double-breasted, 6 buttons"
+},
+{
+"code": "13",
+"label": "Double-breasted, 6 buttons (3 to close)"
+},
+{
+"code": "Z998",
+"label": "Customer's own buttons"
+},
+{
+"code": "26",
+"label": "Single-breasted, 5 hidden buttons"
+},
+{
+"code": "27",
+"label": "Single-breasted, 5 buttons"
 }
 ]
 },
@@ -47,20 +92,195 @@
 "show": [
 "BK",
 "20",
-"D"
+"D",
+"BA",
+"BB",
+"BC",
+"BD",
+"12",
+"13",
+"14",
+"15",
+"17",
+"19",
+"21",
+"216",
+"22",
+"23",
+"24",
+"25",
+"26",
+"27",
+"28",
+"29",
+"30",
+"31",
+"AD",
+"AE",
+"BG",
+"BI",
+"BJ",
+"BL",
+"BM",
+"BN",
+"BT",
+"DE",
+"HA159-133",
+"HA279-118",
+"L"
 ],
 "choices": [
 {
-"code": "20",
-"label": "Peak"
+"code": "BK",
+"label": "Notch (classic)"
 },
 {
-"code": "BK",
-"label": "Notch"
+"code": "20",
+"label": "Peak (classic)"
 },
 {
 "code": "D",
-"label": "Shawl"
+"label": "Shawl (classic)"
+},
+{
+"code": "BA",
+"label": "55°Notch lapel"
+},
+{
+"code": "BB",
+"label": "102°Peak lapel"
+},
+{
+"code": "BC",
+"label": "45°Semi-notch lapel"
+},
+{
+"code": "BD",
+"label": "114°Semi-peak lapel"
+},
+{
+"code": "12",
+"label": "Peak Lapel 115°"
+},
+{
+"code": "13",
+"label": "Notch Lapel with Tab"
+},
+{
+"code": "14",
+"label": "Peak Lapel 105°"
+},
+{
+"code": "15",
+"label": "Peak Lapel 110°"
+},
+{
+"code": "17",
+"label": "Low Peak Lapel 110°"
+},
+{
+"code": "19",
+"label": "Straight Peak Lapel 108°"
+},
+{
+"code": "21",
+"label": "Peak Lapel 99°"
+},
+{
+"code": "216",
+"label": "Asymmetric Shawl Collar"
+},
+{
+"code": "22",
+"label": "Peak Lapel 102°"
+},
+{
+"code": "23",
+"label": "Curved Peak Lapel 103°"
+},
+{
+"code": "24",
+"label": "D- Shawl lapel"
+},
+{
+"code": "25",
+"label": "Fashion shawl lapel"
+},
+{
+"code": "26",
+"label": "Notch Lapel+Pointed Tab"
+},
+{
+"code": "27",
+"label": "0005 Shawl lapel"
+},
+{
+"code": "28",
+"label": "0E Shawl lapel"
+},
+{
+"code": "29",
+"label": "0A Shawl lapel"
+},
+{
+"code": "30",
+"label": "Peak Lapel 100°"
+},
+{
+"code": "31",
+"label": "65° Notch Lapel"
+},
+{
+"code": "AD",
+"label": "120° Curved Peak Lapel"
+},
+{
+"code": "AE",
+"label": "Italian Fishtail Lapel"
+},
+{
+"code": "BG",
+"label": "73°Straight Notch Lapel"
+},
+{
+"code": "BI",
+"label": "50°BC Notch Lapel"
+},
+{
+"code": "BJ",
+"label": "102°RL Peak Lapel"
+},
+{
+"code": "BL",
+"label": "66°Low curved gorge line on Notch lapel"
+},
+{
+"code": "BM",
+"label": "98°TF Peak lapel"
+},
+{
+"code": "BN",
+"label": "55°Notch lapel 1"
+},
+{
+"code": "BT",
+"label": "64° Slant Notch Lapel w/ L Point Tab"
+},
+{
+"code": "DE",
+"label": "101° Peak Lapel"
+},
+{
+"code": "HA159-133",
+"label": "Peak+Removable Shawl Lapel"
+},
+{
+"code": "HA279-118",
+"label": "Notch+Removable Shawl Lapel"
+},
+{
+"code": "L",
+"label": "Notch lapel 4"
 }
 ]
 },
@@ -70,27 +290,327 @@
 "section": "Jacket",
 "default": "D",
 "show": [
+"L",
+"A",
+"B",
 "C",
+"O",
 "D",
+"P",
 "E",
-"F"
+"Q",
+"F",
+"S",
+"M",
+"R",
+"1",
+"218",
+"219",
+"221"
 ],
 "choices": [
 {
+"code": "L",
+"label": "4.5 cm"
+},
+{
+"code": "A",
+"label": "5 cm"
+},
+{
+"code": "B",
+"label": "5.5 cm"
+},
+{
 "code": "C",
-"label": "Slim (6 cm)"
+"label": "6 cm"
+},
+{
+"code": "O",
+"label": "6.5 cm"
 },
 {
 "code": "D",
-"label": "Standard (7 cm)"
+"label": "7 cm"
+},
+{
+"code": "P",
+"label": "7.5 cm"
 },
 {
 "code": "E",
-"label": "Wide (8 cm)"
+"label": "8 cm"
+},
+{
+"code": "Q",
+"label": "8.5 cm"
 },
 {
 "code": "F",
-"label": "Extra wide (9 cm)"
+"label": "9 cm"
+},
+{
+"code": "S",
+"label": "9.5 cm"
+},
+{
+"code": "M",
+"label": "10 cm"
+},
+{
+"code": "R",
+"label": "10.5 cm"
+},
+{
+"code": "1",
+"label": "11 cm"
+},
+{
+"code": "218",
+"label": "11.5 cm"
+},
+{
+"code": "219",
+"label": "12 cm"
+},
+{
+"code": "221",
+"label": "12.5 cm"
+}
+]
+},
+{
+"id": "lapelHoleStyle",
+"label": "Lapel buttonhole style",
+"section": "Jacket",
+"default": "None",
+"show": [
+"None",
+"Regular Functional by Machine",
+"Round-end Decorative by Machine",
+"Smoking Pipe 001(Deco. Handmade)",
+"Lumi 002(Deco. Handmade)",
+"Round 003(Deco. Handmade)",
+"Pinpoint 004(Deco. Handmade)",
+"Rising star 005(Deco. Handmade)",
+"Heart-to-Heart 006(Deco. Handmade)",
+"Best wishes 007(Func. Handmade)",
+"Dragon Horn 009(Deco. Handmade)",
+"Glory Rays 013(Deco. Handmade)",
+"LOVE 014(Deco. Handmade)",
+"Monotree 015(Deco. Handmade)",
+"Cloud 016(Deco. Handmade)",
+"Lucky Bean 017(Deco. Handmade)",
+"Rome with center cut 0.5 cm(Func. Handmade)",
+"Phoenix eye 018(Func. Handmade)",
+"Round-end X fixed (Func. Handmade)",
+"Flower shape(Func. Handmade)",
+"Square-end Functional by Machine",
+"Square-end Decorative by Machine",
+"Rome 2.3CM(Func. Machine)",
+"Rome 1.8CM(Func. Handmade)",
+"Rome 1.8CM(Func. Machine)",
+"Rome(Func. Handmade)",
+"Milanese 2CM(Func. Handmade)",
+"Milanese 2.3CM(Func. Handmade)",
+"Milanese 2.5CM(Func. Handmade)",
+"Milanese 008(Func. Handmade)",
+"Curved Milanese 010(Deco. Handmade)",
+"Crescent(Deco. Handmade)",
+"Milanese 008 with tricolor stitch(Func. Handmade)"
+],
+"choices": [
+{
+"code": "None",
+"label": "None"
+},
+{
+"code": "Regular Functional by Machine",
+"label": "Regular Functional by Machine"
+},
+{
+"code": "Round-end Decorative by Machine",
+"label": "Round-end Decorative by Machine"
+},
+{
+"code": "Smoking Pipe 001(Deco. Handmade)",
+"label": "Smoking Pipe 001 (Deco. Handmade)"
+},
+{
+"code": "Lumi 002(Deco. Handmade)",
+"label": "Lumi 002 (Deco. Handmade)"
+},
+{
+"code": "Round 003(Deco. Handmade)",
+"label": "Round 003 (Deco. Handmade)"
+},
+{
+"code": "Pinpoint 004(Deco. Handmade)",
+"label": "Pinpoint 004 (Deco. Handmade)"
+},
+{
+"code": "Rising star 005(Deco. Handmade)",
+"label": "Rising star 005 (Deco. Handmade)"
+},
+{
+"code": "Heart-to-Heart 006(Deco. Handmade)",
+"label": "Heart-to-Heart 006 (Deco. Handmade)"
+},
+{
+"code": "Best wishes 007(Func. Handmade)",
+"label": "Best wishes 007 (Func. Handmade)"
+},
+{
+"code": "Dragon Horn 009(Deco. Handmade)",
+"label": "Dragon Horn 009 (Deco. Handmade)"
+},
+{
+"code": "Glory Rays 013(Deco. Handmade)",
+"label": "Glory Rays 013 (Deco. Handmade)"
+},
+{
+"code": "LOVE 014(Deco. Handmade)",
+"label": "LOVE 014 (Deco. Handmade)"
+},
+{
+"code": "Monotree 015(Deco. Handmade)",
+"label": "Monotree 015 (Deco. Handmade)"
+},
+{
+"code": "Cloud 016(Deco. Handmade)",
+"label": "Cloud 016 (Deco. Handmade)"
+},
+{
+"code": "Lucky Bean 017(Deco. Handmade)",
+"label": "Lucky Bean 017 (Deco. Handmade)"
+},
+{
+"code": "Rome with center cut 0.5 cm(Func. Handmade)",
+"label": "Rome with center cut 0.5 cm (Func. Handmade)"
+},
+{
+"code": "Phoenix eye 018(Func. Handmade)",
+"label": "Phoenix eye 018 (Func. Handmade)"
+},
+{
+"code": "Round-end X fixed (Func. Handmade)",
+"label": "Round-end X fixed (Func. Handmade)"
+},
+{
+"code": "Flower shape(Func. Handmade)",
+"label": "Flower shape (Func. Handmade)"
+},
+{
+"code": "Square-end Functional by Machine",
+"label": "Square-end Functional by Machine"
+},
+{
+"code": "Square-end Decorative by Machine",
+"label": "Square-end Decorative by Machine"
+},
+{
+"code": "Rome 2.3CM(Func. Machine)",
+"label": "Rome 2.3 cm (Func. Machine)"
+},
+{
+"code": "Rome 1.8CM(Func. Handmade)",
+"label": "Rome 1.8 cm (Func. Handmade)"
+},
+{
+"code": "Rome 1.8CM(Func. Machine)",
+"label": "Rome 1.8 cm (Func. Machine)"
+},
+{
+"code": "Rome(Func. Handmade)",
+"label": "Rome (Func. Handmade)"
+},
+{
+"code": "Milanese 2CM(Func. Handmade)",
+"label": "Milanese 2 cm (Func. Handmade)"
+},
+{
+"code": "Milanese 2.3CM(Func. Handmade)",
+"label": "Milanese 2.3 cm (Func. Handmade)"
+},
+{
+"code": "Milanese 2.5CM(Func. Handmade)",
+"label": "Milanese 2.5 cm (Func. Handmade)"
+},
+{
+"code": "Milanese 008(Func. Handmade)",
+"label": "Milanese 008 (Func. Handmade)"
+},
+{
+"code": "Curved Milanese 010(Deco. Handmade)",
+"label": "Curved Milanese 010 (Deco. Handmade)"
+},
+{
+"code": "Crescent(Deco. Handmade)",
+"label": "Crescent (Deco. Handmade)"
+},
+{
+"code": "Milanese 008 with tricolor stitch(Func. Handmade)",
+"label": "Milanese 008 with tricolor stitch (Func. Handmade)"
+}
+]
+},
+{
+"id": "lapelHole",
+"label": "Lapel buttonhole",
+"section": "Jacket",
+"default": "A",
+"show": [
+"A",
+"B",
+"C",
+"D",
+"E",
+"Z"
+],
+"choices": [
+{
+"code": "A",
+"label": "Left"
+},
+{
+"code": "B",
+"label": "Right"
+},
+{
+"code": "C",
+"label": "Left double"
+},
+{
+"code": "D",
+"label": "Both sides"
+},
+{
+"code": "E",
+"label": "Each side double"
+},
+{
+"code": "Z",
+"label": "None"
+}
+]
+},
+{
+"id": "collarBack",
+"label": "Back of collar",
+"section": "Jacket",
+"default": "A",
+"show": [
+"B",
+"A"
+],
+"choices": [
+{
+"code": "B",
+"label": "Turned back at the end"
+},
+{
+"code": "A",
+"label": "Normal"
 }
 ]
 },
@@ -100,13 +620,14 @@
 "section": "Pockets",
 "default": "B",
 "show": [
+"B",
+"HXD",
 "233",
 "234",
 "235",
 "237",
 "238",
 "A",
-"B",
 "BC",
 "BE",
 "C",
@@ -116,23 +637,30 @@
 "F",
 "G",
 "H",
-"HXD",
 "I",
 "J",
 "R"
 ],
 "choices": [
 {
+"code": "B",
+"label": "Straight Welt Chest Pocket in 2.5 cm"
+},
+{
+"code": "HXD",
+"label": "Round Patch Chest Pocket"
+},
+{
 "code": "233",
-"label": "Tulip shape patch chest pocket"
+"label": "Tulip Shape Patch Chest Pocket"
 },
 {
 "code": "234",
-"label": "Two inverted pleated chest pocket with basic flaps"
+"label": "Two Inverted Pleated Chest Pocket with Basic Flaps"
 },
 {
 "code": "235",
-"label": "Inverted pleated chest pocket with basic flap"
+"label": "Inverted Pleated Chest Pocket with Basic Flap"
 },
 {
 "code": "237",
@@ -144,63 +672,55 @@
 },
 {
 "code": "A",
-"label": "Straight welt chest pocket in 2.3 cm"
-},
-{
-"code": "B",
-"label": "Straight welt chest pocket in 2.5 cm"
+"label": "Straight Welt Chest Pocket in 2.3 cm"
 },
 {
 "code": "BC",
-"label": "Jetted chest pocket"
+"label": "Jetted Chest Pocket"
 },
 {
 "code": "BE",
-"label": "Angled box pleat chest patch pocket"
+"label": "Angled Box Pleat Chest Patch Pocket"
 },
 {
 "code": "C",
-"label": "Straight welt chest pocket in 2.7 cm"
+"label": "Straight Welt Chest Pocket in 2.7 cm"
 },
 {
 "code": "C1",
-"label": "Multi-pleated chest patch pocket"
+"label": "Multi-Pleated Chest Patch Pocket"
 },
 {
 "code": "D",
-"label": "Curved welt chest pocket in 2.3 cm"
+"label": "Curved Welt Chest Pocket in 2.3 cm"
 },
 {
 "code": "E",
-"label": "Curved welt chest pocket in 2.5 cm"
+"label": "Curved Welt Chest Pocket in 2.5 cm"
 },
 {
 "code": "F",
-"label": "Curved welt chest pocket in 2.7 cm"
+"label": "Curved Welt Chest Pocket in 2.7 cm"
 },
 {
 "code": "G",
-"label": "Patch chest pocket"
+"label": "Patch Chest Pocket"
 },
 {
 "code": "H",
 "label": "None"
 },
 {
-"code": "HXD",
-"label": "Round patch chest pocket"
-},
-{
 "code": "I",
-"label": "Boat chest pocket"
+"label": "Boat Chest Pocket"
 },
 {
 "code": "J",
-"label": "Curved welt chest pocket in 2.9 cm"
+"label": "Curved Welt Chest Pocket in 2.9 cm"
 },
 {
 "code": "R",
-"label": "Trapezoid chest pocket"
+"label": "Trapezoid Chest Pocket"
 }
 ]
 },
@@ -210,6 +730,7 @@
 "section": "Pockets",
 "default": "B",
 "show": [
+"HMD",
 "10",
 "11",
 "12",
@@ -243,7 +764,6 @@
 "F",
 "G",
 "H",
-"HMD",
 "I",
 "J",
 "M",
@@ -258,52 +778,56 @@
 ],
 "choices": [
 {
+"code": "HMD",
+"label": "Water-drop Shape Patch"
+},
+{
 "code": "10",
-"label": "Regular slanted flap in 6 cm"
+"label": "Regular Slanted Flap in 6 cm"
 },
 {
 "code": "11",
-"label": "Straight jetted flap in 5.5 cm"
+"label": "Straight Jetted Flap in 5.5 cm"
 },
 {
 "code": "12",
-"label": "Straight jetted flap in 6 cm"
+"label": "Straight Jetted Flap in 6 cm"
 },
 {
 "code": "13",
-"label": "Large slanted flap in 5.5 cm"
+"label": "Large Slanted Flap in 5.5 cm"
 },
 {
 "code": "14",
-"label": "Large slanted flap in 6 cm"
+"label": "Large Slanted Flap in 6 cm"
 },
 {
 "code": "15",
-"label": "Large slanted patch"
+"label": "Large Slanted Patch"
 },
 {
 "code": "18",
-"label": "Patch with basic flap"
+"label": "Patch with Basic Flap"
 },
 {
 "code": "19",
-"label": "Inverted pleated with angled flap & button"
+"label": "Inverted Pleated with Angled Flap & Button"
 },
 {
 "code": "2",
-"label": "Jetted with button tab"
+"label": "Jetted with Button Tab"
 },
 {
 "code": "20",
-"label": "Inverted pleated with basic flap"
+"label": "Inverted Pleated with Basic Flap"
 },
 {
 "code": "22",
-"label": "Straight jetted flap in 6.5 cm"
+"label": "Straight Jetted Flap in 6.5 cm"
 },
 {
 "code": "23",
-"label": "Regular slanted flap in 6.5 cm"
+"label": "Regular Slanted Flap in 6.5 cm"
 },
 {
 "code": "233",
@@ -311,31 +835,31 @@
 },
 {
 "code": "234",
-"label": "Box patch pocket with flap"
+"label": "Box Patch Pocket with Flap"
 },
 {
 "code": "235",
-"label": "New water-drop shape patch"
+"label": "New Water-drop Shape Patch"
 },
 {
 "code": "236",
-"label": "Inverted pleated with basic flap & button"
+"label": "Inverted Pleated with Basic Flap & Button"
 },
 {
 "code": "237",
-"label": "Patch with basic flap & button"
+"label": "Patch with Basic Flap & Button"
 },
 {
 "code": "238",
-"label": "Round patch pocket with top stitch 2 cm to opening"
+"label": "Round Patch Pocket with Top Stitch 2 cm to Opening"
 },
 {
 "code": "24",
-"label": "Large slanted flap in 6.5 cm"
+"label": "Large Slanted Flap in 6.5 cm"
 },
 {
 "code": "25Y",
-"label": "Regular slanted flap in 5.5 cm"
+"label": "Regular Slanted Flap in 5.5 cm"
 },
 {
 "code": "5",
@@ -343,91 +867,87 @@
 },
 {
 "code": "6",
-"label": "Patch pocket with straight button tab"
+"label": "Patch Pocket with Straight Button Tab"
 },
 {
 "code": "7",
-"label": "Patch pocket with rounded button tab"
+"label": "Patch Pocket with Rounded Button Tab"
 },
 {
 "code": "A",
-"label": "Straight jetted flap in 4 cm"
+"label": "Straight Jetted Flap in 4 cm"
 },
 {
 "code": "B",
-"label": "Straight jetted flap in 4.5 cm"
+"label": "Straight Jetted Flap in 4.5 cm"
 },
 {
 "code": "BE",
-"label": "Angled box pleat patch pocket"
+"label": "Angled Box Pleat Patch Pocket"
 },
 {
 "code": "C",
-"label": "Straight jetted flap in 5 cm"
+"label": "Straight Jetted Flap in 5 cm"
 },
 {
 "code": "D",
-"label": "Straight jetted pocket"
+"label": "Straight Jetted Pocket"
 },
 {
 "code": "DJ",
-"label": "Diagonal patch pocket with flap"
+"label": "Diagonal Patch Pocket with Flap"
 },
 {
 "code": "E",
-"label": "Straight welt pocket in 1.2 cm"
+"label": "Straight Welt Pocket in 1.2 cm"
 },
 {
 "code": "F",
-"label": "Straight welt pocket in 1.5 cm"
+"label": "Straight Welt Pocket in 1.5 cm"
 },
 {
 "code": "G",
-"label": "Regular slanted flap in 4 cm"
+"label": "Regular Slanted Flap in 4 cm"
 },
 {
 "code": "H",
-"label": "Regular slanted flap in 4.5 cm"
-},
-{
-"code": "HMD",
-"label": "Water-drop shape patch"
+"label": "Regular Slanted Flap in 4.5 cm"
 },
 {
 "code": "I",
-"label": "Regular slanted flap in 5 cm"
+"label": "Regular Slanted Flap in 5 cm"
 },
 {
 "code": "J",
-"label": "Slanted jetted pocket"
+"label": "Slanted Jetted Pocket"
 },
 {
 "code": "M",
-"label": "Rounded patch pocket"
+"label": "Rounded Patch Pocket"
 },
 {
 "code": "N",
-"label": "Straight welt pocket in 1 cm"
+"label": "Straight Welt Pocket in 1 cm"
 },
 {
 "code": "O",
-"label": "Large slanted flap in 4 cm"
+"label": "Large Slanted Flap in 4 cm"
 },
 {
 "code": "Q",
-"label": "Large slanted flap in 4.5 cm"
+"label": "Large Slanted Flap in 4.5 cm"
 },
 {
 "code": "R",
-"label": "Large slanted flap in 5 cm"
+"label": "Large Slanted Flap in 5 cm"
 },
 {
 "code": "S",
-"label": "Large slanted jetted pocket"
+"label": "Large Slanted Jetted Pocket"
 },
 {
 "code": "S1",
-"label": "Multi-pleat patch pocket"
+"label": "Multi-Pleat Patch Pocket"
 },
 {
 "code": "SA",
@@ -435,7 +955,7 @@
 },
 {
 "code": "Y",
-"label": "Jetted pocket 4"
+"label": "Jetted Pocket 4"
 }
 ]
 },
@@ -505,7 +1025,47 @@
 },
 {
 "code": "YK",
-"label": "Italian card pocket"
+"label": "Italian Card Pocket"
+}
+]
+},
+{
+"id": "namecard",
+"label": "Inside card pocket",
+"section": "Pockets",
+"default": "D",
+"show": [
+"A",
+"B",
+"C",
+"D",
+"E",
+"F"
+],
+"choices": [
+{
+"code": "A",
+"label": "Left"
+},
+{
+"code": "B",
+"label": "Right"
+},
+{
+"code": "C",
+"label": "Both sides"
+},
+{
+"code": "D",
+"label": "None"
+},
+{
+"code": "E",
+"label": "Left Inner Pocket Depth 15 cm"
+},
+{
+"code": "F",
+"label": "Right Inner Pocket Depth 15 cm"
 }
 ]
 },
@@ -550,17 +1110,42 @@
 "section": "Sleeves",
 "default": "4",
 "show": [
+"4",
+"0",
+"1",
+"2",
 "3",
-"4"
+"5",
+"6"
 ],
 "choices": [
+{
+"code": "4",
+"label": "Four"
+},
+{
+"code": "0",
+"label": "None"
+},
+{
+"code": "1",
+"label": "One"
+},
+{
+"code": "2",
+"label": "Two"
+},
 {
 "code": "3",
 "label": "Three"
 },
 {
-"code": "4",
-"label": "Four"
+"code": "5",
+"label": "Five"
+},
+{
+"code": "6",
+"label": "Six"
 }
 ]
 },
@@ -570,8 +1155,9 @@
 "section": "Sleeves",
 "default": "B",
 "show": [
+"A",
 "B",
-"A"
+"Z"
 ],
 "choices": [
 {
@@ -580,103 +1166,7 @@
 },
 {
 "code": "B",
-"label": "No kissing"
-}
-]
-},
-{
-"id": "sleeveVent",
-"label": "Sleeve buttonholes",
-"section": "Sleeves",
-"default": "A",
-"show": [
-"A",
-"B"
-],
-"choices": [
-{
-"code": "A",
-"label": "Functional"
-},
-{
-"code": "B",
-"label": "Mock"
-}
-]
-},
-{
-"id": "cuff",
-"label": "Sleeve cuff",
-"section": "Sleeves",
-"default": "A",
-"show": [
-"A",
-"B",
-"C",
-"C2",
-"C3",
-"X"
-],
-"choices": [
-{
-"code": "A",
-"label": "Square sleeve cuff"
-},
-{
-"code": "B",
-"label": "Round sleeve cuff"
-},
-{
-"code": "C",
-"label": "British turn-up cuff"
-},
-{
-"code": "C2",
-"label": "Turn-back cuff 3.5 cm"
-},
-{
-"code": "C3",
-"label": "Turn-back cuff 4 cm"
-},
-{
-"code": "X",
-"label": "Angled vent cuff"
-}
-]
-},
-{
-"id": "lapelHole",
-"label": "Lapel buttonhole",
-"section": "Details",
-"default": "A",
-"show": [
-"A",
-"B",
-"C",
-"D",
-"E",
-"Z"
-],
-"choices": [
-{
-"code": "A",
-"label": "Left"
-},
-{
-"code": "B",
-"label": "Right"
-},
-{
-"code": "C",
-"label": "Left double"
-},
-{
-"code": "D",
-"label": "Both sides"
-},
-{
-"code": "E",
-"label": "Each side double"
+"label": "Not kissing"
 },
 {
 "code": "Z",
@@ -685,22 +1175,27 @@
 ]
 },
 {
-"id": "holes",
-"label": "Buttonholes made",
-"section": "Details",
+"id": "sleeveHoleDir",
+"label": "Sleeve buttonhole direction",
+"section": "Sleeves",
 "default": "A",
 "show": [
 "A",
-"H"
+"B",
+"Z"
 ],
 "choices": [
 {
 "code": "A",
-"label": "By machine"
+"label": "Straight"
 },
 {
-"code": "H",
-"label": "By hand"
+"code": "B",
+"label": "Slant"
+},
+{
+"code": "Z",
+"label": "None"
 }
 ]
 },
@@ -711,8 +1206,13 @@
 "default": "C",
 "show": [
 "A",
+"B",
 "C",
-"E"
+"D",
+"E",
+"F",
+"G",
+"H"
 ],
 "choices": [
 {
@@ -720,12 +1220,32 @@
 "label": "None"
 },
 {
+"code": "B",
+"label": "0.15 cm edge by machine"
+},
+{
 "code": "C",
-"label": "0.6 cm edge, by machine"
+"label": "0.6 cm edge by machine"
+},
+{
+"code": "D",
+"label": "0.15 cm edge by hands"
 },
 {
 "code": "E",
-"label": "0.6 cm edge, by hand"
+"label": "0.6 cm edge by hands"
+},
+{
+"code": "F",
+"label": "0.15*0.6 cm double pic stitching"
+},
+{
+"code": "G",
+"label": "Machine 0.6 cm top stitching"
+},
+{
+"code": "H",
+"label": "Top Stitch 4 cm to edge"
 }
 ]
 },
@@ -735,10 +1255,11 @@
 "section": "Details",
 "default": "B",
 "show": [
-"B",
 "A",
+"B",
+"C",
 "D",
-"C"
+"E"
 ],
 "choices": [
 {
@@ -756,6 +1277,10 @@
 {
 "code": "D",
 "label": "Neapolitan"
+},
+{
+"code": "E",
+"label": "Shirt Head"
 }
 ]
 },
@@ -767,7 +1292,9 @@
 "show": [
 "A",
 "B",
-"C"
+"C",
+"D",
+"L"
 ],
 "choices": [
 {
@@ -781,6 +1308,69 @@
 {
 "code": "C",
 "label": "Full canvas (3 extra working days)"
+},
+{
+"code": "D",
+"label": "Light Half Canvas"
+},
+{
+"code": "L",
+"label": "Ultra-thin Half Canvas"
+}
+]
+},
+{
+"id": "facing",
+"label": "Facing",
+"section": "Details",
+"default": "B",
+"show": [
+"B",
+"A",
+"C",
+"DGG",
+"E",
+"F",
+"G",
+"G03",
+"US66"
+],
+"choices": [
+{
+"code": "B",
+"label": "Facing 4"
+},
+{
+"code": "A",
+"label": "Facing 5"
+},
+{
+"code": "C",
+"label": "Sword-Shaped Facing / Double Point Facing"
+},
+{
+"code": "DGG",
+"label": "Facing 9"
+},
+{
+"code": "E",
+"label": "Facing 2"
+},
+{
+"code": "F",
+"label": "Facing 1"
+},
+{
+"code": "G",
+"label": "Available for half lining"
+},
+{
+"code": "G03",
+"label": "Available for no lining"
+},
+{
+"code": "US66",
+"label": "Facing 7"
 }
 ]
 },
@@ -806,6 +1396,56 @@
 {
 "code": "C",
 "label": "No lining"
+}
+]
+},
+{
+"id": "brandLabel",
+"label": "Brand label",
+"section": "Lining",
+"default": "A",
+"show": [
+"A",
+"B",
+"E",
+"F",
+"K",
+"L1",
+"R",
+"S"
+],
+"choices": [
+{
+"code": "A",
+"label": "No brand label"
+},
+{
+"code": "B",
+"label": "2 cm above right inner pocket"
+},
+{
+"code": "E",
+"label": "2 cm above left inner pocket"
+},
+{
+"code": "F",
+"label": "8 cm below the left inner pocket"
+},
+{
+"code": "K",
+"label": "8 cm below the right inner pocket, on self-fabric"
+},
+{
+"code": "L1",
+"label": "Above the left inner pocket (no label on lining)"
+},
+{
+"code": "R",
+"label": "Under the left inner pocket (by machine)"
+},
+{
+"code": "S",
+"label": "Under the left inner pocket (by handmade)"
 }
 ]
 }

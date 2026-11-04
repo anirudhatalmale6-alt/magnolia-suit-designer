@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '14';
+    var V = '15';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=14">
+<link rel="stylesheet" href="css/designer.css?v=15">
 </head>
 <body>
 <header class="topbar">
@@ -29,7 +29,7 @@
     <button class="ghost" id="staffBtn" type="button">Staff</button>
   </div>
 </header>
-<div class="ribbon">Preview (Phase 2): fabrics, style options, buttons, thread colours and linings. Prices and ordering come in the next phases.</div>
+<div class="ribbon">Preview (Phase 2): fabrics, all style options, buttons, thread colours and linings. Prices and ordering come in the next phases.</div>
 
 <div class="wrap">
   <section class="stage" id="stage">
@@ -79,11 +79,9 @@
     <section class="tab" data-pane="style" hidden>
       <div id="styleSteps"></div>
       <div class="staff-only adv" hidden>
-        <h3>Advanced (staff)</h3>
-        <label class="adv-row">Gorge height
-          <select id="gorge"><option value="standard">Standard</option><option value="low">Low</option><option value="high">High</option></select></label>
-        <label class="adv-row">Exact lapel (all factory lapels)<select id="lapelExact"></select></label>
-        <p class="hint">Gorge and the exact lapel go on the order sheet. The picture keeps the standard gorge.</p>
+        <h3>Staff only: hidden factory options</h3>
+        <p class="hint">Not shown to customers. Each one starts on the factory default; change only what the order needs.</p>
+        <div id="staffHidden"></div>
       </div>
     </section>
 
@@ -99,16 +97,17 @@
 
       <h3>Lining</h3>
       <div class="grid lin-grid" id="linGrid"></div>
+      <label class="check"><input type="checkbox" id="sleeveLinSame" checked> Sleeve lining the same as the body</label>
+      <div id="sleeveLinBox" hidden><p class="hint">Choose the sleeve lining:</p><div class="grid lin-grid" id="sleeveLinGrid"></div></div>
 
-      <h3>Contrast fabric</h3>
-      <p class="hint">Shown on the order sheet. The picture keeps the jacket cloth for these parts.</p>
-      <div class="thread-row"><b>Undercollar</b><div class="grid lin-grid" id="ucGrid"></div></div>
-      <div class="thread-row"><b>Elbow patches</b>
-        <div class="seg" id="elbowSeg"><button type="button" data-v="" class="on">None</button><button type="button" data-v="A">Round elbow patch</button><button type="button" data-v="D">Round sleeve patch</button></div>
-        <div class="grid lin-grid" id="elbowGrid" hidden></div></div>
-      <div class="thread-row"><b>Satin on lapel</b>
-        <div class="seg" id="satinSeg"><button type="button" data-v="" class="on">None</button><button type="button" data-v="1cm">1 cm satin trim on the lapel</button></div>
-        <div class="grid lin-grid" id="satinGrid" hidden></div></div>
+      <div class="staff-only adv" hidden>
+        <h3>Staff only: contrast fabric</h3>
+        <div class="thread-row"><b>Undercollar (collar felt)</b><div class="grid lin-grid" id="ucGrid"></div></div>
+        <div class="thread-row"><b>Elbow patches</b>
+          <div class="seg" id="elbowSeg"><button type="button" data-v="" class="on">None</button><button type="button" data-v="A">Round elbow patch</button><button type="button" data-v="D">Round sleeve patch</button></div>
+          <div class="grid lin-grid" id="elbowGrid" hidden></div></div>
+        <p class="hint">Satin and other contrast parts: Style tab, "Contrast position" and "Contrast fabric".</p>
+      </div>
     </section>
 
     <section class="tab" data-pane="summary" hidden>
@@ -137,6 +136,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=14"></script>
+<script src="js/designer.js?v=15"></script>
 </body>
 </html>
