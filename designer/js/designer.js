@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '13';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '14';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -14,7 +14,7 @@
   const cv = $('#cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), busy = $('#busy');
   const state = { view: 'front', fabric: null, tile: null, custom: false, zoom: null,
     opts: {}, button: null, sleeveSame: true, sleeveButton: null, thread: { button: null, lapel: null, front: null, sleeve: [] },
-    lining: null, gorge: 'standard', lapelExact: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null };
+    lining: null, gorge: 'standard', lapelExact: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null, satin: '', satinFabric: null };
   const views = {}, tiles = {};
   let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], LININGS = [], THREADS = [], CONTRAST = [];
 
@@ -96,9 +96,9 @@
     }
     const miss = [];
     if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
-    if (best.f !== want.front) miss.push('this button front');
+    if (best.f !== want.front) miss.push(((choiceOf('front') || {}).label || 'this front').toLowerCase());
     if (best.p !== want.pocket || best.t !== want.ticket) miss.push('these pockets');
-    const note = miss.length ? `A photo with ${miss.join(' and ')} is not in yet, so the closest one is shown. Your choice still goes on the order.` : '';
+    const note = miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '';
     return { name: best.name, note };
   }
   async function loadView(name) {
@@ -363,6 +363,8 @@
       G ? `${G.undercollar} ${state.undercollar ? trimCode('contrast', state.undercollar) : G.undercollarMatch}` : '']);
     rows.push(['Elbow patches', state.elbow ? `${state.elbow === 'A' ? 'Round elbow patch' : 'Round sleeve patch'}, ${contrastName(state.elbowFabric)}` : 'None',
       G && state.elbow ? `${G.elbow} ${state.elbow} · ${G.elbowFabric} ${trimCode('contrast', state.elbowFabric)}` : '']);
+    rows.push(['Satin on lapel', state.satin ? `1 cm trim, ${contrastName(state.satinFabric)}` : 'None',
+      STAFF && state.satin ? `Contrast position: 1cm satin splicing on lapel · ${trimCode('contrast', state.satinFabric)}` : '']);
     $('#summary').innerHTML = rows.map(([k, v, code, head]) => head ? `<dt class="sum-h">${k}</dt><dd></dd>` :
       `<dt>${k}</dt><dd>${esc(v || '')}${STAFF && code ? ` <span class="code">${esc(code)}</span>` : ''}</dd>`).join('');
   }
@@ -508,6 +510,7 @@
 
   // ---------- contrast fabrics (undercollar melton, elbow patch suede) ----------
   const contrastName = id => { const c = CONTRAST.find(x => x.id === id); if (!c) return '';
+    if (c.name) return c.name;
     return `${c.kind === 'melton' ? 'Melton' : 'Suede'} ${CONTRAST.filter(x => x.kind === c.kind).indexOf(c) + 1}`; };
   function cTiles(kind, cur, none) {
     return (none ? `<button type="button" class="fab${!cur ? ' on' : ''}" data-c=""><span class="ph">Same cloth</span><b>${none}</b></button>` : '') +
@@ -519,7 +522,14 @@
     $$('#elbowSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === state.elbow));
     $('#elbowGrid').hidden = !state.elbow;
     if (state.elbow) $('#elbowGrid').innerHTML = cTiles('suede', state.elbowFabric);
+    $$('#satinSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === state.satin));
+    $('#satinGrid').hidden = !state.satin;
+    if (state.satin) $('#satinGrid').innerHTML = cTiles('satin', state.satinFabric);
   }
+  $('#satinSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.satin = b.dataset.v;
+    if (state.satin && !state.satinFabric) state.satinFabric = (CONTRAST.find(c => c.kind === 'satin') || {}).id || null;
+    paintContrast(); paintSummary(); };
+  $('#satinGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.satinFabric = b.dataset.c; paintContrast(); paintSummary(); };
   $('#ucGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.undercollar = b.dataset.c || null; paintContrast(); paintSummary(); };
   $('#elbowSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.elbow = b.dataset.v;
     if (state.elbow && !state.elbowFabric) state.elbowFabric = (CONTRAST.find(c => c.kind === 'suede') || {}).id || null;
