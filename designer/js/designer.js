@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '9';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '10';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -352,7 +352,8 @@
     rows.push(['Front buttonholes', tn('front'), tc('front')]);
     const n = sleeveHoles(), sl = state.thread.sleeve.slice(0, n);
     rows.push(['Sleeve buttonholes', sl.some(Boolean) ? Array.from({ length: n }, (_, i) => `${i + 1}: ${sl[i] ? threadName(sl[i]) + (trimCode('threads', sl[i]) ? ` (${trimCode('threads', sl[i])})` : '') : 'match'}`).join(', ') : 'Matching the cloth', '']);
-    rows.push(['Lining', ln ? liningName(ln) : 'Matching (to be chosen)', trimCode('linings', ln) || '']);
+    const lo = LININGS.find(l => l.id === ln);
+    rows.push(['Lining', lo ? `${lo.name || liningName(ln)}${lo.book ? '' : ' (reach out for availability)'}` : 'Matching (to be chosen)', trimCode('linings', ln) || '']);
     $('#summary').innerHTML = rows.map(([k, v, code, head]) => head ? `<dt class="sum-h">${k}</dt><dd></dd>` :
       `<dt>${k}</dt><dd>${esc(v || '')}${STAFF && code ? ` <span class="code">${esc(code)}</span>` : ''}</dd>`).join('');
   }
@@ -480,9 +481,19 @@
     if (key === 'button') render(); else paintSummary();
   };
   const liningName = id => `Lining ${parseInt(id.slice(1), 10)}`;
+  const LIN_GROUPS = [['Plain', l => l.book && (l.kind === 'plain' || l.kind === 'bemberg')], ['Printed', l => l.book && l.kind === 'printed'],
+    ['Picture linings', l => l.book && l.kind === 'positional', 'One printed scene across the back. Only with double vents or no vent.'],
+    ['Reach out for availability', l => !l.book, 'Not in our books. Please ask us before choosing one of these.']];
+  function linTile(l) {
+    const code = trimCode('linings', l.id);
+    return `<button type="button" class="fab${l.id === state.lining ? ' on' : ''}" data-l="${l.id}"><img src="linings/${l.id}.jpg?v=${VER}" alt="" loading="lazy" width="150" height="105"><b>${l.name ? esc(l.name) : liningName(l.id)}</b>${code ? `<small class="code">${esc(code)}</small>` : ''}</button>`;
+  }
   function paintLinings() {
     $('#linGrid').innerHTML = `<button type="button" class="fab${!state.lining ? ' on' : ''}" data-l=""><span class="ph">Tone on tone</span><b>Matching</b><small>We choose a tone to suit the cloth</small></button>` +
-      LININGS.filter(l => l.body).map(l => `<button type="button" class="fab${l.id === state.lining ? ' on' : ''}" data-l="${l.id}"><img src="linings/${l.id}.jpg?v=${VER}" alt="" loading="lazy" width="150" height="105"><b>${liningName(l.id)}</b>${trimCode('linings', l.id) ? `<small class="code">${esc(trimCode('linings', l.id))}</small>` : ''}</button>`).join('');
+      LIN_GROUPS.map(([title, test, hint]) => {
+        const list = LININGS.filter(test);
+        return list.length ? `<p class="lin-h${hint && hint.startsWith('Not in') ? ' warn' : ''}">${esc(title)}</p>${hint ? `<p class="hint lin-hint">${esc(hint)}</p>` : ''}${list.map(linTile).join('')}` : '';
+      }).join('');
   }
   $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); };
 

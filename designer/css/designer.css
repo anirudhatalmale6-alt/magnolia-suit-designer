@@ -141,3 +141,6 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
   .tabs button { gap: 4px; padding: 8px 2px; font-size: 13.5px; }
   .tabs button span { width: 19px; height: 19px; font-size: 11px; }
 }
+.lin-grid .lin-h { grid-column: 1 / -1; margin: 14px 0 0; font-weight: 600; font-size: 13.5px; color: var(--teal-dd); }
+.lin-grid .lin-hint { grid-column: 1 / -1; margin: 0; font-size: 12.5px; }
+.lin-grid .lin-h.warn { color: #9a4a1c; border-top: 1px solid var(--line); padding-top: 14px; }
