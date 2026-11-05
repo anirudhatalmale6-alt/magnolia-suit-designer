@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '28';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '29';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -272,12 +272,12 @@
 
   // ---------- lining on the open-jacket view ----------
   // The photo's grey lining keeps its folds and pocket welts (shading); its colour becomes the chosen lining.
-  // Plain linings are one colour; printed ones repeat their swatch photo (mirrored, about LIN_CM wide).
-  const LIN_CM = 10, linTex = {};
+  // Plain linings are one colour; printed ones repeat their swatch photo (made seamless at build time, LIN_CM wide).
+  const LIN_CM = 14, linTex = {};
   async function loadLinTex(l, Z) {
     const key = l.id + '@' + Z;
     if (linTex[key]) return linTex[key];
-    const im = await loadImg(`linings/${l.id}.jpg?v=${VER}`);
+    const im = await loadImg(`linings_tile/${l.id}.jpg?v=${VER}`);
     const w = Math.max(8, Math.round(LIN_CM * PX_PER_CM * Z)), h = Math.max(8, Math.round(w * im.height / im.width));
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, w, h);
@@ -302,9 +302,8 @@
         if (!a) continue;
         const sh = L[q] / 128;
         let c = flat;
-        if (!c) {                                   // mirrored repeat so the swatch edges never show a seam
-          let u = Math.floor((zx * Z + ox)) % (2 * tex.w), v = Math.floor((zy * Z + oy)) % (2 * tex.h);
-          if (u >= tex.w) u = 2 * tex.w - 1 - u; if (v >= tex.h) v = 2 * tex.h - 1 - v;
+        if (!c) {                                   // straight repeat: the tile is seamless
+          const u = Math.floor(zx * Z + ox) % tex.w, v = Math.floor(zy * Z + oy) % tex.h;
           const k = (v * tex.w + u) * 3; c = [tex.T[k], tex.T[k + 1], tex.T[k + 2]];
         }
         for (let ch = 0; ch < 3; ch++) {
