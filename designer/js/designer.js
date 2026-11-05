@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '17';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '18';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -15,10 +15,10 @@
   const state = { view: 'front', fabric: null, tile: null, custom: false, zoom: null,
     opts: {}, button: null, sleeveSame: true, sleeveButton: null, thread: { button: null, lapel: null, front: null, sleeve: [] },
     lining: null, sleeveLinSame: true, sleeveLining: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null, hid: {},
-    mono: { type: '', text: '', colour: null, font: null, pos: null, height: null, gal: null, gheight: null, drawing: '' },
+    monos: [], monoSel: 0, fabricPicked: false, reached: 0,
     remark: '', photos: [null, null, null], prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
-  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null;
+  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null;
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
                   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
@@ -197,7 +197,7 @@
   // The photo's own buttons stay in the overlay (light, shadow, thread holes); their colour is moved to the
   // chosen button's colour. Buttons seen straight from the front are replaced by the real catalogue photo.
   const btnImgs = {};
-  const btnByCode = id => BUTTONS.find(b => b.id === id);
+  const btnByCode = id => BUTTONS.find(b => b.id === id) || SLEEVES.find(b => b.id === id);
   const trimCode = (kind, id) => STAFF && STAFF._trims && id ? STAFF._trims[kind][id] : null;
   const sleeveBtn = () => state.sleeveSame ? state.button : (state.sleeveButton || state.button);
   function threadRGB(key) { const t = state.thread[key]; return t ? (THREADS.find(x => x.id === t) || {}).rgb : null; }
@@ -405,7 +405,7 @@
     };
     $('#grid').onclick = e => {
       const b = e.target.closest('[data-id]'); if (!b) return;
-      state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false;
+      state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; paintSteps();
       $$('#grid .fab').forEach(x => x.classList.toggle('on', x === b)); render();
     };
   }
@@ -480,7 +480,7 @@
   };
 
   // ---------- trims: buttons, thread colours, lining ----------
-  const MAT = { Horn: 'Horn', Shell: 'Shell', Metal: 'Metal', Pes: 'Polyester', Bone: 'Bone', Fabric: 'Covered', '': 'Button' };
+  const MAT = { Horn: 'Horn', Corozo: 'Corozo', Shell: 'Shell', Metal: 'Metal', Pes: 'Polyester', Bone: 'Bone', Wood: 'Wood', Fabric: 'Covered', '': 'Button' };
   let btnFilter = '';
   function btnTiles(list, cur) {
     return `<button type="button" class="fab${!cur ? ' on' : ''}" data-b=""><span class="ph round">Standard</span><b>As pictured</b></button>` +
@@ -493,7 +493,7 @@
     const list = BUTTONS.filter(b => !btnFilter || b.mat === btnFilter);
     $('#btnGrid').innerHTML = btnTiles(list, state.button);
     $('#sleeveBtnBox').hidden = state.sleeveSame;
-    if (!state.sleeveSame) $('#sleeveGrid').innerHTML = btnTiles(BUTTONS.filter(b => b.sleeve), state.sleeveButton);
+    if (!state.sleeveSame) $('#sleeveGrid').innerHTML = btnTiles(SLEEVES, state.sleeveButton);
   }
   $('#btnMat').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; btnFilter = b.dataset.m; paintButtons(); };
   $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); render(); };
@@ -540,12 +540,12 @@
   function paintLinings() {
     $('#linGrid').innerHTML = `<button type="button" class="fab${!state.lining ? ' on' : ''}" data-l=""><span class="ph">Tone on tone</span><b>Matching</b><small>We choose a tone to suit the cloth</small></button>` +
       LIN_GROUPS.map(([title, test, hint]) => {
-        const list = LININGS.filter(test);
+        const list = LININGS.filter(l => l.b !== false && test(l));
         return list.length ? `<p class="lin-h${hint && hint.startsWith('Not in') ? ' warn' : ''}">${esc(title)}</p>${hint ? `<p class="hint lin-hint">${esc(hint)}</p>` : ''}${list.map(l => linTile(l)).join('')}` : '';
       }).join('');
     $('#sleeveLinBox').hidden = state.sleeveLinSame;
     if (!state.sleeveLinSame) {
-      const sl = LININGS.filter(l => l.kind !== 'positional');      // picture linings are cut for the back only
+      const sl = LININGS.filter(l => l.s && l.kind !== 'positional');      // sleeve linings the factory offers; picture linings are cut for the back only
       $('#sleeveLinGrid').innerHTML = `<button type="button" class="fab${!state.sleeveLining ? ' on' : ''}" data-l=""><span class="ph">Tone on tone</span><b>Matching</b></button>` +
         sl.filter(l => l.book).map(l => linTile(l, state.sleeveLining)).join('') +
         (sl.some(l => !l.book) ? `<p class="lin-h warn">Reach out for availability</p>` + sl.filter(l => !l.book).map(l => linTile(l, state.sleeveLining)).join('') : '');
@@ -576,9 +576,23 @@
     paintContrast(); paintSummary(); };
   $('#elbowGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.elbowFabric = b.dataset.c; paintContrast(); paintSummary(); };
 
-  // ---------- monogram (factory Monogram tab: letters, a gallery symbol, or the customer's own drawing) ----------
+  // ---------- monogram (factory Monogram tab: letters, a gallery symbol, or the customer's own drawing; max 2 per jacket) ----------
+  const MAX_MONO = 2;
+  const newMono = () => ({ type: '', text: '', colour: null, font: null, pos: null, height: null, gal: null, gheight: null, drawing: '' });
+  state.monos.push(newMono());
+  const cm = () => state.monos[state.monoSel];
+  function paintMonoTabs() {
+    $('#monoTabs').innerHTML = state.monos.map((m, i) => `<button type="button" class="chip${i === state.monoSel ? ' on' : ''}" data-mi="${i}">Monogram ${i + 1}${i ? ' <span class="x" data-mx="' + i + '">&times;</span>' : ''}</button>`).join('') +
+      (state.monos.length < MAX_MONO ? '<button type="button" class="chip" data-madd="1">+ Add a second monogram</button>' : '');
+  }
+  $('#monoTabs').onclick = e => {
+    const x = e.target.closest('[data-mx]'); if (x) { state.monos.splice(+x.dataset.mx, 1); state.monoSel = 0; paintMono(); paintSummary(); return; }
+    if (e.target.closest('[data-madd]')) { state.monos.push(newMono()); state.monoSel = state.monos.length - 1; paintMono(); paintSummary(); return; }
+    const b = e.target.closest('[data-mi]'); if (b) { state.monoSel = +b.dataset.mi; paintMono(); }
+  };
   function paintMono() {
-    const m = state.mono, M = MONO;
+    paintMonoTabs();
+    const m = cm(), M = MONO;
     $$('#monoType button').forEach(b => b.classList.toggle('on', b.dataset.v === m.type));
     if (!m.type) { $('#monoBox').innerHTML = ''; return; }
     const row = (key, label, cur, list) => stepRow(`data-mstep="${key}"`, label, cur, list);
@@ -597,23 +611,27 @@
     if (m.type !== 'drawing') html += `<div class="thread-row"><b>Thread colour</b>${palette(m.colour, 'mono')}</div>`;
     html += row('pos', 'Position', m.pos || '', [{ v: '', label: 'Choose a position' }].concat(M.positions.map(p => ({ v: p.id, label: p.name, img: p.img && 'mono/' + p.img }))));
     const H = m.type === 'gallery' ? M.gHeights : M.heights;
-    html += `<div class="adv-row">Height<div class="seg" id="monoH">${H.map(h => `<button type="button" data-v="${h.id}" class="${(m.type === 'gallery' ? m.gheight : m.height) === h.id ? 'on' : ''}">${esc(h.name)}</button>`).join('')}</div></div>`;
+    const hk = m.type === 'gallery' ? 'gheight' : 'height';
+    html += row(hk, 'Height', m[hk] || '', [{ v: '', label: 'Standard' }].concat(H.map(h => ({ v: h.id, label: h.name, img: h.img && 'mono/' + h.img }))));
     $('#monoBox').innerHTML = html;
   }
-  $('#monoType').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.mono.type = b.dataset.v; paintMono(); paintSummary(); };
-  $('#monoBox').oninput = e => { if (e.target.id !== 'monoText') return; state.mono.text = e.target.value; $('#monoCount').textContent = `${state.mono.text.length}/${MONO.maxText}`; paintSummary(); };
-  $('#monoBox').onchange = e => { if (e.target.id !== 'monoDraw' || !e.target.files[0]) return; state.mono.drawing = e.target.files[0].name; paintMono(); paintSummary(); };
+  $('#monoType').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; cm().type = b.dataset.v; paintMono(); paintSummary(); };
+  $('#monoBox').oninput = e => { if (e.target.id !== 'monoText') return; cm().text = e.target.value; $('#monoCount').textContent = `${cm().text.length}/${MONO.maxText}`; paintSummary(); };
+  $('#monoBox').onchange = e => { if (e.target.id !== 'monoDraw' || !e.target.files[0]) return; cm().drawing = e.target.files[0].name; paintMono(); paintSummary(); };
   $('#monoBox').onclick = e => {
     if (toggleStep(e)) return;
     const sk = e.target.closest('.sk');
-    if (sk) { state.mono[sk.closest('[data-mstep]').dataset.mstep] = sk.dataset.v || null; paintMono(); paintSummary(); return; }
-    const c = e.target.closest('.pal [data-c]'); if (c) { state.mono.colour = c.dataset.c || null; paintMono(); paintSummary(); return; }
-    const h = e.target.closest('#monoH [data-v]'); if (h) { state.mono[state.mono.type === 'gallery' ? 'gheight' : 'height'] = h.dataset.v; paintMono(); paintSummary(); }
+    if (sk) { cm()[sk.closest('[data-mstep]').dataset.mstep] = sk.dataset.v || null; paintMono(); paintSummary(); return; }
+    const c = e.target.closest('.pal [data-c]'); if (c) { cm().colour = c.dataset.c || null; paintMono(); paintSummary(); return; }
   };
   function monoRows(rows) {
-    const m = state.mono, M = MONO, S = STAFF && STAFF._mono, code = (k, v) => S && v ? ` · ${S.groups[k]} ${v}` : '';
-    rows.push(['<b>Monogram</b>', '', '', true]);
-    if (!m.type) { rows.push(['Monogram', 'None', '']); return; }
+    const used = state.monos.filter(m => m.type);
+    if (!used.length) { rows.push(['<b>Monogram</b>', '', '', true]); rows.push(['Monogram', 'None', '']); return; }
+    used.forEach((m, i) => monoRow(rows, m, used.length > 1 ? `Monogram ${i + 1}` : 'Monogram'));
+  }
+  function monoRow(rows, m, title) {
+    const M = MONO, S = STAFF && STAFF._mono;
+    rows.push([`<b>${title}</b>`, '', '', true]);
     const pick = (list, id) => (list.find(x => x.id === id) || {}).name;
     if (m.type === 'word') {
       rows.push(['Monogram text', m.text || 'Not entered yet', '']);
@@ -647,10 +665,37 @@
 
   // ---------- views / tabs ----------
   $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+  // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
+  const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
+  function showTab(name) {
+    $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
+    $$('.tab').forEach(p => { p.hidden = p.dataset.pane !== name; });
+    $('.panel').scrollTop = 0; if (innerWidth <= 900) $('.tabs').scrollIntoView({ block: 'start' });
+  }
+  function paintSteps() {
+    $$('.tabs button').forEach(b => b.classList.toggle('locked', !STAFF && STEPS_ORDER.indexOf(b.dataset.tab) > state.reached));
+    const fb = $('[data-next=fabric]');
+    fb.disabled = !state.fabricPicked && !STAFF;
+    fb.nextElementSibling.textContent = fb.disabled ? 'Choose a fabric first (tap one of the swatches).' : '';
+  }
   $$('.tabs button').forEach(b => b.onclick = () => {
-    $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
-    $$('.tab').forEach(p => { p.hidden = p.dataset.pane !== b.dataset.tab; });
+    const i = STEPS_ORDER.indexOf(b.dataset.tab);
+    if (!STAFF && i > state.reached) {
+      const need = STEPS_ORDER[state.reached];
+      toast(`Please finish the ${need[0].toUpperCase() + need.slice(1)} step first, then tap Next.`); return;
+    }
+    showTab(b.dataset.tab);
   });
+  $$('.next-btn').forEach(b => b.onclick = () => {
+    const i = STEPS_ORDER.indexOf(b.dataset.next);
+    if (b.disabled) return;
+    state.reached = Math.max(state.reached, i + 1); paintSteps(); showTab(STEPS_ORDER[i + 1]);
+  });
+  let toastT;
+  function toast(msg) {
+    let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600);
+  }
   function openSwatch() {
     const f = state.fabric; if (!f || state.custom) return;
     $('#swImg').src = `swatch/${f.id}.jpg?v=${VER}`;
@@ -684,7 +729,7 @@
     $('#staffBadge').hidden = false; $('#staffBtn').textContent = 'Exit staff';
     $$('.staff-only').forEach(x => { x.hidden = false; });
     $('#q').placeholder = 'Search by number, colour, cloth or factory code';
-    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast(); paintMono();
+    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast(); paintMono(); paintSteps();
   }
   function staffOff() {
     STAFF = null; store.set('mb_staff', '');
@@ -692,7 +737,7 @@
     $$('.staff-only').forEach(x => { x.hidden = true; });
     $('#q').placeholder = 'Search by number, colour or cloth (e.g. 1042, navy, cashmere)';
     if (state.custom) { state.custom = false; render(); }
-    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast(); paintMono();
+    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast(); paintMono(); paintSteps();
   }
   $('#staffBtn').onclick = () => { if (STAFF) return staffOff(); $('#pwErr').hidden = true; $('#modal').hidden = false; $('#pw').value = ''; $('#pw').focus(); };
   $('#pwCancel').onclick = () => { $('#modal').hidden = true; };
@@ -720,11 +765,11 @@
   (async function init() {
     try {
       const get = async n => (await fetch(`${n}?v=${VER}`)).json();
-      [FABRICS, OPTS, BUTTONS, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
+      [FABRICS, OPTS, BUTTONS, SLEEVES, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'sleeve_buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
-    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); render();
+    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); paintSteps(); render();
     const pw = store.get('mb_staff');
     if (pw) { try { staffOn(await unlock(pw), pw); } catch (e) { store.set('mb_staff', ''); } }
   })();

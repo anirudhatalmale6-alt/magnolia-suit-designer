@@ -174,3 +174,12 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
 #monoCount { display: block; text-align: right; color: var(--muted); font-size: 12px; margin: -6px 0 6px; }
 #monoBox .upload { margin-top: 10px; }
 .adv-row .seg { margin-top: 4px; }
+.next-bar { margin: 26px 0 10px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.next-btn { width: 100%; padding: 13px 18px; font-size: 15.5px; border-radius: 12px; }
+.next-btn:disabled { background: #b9c9c9; cursor: not-allowed; }
+.next-hint { color: var(--muted); font-size: 12.5px; text-align: center; }
+.tabs button.locked { opacity: .45; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 14px; z-index: 20; max-width: calc(100% - 32px); text-align: center; }
+.mono-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.mono-tabs .x { margin-left: 4px; color: var(--muted); font-size: 15px; line-height: 1; }
+.step-thumb:empty { display: none; }

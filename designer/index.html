@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '17';
+    var V = '18';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=17">
+<link rel="stylesheet" href="css/designer.css?v=18">
 </head>
 <body>
 <header class="topbar">
@@ -74,6 +74,7 @@
         <h3>Try a swatch photo</h3>
         <label class="upload">Upload any fabric photo to see it on the jacket<input type="file" accept="image/*" id="upload"></label>
       </div>
+      <div class="next-bar"><button type="button" class="primary next-btn" data-next="fabric">Next: Style &rsaquo;</button><small class="next-hint"></small></div>
     </section>
 
     <section class="tab" data-pane="style" hidden>
@@ -83,6 +84,7 @@
         <p class="hint">Not shown to customers. Each one starts on the factory default; change only what the order needs.</p>
         <div id="staffHidden"></div>
       </div>
+      <div class="next-bar"><button type="button" class="primary next-btn" data-next="style">Next: Trims &rsaquo;</button><small class="next-hint"></small></div>
     </section>
 
     <section class="tab" data-pane="trims" hidden>
@@ -101,6 +103,7 @@
       <div id="sleeveLinBox" hidden><p class="hint">Choose the sleeve lining:</p><div class="grid lin-grid" id="sleeveLinGrid"></div></div>
 
       <h3>Monogram</h3>
+      <div class="mono-tabs" id="monoTabs"></div>
       <div class="seg" id="monoType"><button type="button" data-v="" class="on">No monogram</button><button type="button" data-v="word">Letters</button><button type="button" data-v="gallery">Symbol</button><button type="button" data-v="drawing">Own drawing</button></div>
       <div id="monoBox"></div>
 
@@ -112,6 +115,7 @@
           <div class="grid lin-grid" id="elbowGrid" hidden></div></div>
         <p class="hint">Satin and other contrast parts: Style tab, "Contrast position" and "Contrast fabric".</p>
       </div>
+      <div class="next-bar"><button type="button" class="primary next-btn" data-next="trims">Next: Summary &rsaquo;</button><small class="next-hint"></small></div>
     </section>
 
     <section class="tab" data-pane="summary" hidden>
@@ -149,6 +153,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=17"></script>
+<script src="js/designer.js?v=18"></script>
 </body>
 </html>
