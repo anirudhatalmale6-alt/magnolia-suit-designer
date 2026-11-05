@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '18';
+    var V = '19';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,19 +19,81 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=18">
+<link rel="stylesheet" href="css/designer.css?v=19">
 </head>
 <body>
 <header class="topbar">
   <a class="brand" href="./" aria-label="Magnolia Bespoke"><img src="logo-white.png" alt="Magnolia Bespoke"></a>
   <div class="top-right">
     <span class="staff-badge" id="staffBadge" hidden>Staff view</span>
+    <button class="ghost" id="howBtn" type="button">How it works</button>
+    <button class="ghost" id="restartBtn" type="button" hidden>Start over</button>
     <button class="ghost" id="staffBtn" type="button">Staff</button>
   </div>
 </header>
 <div class="ribbon">Preview (Phase 2): fabrics, all style options, buttons, thread colours and linings. Prices and ordering come in the next phases.</div>
 
-<div class="wrap">
+<section class="welcome" id="welcome">
+  <div class="w-screen" data-w="home">
+    <div class="w-hero"><img src="hero.jpg" alt="Jackets designed in the Magnolia Bespoke designer"></div>
+    <div class="w-copy">
+      <p class="w-kicker">Magnolia Bespoke</p>
+      <h1>Your suit,<br><em>designed by you.</em></h1>
+      <p class="w-lead">Choose the cloth, then every detail: lapels, pockets, buttons, lining and your monogram. You see your jacket change as you go.</p>
+      <div class="w-actions"><button type="button" class="primary w-big" data-go="mode">Start designing &rsaquo;</button><button type="button" class="ghost dark" data-go="how">How it works</button></div>
+      <p class="w-where">Jerusalem &middot; Lakewood, NJ</p>
+    </div>
+  </div>
+
+  <div class="w-screen" data-w="how" hidden>
+    <p class="w-kicker">How it works</p>
+    <h2>From cloth to finished suit</h2>
+    <ol class="w-steps">
+      <li><b>Choose how you design</b><span>In person at our Jerusalem or Lakewood shop, or online from home.</span></li>
+      <li><b>Choose what you're building</b><span>A full suit, a jacket, or trousers.</span></li>
+      <li><b>Pick your fabric</b><span>Hundreds of cloths, including Italian. The fabric sets the price.</span></li>
+      <li><b>Design every detail</b><span>Front, lapels, pockets, vents, sleeves, stitching, buttons, thread colours, lining and up to two monograms. Every choice has a picture.</span></li>
+      <li><b>Measurements</b><span>Taken in person at the shop, or sent from home.</span></li>
+      <li><b>We make it for you</b><span>Your suit is made with every choice you picked.</span></li>
+    </ol>
+    <div class="w-prices">
+      <div><b>In person</b><span>Full suit from <strong>$445</strong></span></div>
+      <div><b>Online</b><span>Full suit from <strong>$395</strong></span></div>
+    </div>
+    <div class="w-actions"><button type="button" class="primary w-big" data-go="mode">Start designing &rsaquo;</button><button type="button" class="ghost dark" data-go="home">Back</button></div>
+  </div>
+
+  <div class="w-screen" data-w="mode" hidden>
+    <p class="w-kicker">Let's begin</p>
+    <h2>How would you like to design?</h2>
+    <div class="w-cards">
+      <button type="button" class="w-card" data-mode="inperson"><b>In person</b><span>Design with us at the shop. Measurements taken in person.</span><em>Full suit from $445</em></button>
+      <button type="button" class="w-card" data-mode="online"><b>Online</b><span>Design and order from home.</span><em>Full suit from $395</em></button>
+    </div>
+    <div class="w-locs" id="wLocs" hidden>
+      <p class="w-q">Which shop?</p>
+      <div class="w-cards">
+        <button type="button" class="w-card" data-loc="jerusalem"><b>Jerusalem</b><span>Yam Suf St</span></button>
+        <button type="button" class="w-card" data-loc="lakewood"><b>Lakewood, NJ</b><span>Serving the tri-state area</span></button>
+      </div>
+    </div>
+    <div class="w-actions"><button type="button" class="ghost dark" data-go="home">Back</button></div>
+  </div>
+
+  <div class="w-screen" data-w="build" hidden>
+    <p class="w-kicker">Let's begin</p>
+    <h2>What are we building?</h2>
+    <div class="w-cards w-three">
+      <button type="button" class="w-card" data-build="suit"><b>Full suit</b><span>Jacket and trousers</span><em class="w-from" data-price="suit"></em></button>
+      <button type="button" class="w-card" data-build="jacket"><b>Jacket only</b><span>No trousers</span></button>
+      <button type="button" class="w-card soon" data-build="pants" disabled><b>Trousers only</b><span>Coming soon</span></button>
+    </div>
+    <p class="hint w-note" id="wBuildNote"></p>
+    <div class="w-actions"><button type="button" class="ghost dark" data-go="mode">Back</button></div>
+  </div>
+</section>
+
+<div class="wrap" id="designer" hidden>
   <section class="stage" id="stage">
     <canvas id="cv" width="1024" height="1536" aria-label="Jacket preview"></canvas>
     <div class="busy" id="busy">Loading…</div>
@@ -52,6 +114,8 @@
       <button type="button" role="tab" data-tab="trims"><span>3</span>Trims</button>
       <button type="button" role="tab" data-tab="summary"><span>4</span>Summary</button>
     </nav>
+
+    <div class="progress" id="progress"><div class="pg-top"><span id="pgTxt"></span><span id="pgPct"></span></div><div class="pg-bar"><i id="pgBar"></i></div></div>
 
     <div class="chosen" id="chosen"></div>
 
@@ -122,6 +186,7 @@
       <h3>Your jacket</h3>
       <dl class="summary" id="summary"></dl>
       <h3>Remarks</h3>
+      <p class="hint">Any special request for your tailor. We note every request, but special requests are not guaranteed.</p>
       <textarea id="remark" class="remark" maxlength="400" placeholder="Anything we should know (max 400 characters)"></textarea>
       <div class="remark-meta"><small id="remarkCount">0/400</small></div>
       <div class="photo-slots" id="photoSlots"></div>
@@ -153,6 +218,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=18"></script>
+<script src="js/designer.js?v=19"></script>
 </body>
 </html>

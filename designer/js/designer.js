@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '18';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '19';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -15,7 +15,7 @@
   const state = { view: 'front', fabric: null, tile: null, custom: false, zoom: null,
     opts: {}, button: null, sleeveSame: true, sleeveButton: null, thread: { button: null, lapel: null, front: null, sleeve: [] },
     lining: null, sleeveLinSame: true, sleeveLining: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null, hid: {},
-    monos: [], monoSel: 0, fabricPicked: false, reached: 0,
+    monos: [], monoSel: 0, fabricPicked: false, reached: 0, mode: '', location: '', build: '',
     remark: '', photos: [null, null, null], prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
   let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null;
@@ -334,6 +334,8 @@
   function paintSummary() {
     const f = state.fabric, s = f && STAFF && STAFF[f.id];
     const rows = [
+      ['Design', state.mode === 'online' ? 'Online' : state.mode === 'inperson' ? `In person${state.location ? ', ' + LOCS[state.location] : ''}` : 'Not chosen', ''],
+      ['Building', { suit: 'Full suit (jacket now, trousers coming soon)', jacket: 'Jacket only', pants: 'Trousers only' }[state.build] || 'Jacket', ''],
       ['Fabric', state.custom ? 'Uploaded swatch' : `No. ${num(f)}, ${f.name}`, s && !state.custom ? `${s.code} · band ${s.band || 'not set yet'}` : ''],
       ['Cloth', state.custom ? '' : `${f.composition || 'Composition to follow'}${f.weight ? `, ${f.weight} g` : ''}`, '']
     ];
@@ -405,7 +407,7 @@
     };
     $('#grid').onclick = e => {
       const b = e.target.closest('[data-id]'); if (!b) return;
-      state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; paintSteps();
+      state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; paintSteps(); paintProgress();
       $$('#grid .fab').forEach(x => x.classList.toggle('on', x === b)); render();
     };
   }
@@ -663,6 +665,44 @@
   $('#prefitSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.prefit = b.dataset.v; paintExtras(); paintSummary(); };
   $('#urgentSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.urgent = b.dataset.v; paintExtras(); paintSummary(); };
 
+  // ---------- welcome: home, how it works, in person / online, what are we building ----------
+  const LOCS = { jerusalem: 'Jerusalem (Yam Suf St)', lakewood: 'Lakewood, NJ' };
+  function showWelcome(w) {
+    $('#welcome').hidden = false; $('#designer').hidden = true; $('#restartBtn').hidden = true; busy.hidden = true;
+    $$('.w-screen').forEach(x => { x.hidden = x.dataset.w !== w; });
+    if (w === 'mode') { $$('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === state.mode)); $('#wLocs').hidden = state.mode !== 'inperson'; }
+    if (w === 'build') {
+      const from = state.mode === 'online' ? 395 : 445;
+      $('[data-price=suit]').textContent = `From $${from}`;
+      $('#wBuildNote').textContent = '';
+    }
+    window.scrollTo(0, 0);
+  }
+  function startDesigner() {
+    $('#welcome').hidden = true; $('#designer').hidden = false; $('#restartBtn').hidden = false;
+    store.set('mb_flow', JSON.stringify({ mode: state.mode, location: state.location, build: state.build }));
+    paintProgress(); paintSummary(); render();
+  }
+  $('#welcome').onclick = e => {
+    const go = e.target.closest('[data-go]'); if (go) return showWelcome(go.dataset.go);
+    const m = e.target.closest('[data-mode]');
+    if (m) { state.mode = m.dataset.mode; if (state.mode === 'online') { state.location = ''; return showWelcome('build'); } return showWelcome('mode'); }
+    const l = e.target.closest('[data-loc]'); if (l) { state.location = l.dataset.loc; return showWelcome('build'); }
+    const b = e.target.closest('[data-build]'); if (b && !b.disabled) { state.build = b.dataset.build; startDesigner(); }
+  };
+  $('#howBtn').onclick = () => showWelcome('how');
+  $('#restartBtn').onclick = () => { if (confirm('Start over? Your choices on this screen will be cleared.')) { store.set('mb_flow', ''); location.reload(); } };
+
+  // progress: where the customer is in the steps
+  const STEP_PCT = { fabric: 0, style: 25, trims: 60, summary: 90 };
+  function paintProgress() {
+    const cur = ($('.tabs button.on') || {}).dataset ? $('.tabs button.on').dataset.tab : 'fabric';
+    const i = STEPS_ORDER.indexOf(cur), names = { fabric: 'Fabric', style: 'Style', trims: 'Trims', summary: 'Review' };
+    const pct = cur === 'fabric' && state.fabricPicked ? 10 : STEP_PCT[cur];
+    $('#pgTxt').innerHTML = `Step ${i + 1} of ${STEPS_ORDER.length} &middot; <b>${names[cur]}</b>`;
+    $('#pgPct').textContent = `${pct}%`; $('#pgBar').style.width = pct + '%';
+  }
+
   // ---------- views / tabs ----------
   $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
@@ -671,6 +711,7 @@
     $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
     $$('.tab').forEach(p => { p.hidden = p.dataset.pane !== name; });
     $('.panel').scrollTop = 0; if (innerWidth <= 900) $('.tabs').scrollIntoView({ block: 'start' });
+    paintProgress();
   }
   function paintSteps() {
     $$('.tabs button').forEach(b => b.classList.toggle('locked', !STAFF && STEPS_ORDER.indexOf(b.dataset.tab) > state.reached));
@@ -769,7 +810,9 @@
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
-    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); paintSteps(); render();
+    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); paintSteps();
+    let flow = null; try { flow = JSON.parse(store.get('mb_flow') || 'null'); } catch (e) { flow = null; }
+    if (flow && flow.build) { Object.assign(state, flow); startDesigner(); } else showWelcome('home');
     const pw = store.get('mb_staff');
     if (pw) { try { staffOn(await unlock(pw), pw); } catch (e) { store.set('mb_staff', ''); } }
   })();
