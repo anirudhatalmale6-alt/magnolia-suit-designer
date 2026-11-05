@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '25';
+    var V = '26';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -120,6 +120,7 @@
       <button type="button" data-view="three4">Three-quarter</button>
       <button type="button" data-view="side">Side</button>
       <button type="button" data-view="back">Back</button>
+      <button type="button" data-view="open">Inside</button>
     </div>
     <div class="zoom-hint" id="zoomHint">Tap the jacket to zoom into the cloth</div>
   </section>

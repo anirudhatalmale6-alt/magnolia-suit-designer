@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '25';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '26';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -100,6 +100,11 @@
       const v = state.opts.vent || 'C';
       return { name: v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : 'back', note: '' };
     }
+    if (state.view === 'open') {                    // two inside photos so far: notch and shawl, single-breasted
+      const miss = [s.lapel === 'peak' ? 'peak lapel' : '', s.db ? 'double-breasted' : ''].filter(Boolean);
+      return { name: s.lapel === 'shawl' ? 'open_shawl' : 'open_notch',
+        note: miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '' };
+    }
     const want = { lapel: s.lapel, front: s.db ? (['8', '9', '11'].includes(s.front) ? 'db4' : 'db') : s.front,
       pocket: pocketLook(state.opts.lowerPocket || 'B'), ticket: ticketLook(state.opts.ticket || 'D') };
     // the lapel and closure matter most, then the pocket shape, then the ticket pocket
@@ -133,7 +138,9 @@
       U[i] = (u - cx) * c - (v - cy) * s + cx; V[i] = (u - cx) * s + (v - cy) * c + cy;
       A[i] = 1 - a / 255; SH[i] = S[p] / 128;
     }
-    return (views[name] = { B, S, Wp, U, V, A, SH, ov, OVP, meta, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
+    let LN = null;                                  // open-jacket views: lining mask (alpha) and its shading (red, 128 = x1.0)
+    if (name.startsWith('open')) LN = pixels(await loadImg(`maps/${name}/lining.webp?v=${VER}`));
+    return (views[name] = { B, S, Wp, U, V, A, SH, ov, OVP, meta, LN, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
   }
   const tilePx = {};
   async function loadTile(f, z = 1) {
@@ -160,6 +167,7 @@
       }
       O[p + 3] = 255;
     }
+    if (st.LN) liningPass(st, O, 0, 0, 1);
     ctx.putImageData(out, 0, 0); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1);
   }
 
@@ -201,8 +209,54 @@
         O[p] = r; O[p + 1] = g; O[p + 2] = bl; O[p + 3] = 255;
       }
     }
+    if (st.LN) liningPass(st, O, zx, zy, Z);
     ctx.putImageData(out, 0, 0);
     ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z);
+  }
+
+  // ---------- lining on the open-jacket view ----------
+  // The photo's grey lining keeps its folds and pocket welts (shading); its colour becomes the chosen lining.
+  // Plain linings are one colour; printed ones repeat their swatch photo (mirrored, about LIN_CM wide).
+  const LIN_CM = 10, linTex = {};
+  async function loadLinTex(l, Z) {
+    const key = l.id + '@' + Z;
+    if (linTex[key]) return linTex[key];
+    const im = await loadImg(`linings/${l.id}.jpg?v=${VER}`);
+    const w = Math.max(8, Math.round(LIN_CM * PX_PER_CM * Z)), h = Math.max(8, Math.round(w * im.height / im.width));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, w, h);
+    const px = x.getImageData(0, 0, w, h).data, T = new Float32Array(w * h * 3);
+    for (let i = 0, j = 0; i < px.length; i += 4, j += 3) { T[j] = LIN[px[i]]; T[j + 1] = LIN[px[i + 1]]; T[j + 2] = LIN[px[i + 2]]; }
+    return (linTex[key] = { T, w, h });
+  }
+  function liningColour() {                        // flat linear colour, or null when the lining is printed
+    const l = state.lining && LININGS.find(x => x.id === state.lining);
+    if (l) return l.kind === 'printed' || l.kind === 'positional' ? null : l.rgb.map(v => LIN[v]);
+    const T = state.tile && state.tile.T; if (!T) return [0.2, 0.2, 0.22];
+    const m = [0, 0, 0]; for (let i = 0; i < T.length; i += 3) { m[0] += T[i]; m[1] += T[i + 1]; m[2] += T[i + 2]; }
+    return m.map(v => Math.min(1, v / (T.length / 3) * 1.6));    // tone on tone: a lighter shade of the cloth
+  }
+  function liningPass(st, O, zx, zy, Z) {
+    const L = st.LN, flat = liningColour(), tex = flat ? null : linTex[state.lining + '@' + Z];
+    if (!flat && !tex) return;                     // printed swatch still loading: render() loads it first
+    for (let oy = 0, p = 0; oy < H; oy++) {
+      const my = Math.min(H - 1, (zy + oy / Z) | 0);
+      for (let ox = 0; ox < W; ox++, p += 4) {
+        const mx = Math.min(W - 1, (zx + ox / Z) | 0), q = (my * W + mx) * 4, a = L[q + 3] / 255;
+        if (!a) continue;
+        const sh = L[q] / 128;
+        let c = flat;
+        if (!c) {                                   // mirrored repeat so the swatch edges never show a seam
+          let u = Math.floor((zx * Z + ox)) % (2 * tex.w), v = Math.floor((zy * Z + oy)) % (2 * tex.h);
+          if (u >= tex.w) u = 2 * tex.w - 1 - u; if (v >= tex.h) v = 2 * tex.h - 1 - v;
+          const k = (v * tex.w + u) * 3; c = [tex.T[k], tex.T[k + 1], tex.T[k + 2]];
+        }
+        for (let ch = 0; ch < 3; ch++) {
+          let lin = c[ch] * sh; if (lin > 1) lin = 1;
+          O[p + ch] = O[p + ch] * (1 - a) + GAM[(lin * OUTN) | 0] * a;
+        }
+      }
+    }
   }
 
   // ---------- buttons on the jacket ----------
@@ -281,6 +335,8 @@
         if (state.zoom) state.ztile = await loadTile(f, ZOOM);
       }
       if (state.button) await loadBtn(state.button);
+      const lo = st.LN && state.lining && LININGS.find(x => x.id === state.lining);
+      if (lo && (lo.kind === 'printed' || lo.kind === 'positional')) await loadLinTex(lo, state.zoom ? ZOOM : 1);
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
@@ -596,7 +652,8 @@
   }
   $('#sleeveLinSame').onchange = e => { state.sleeveLinSame = e.target.checked; paintLinings(); paintSummary(); };
   $('#sleeveLinGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.sleeveLining = b.dataset.l || null; paintLinings(); paintSummary(); goNext($('#hMono')); };
-  $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); goNext($('#sleeveLinSame').closest('label')); };
+  function showInside() { state.view = 'open'; state.zoom = null; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'open')); render(); }
+  $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); showInside(); goNext($('#sleeveLinSame').closest('label')); };
 
   // ---------- contrast fabrics (undercollar melton, elbow patch suede) ----------
   const contrastName = id => { const c = CONTRAST.find(x => x.id === id); if (!c) return '';
