@@ -1362,8 +1362,7 @@
 "default": "B",
 "show": [
 "A",
-"B",
-"Z"
+"B"
 ],
 "choices": [
 {
@@ -1375,11 +1374,6 @@
 "code": "B",
 "label": "Not kissing",
 "img": "208.jpg"
-},
-{
-"code": "Z",
-"label": "None",
-"img": ""
 }
 ]
 },

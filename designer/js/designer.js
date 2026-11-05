@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '27';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '28';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -69,7 +69,7 @@
   const ticketLook = c => c === 'D' ? '' : 'F G H I J'.split(' ').includes(c) ? 'flap' : 'jet';
   // photos by angle: [lapel, front, lower pocket look, ticket look] -> map folder
   const PHOTOS = {
-    front: [['notch', '2', 'flap', '', 'front_notch_sb'], ['notch', '2', 'slant', '', 'front_notch_sb_slant'], ['notch', '2', 'patch', '', 'front_notch_sb_patch'],
+    front: [['notch', '2', 'slant', '', 'front_notch_sb_slant'], ['notch', '2', 'patch', '', 'front_notch_sb_patch'],
       ['notch', '2', 'jet', '', 'front_notch_sb_jet'], ['notch', '2', 'flap', 'jet', 'front_notch_sb_tjet'], ['notch', '2', 'flap', 'flap', 'front_notch_sb_tflap'],
       ['notch', '3', 'flap', '', 'front_notch_sb3'], ['notch', '3', 'patch', '', 'front_notch_sb3_patch'], ['notch', '3', 'jet', 'jet', 'front_notch_sb3_jet_tjet'],
       ['notch', '5', 'flap', '', 'front_notch_sb3r2'], ['notch', '1', 'flap', '', 'front_notch_sb1'],
@@ -114,11 +114,13 @@
       if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name }; }
     }
     let pk = null;
-    if ((best.p !== want.pocket || best.t !== want.ticket) && PK[state.view]) {
+    const sx = s.db ? (state.view === 'front' ? 14 : 14) : 0;   // double-breasted: pockets further from the buttons
+    if ((best.p !== want.pocket || best.t !== want.ticket || sx) && PK[state.view]) {
       const P = PK[state.view].patches.find(x => x[0] === want.pocket && x[1] === want.ticket) ||
         PK[state.view].patches.find(x => x[0] === want.pocket && best.p !== want.pocket);
       const own = PK[state.view].patches.find(x => x[0] === best.p && x[1] === best.t) || PK[state.view].patches.find(x => x[0] === best.p);
-      if (P) { pk = P[2] + (own ? '+' + own[2] : ''); best.p = P[0]; best.t = P[1]; }
+      const Pw = P || (sx && PK[state.view].patches.find(x => x[0] === want.pocket && x[1] === want.ticket));
+      if (Pw) { pk = Pw[2] + (own ? '+' + own[2] : '') + (sx ? '@' + sx : ''); best.p = Pw[0]; best.t = Pw[1]; }
     }
     const miss = [];
     if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
@@ -158,12 +160,14 @@
   const pkImgs = {};
   async function pkImg(f) { return pkImgs[f] || (pkImgs[f] = pixels(await loadImg(`maps/_pk/${f}.webp?v=${VER}`))); }
   async function patchView(st, pk) {
-    const v = PK[state.view], [dn, tn] = pk.split('+'), [pw, ph] = v.size, [tdx, tdy] = st.meta.pk || [0, 0];
+    const v = PK[state.view], [pkf, sxs] = pk.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size, [tdx, tdy] = st.meta.pk || [0, 0];
+    const sx = +sxs || 0, split = state.view === 'front' ? pw / 2 : 209;   // left / right pocket (three-quarter: far / near)
+    const dxOf = px => !sx ? 0 : px < split ? (state.view === 'front' ? -sx : 0) : sx;
     const Dp = v.patches.find(x => x[2] === dn), D = await pkImg(dn), Tp = tn && v.patches.find(x => x[2] === tn), T = Tp && await pkImg(tn);
     const S = st.S.slice(), Wp = st.Wp.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
     const ox = v.at[0] + tdx, oy = v.at[1] + tdy;            // patch origin on this photo
     // per patch pixel: target index, donor value, weight = new pocket area + this photo's own pocket area
-    const n = pw * ph, idx = new Int32Array(n).fill(-1), w = new Float32Array(n), sd = new Float32Array(n), st0 = new Float32Array(n);
+    const n = pw * ph, dsx = new Int32Array(n), idx = new Int32Array(n).fill(-1), w = new Float32Array(n), sd = new Float32Array(n), st0 = new Float32Array(n);
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
       const x = ox + px, y = oy + py, k = py * pw + px;
       if (x < 0 || x >= W || y < 0 || y >= H) continue;
@@ -172,10 +176,12 @@
       for (let d = 4; d <= 28 && e > 0; d += 4) if (!st.A[i - d] || !st.A[i + d]) e = Math.min(e, (d - 4) / 24);
       if (st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
       const qdy = py + Dp[3][1], qty = Tp ? py + Tp[3][1] : -1;   // each donor's pocket sits at its own offset
-      const a = qdy >= 0 && qdy < ph ? D[((qdy + ph) * pw + px) * 4] / 255 : 0;   // weight: bottom half of the image
+      const pxd = px - dxOf(px), okd = pxd >= 0 && pxd < pw && qdy >= 0 && qdy < ph;
+      dsx[k] = pxd;
+      const a = okd ? D[((qdy + ph) * pw + pxd) * 4] / 255 : 0;   // weight: bottom half of the image
       const b = Tp && qty >= 0 && qty < ph ? T[((qty + ph) * pw + px) * 4 + 1] / 255 : 0;   // wide area: erase this photo's own pockets
       idx[k] = i; w[k] = Math.max(a, b) * e; st0[k] = S[i * 4];
-      sd[k] = qdy >= 0 && qdy < ph ? D[(qdy * pw + px) * 4] : st0[k];
+      sd[k] = okd ? D[(qdy * pw + pxd) * 4] : st0[k];
     }
     // brightness match: one ratio between this photo's cloth and the donor's, measured on plain cloth around the
     // pockets (a local ratio picks up darts and folds and leaves bands)
@@ -185,7 +191,7 @@
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
       const k = py * pw + px, i = idx[k]; if (i < 0 || w[k] <= 0) continue;
       const p = i * 4, ww = w[k];
-      const qdy = py + Dp[3][1], q = qdy >= 0 && qdy < ph ? (qdy * pw + px) * 4 : -1;
+      const qdy = py + Dp[3][1], q = qdy >= 0 && qdy < ph && dsx[k] >= 0 && dsx[k] < pw ? (qdy * pw + dsx[k]) * 4 : -1;
       S[p] = Math.min(255, st0[k] * (1 - ww) + sd[k] * g * ww);
       if (q >= 0) { Wp[p] = Wp[p] * (1 - ww) + D[q + 1] * ww; Wp[p + 1] = Wp[p + 1] * (1 - ww) + D[q + 2] * ww; }
       uvAt(i, S, Wp, U, V, SH);
@@ -588,11 +594,23 @@
     if (b.dataset.v) state.hid[h.title] = b.dataset.v; else delete state.hid[h.title];
     paintHidden(); paintSummary(); goNext(document.querySelector(`[data-hstep="${hi + 1}"]`) || $('[data-next=style]'));
   };
+  // where each style choice shows on the jacket: [view, zoom x, zoom y] (no x = whole jacket)
+  const SHOW = { front: ['front'], lapel: ['front'], lapelWidth: ['front', 420, 520], lapelHoleStyle: ['front', 640, 470],
+    lapelHole: ['front', 640, 470], collarBack: ['back', 512, 330], chestPocket: ['front', 690, 610], lowerPocket: ['front'],
+    ticket: ['front'], namecard: ['open'], vent: ['back'], cuffButtons: ['front', 70, 1250], kissing: ['front', 70, 1250],
+    sleeveHoleDir: ['front', 70, 1250], pick: ['front', 420, 560], shoulder: ['front', 250, 380], canvas: ['front'],
+    facing: ['open'], liningStyle: ['open'], brandLabel: ['open'] };
+  function showPart(id) {
+    const s = SHOW[id]; if (!s) return;
+    state.view = s[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === s[0]));
+    const Z = ZOOM;
+    state.zoom = s.length > 1 ? { zx: Math.max(0, Math.min(W - W / Z, s[1] - W / Z / 2)), zy: Math.max(0, Math.min(H - H / Z, s[2] - H / Z / 2)) } : null;
+  }
   function setOpt(id, v) {
     state.opts[id] = v;
     if (id === 'front' && DB_FRONTS.includes(v) && (state.opts.lapel || 'BK') === 'BK') { state.opts.lapel = '20'; paintStyle(); }   // double-breasted comes with a peak lapel
     if (id === 'cuffButtons') paintThreads();
-    if (['front', 'lapel', 'lowerPocket', 'ticket', 'vent'].includes(id)) render(); else paintSummary();
+    showPart(id); render();
   }
   $('#styleSteps').onclick = e => {
     if (toggleStep(e)) return;
