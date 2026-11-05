@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '23';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '24';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -273,6 +273,7 @@
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
         if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy); else draw(st);
+        paintMini();
         $('#stage').classList.toggle('zoom', !!state.zoom);
         $('#zoomHint').textContent = state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
         if (my === ticket) busy.hidden = true;
@@ -488,6 +489,23 @@
     goNext(nextAfter(document.querySelector(`[data-step="${id}"]`), '#styleSteps .step') || $('[data-next=style]'));
   };
 
+  // show a part of the jacket close up (front view), e.g. the buttons right after choosing them
+  function zoomTo(x, y) {
+    state.view = 'front'; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'front'));
+    const Z = ZOOM; state.zoom = { zx: Math.max(0, Math.min(W - W / Z, x - W / Z / 2)), zy: Math.max(0, Math.min(H - H / Z, y - H / Z / 2)) };
+  }
+  const FRONT_BTN = [500, 940], SLEEVE_BTN = [70, 1250];      // where the buttons sit on the front photos
+  // phones: a small copy of the jacket follows the customer down the page while the big picture is out of view
+  const mini = document.createElement('button'); mini.type = 'button'; mini.className = 'mini'; mini.hidden = true;
+  mini.setAttribute('aria-label', 'Back to the jacket picture');
+  const miniCv = document.createElement('canvas'); miniCv.width = 240; miniCv.height = 360; mini.appendChild(miniCv); document.body.appendChild(mini);
+  function paintMini() { miniCv.getContext('2d').drawImage(cv, 0, 0, 240, 360); }
+  mini.onclick = () => $('#stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if ('IntersectionObserver' in window) new IntersectionObserver(es => {
+    const off = !es[0].isIntersecting;
+    mini.hidden = !(off && innerWidth <= 900 && !$('#designer').hidden);
+  }, { threshold: 0.15 }).observe($('#stage'));
+
   // ---------- trims: buttons, thread colours, lining ----------
   const MAT = { Horn: 'Horn', Corozo: 'Corozo', Shell: 'Shell', Metal: 'Metal', Pes: 'Polyester', Bone: 'Bone', Wood: 'Wood', Fabric: 'Covered', '': 'Button' };
   let btnFilter = '';
@@ -505,8 +523,8 @@
     if (!state.sleeveSame) $('#sleeveGrid').innerHTML = btnTiles(SLEEVES, state.sleeveButton);
   }
   $('#btnMat').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; btnFilter = b.dataset.m; paintButtons(); };
-  $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); render(); goNext($('#sleeveSame').closest('label')); };
-  $('#sleeveGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.sleeveButton = b.dataset.b || null; paintButtons(); render(); goNext($('#hThreads')); };
+  $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); if (state.button) zoomTo(...FRONT_BTN); render(); goNext($('#sleeveSame').closest('label')); };
+  $('#sleeveGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.sleeveButton = b.dataset.b || null; paintButtons(); if (state.sleeveButton) zoomTo(...SLEEVE_BTN); render(); goNext($('#hThreads')); };
   $('#sleeveSame').onchange = e => { state.sleeveSame = e.target.checked; paintButtons(); render(); };
 
   const rgbCss = c => `rgb(${c.join(',')})`;
@@ -536,7 +554,7 @@
       else state.thread.sleeve = Array.from({ length: 6 }, () => v);
     } else state.thread[key] = v;
     paintThreads();
-    if (key === 'button') render(); else paintSummary();
+    if (key === 'button') { zoomTo(...FRONT_BTN); render(); } else paintSummary();
     if (key === 'sleeve' && state.holeSel) return;            // picking hole by hole: stay here
     const rows = [...document.querySelectorAll('#threadRows .pal')].map(p => p.closest('.thread-row'));
     const i = rows.findIndex(r => r.querySelector(`[data-t="${key}"]`));
