@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '19';
+    var V = '20';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=19">
+<link rel="stylesheet" href="css/designer.css?v=20">
 </head>
 <body>
 <header class="topbar">
@@ -50,7 +50,7 @@
     <h2>From cloth to finished suit</h2>
     <ol class="w-steps">
       <li><b>Choose how you design</b><span>In person at our Jerusalem or Lakewood shop, or online from home.</span></li>
-      <li><b>Choose what you're building</b><span>A full suit, a jacket, or trousers.</span></li>
+      <li><b>Choose what you're building</b><span>A full suit or a jacket. Trousers, bekeshe, coat and shirt are coming.</span></li>
       <li><b>Pick your fabric</b><span>Hundreds of cloths, including Italian. The fabric sets the price.</span></li>
       <li><b>Design every detail</b><span>Front, lapels, pockets, vents, sleeves, stitching, buttons, thread colours, lining and up to two monograms. Every choice has a picture.</span></li>
       <li><b>Measurements</b><span>Taken in person at the shop, or sent from home.</span></li>
@@ -86,7 +86,10 @@
     <div class="w-cards w-three">
       <button type="button" class="w-card" data-build="suit"><b>Full suit</b><span>Jacket and trousers</span><em class="w-from" data-price="suit"></em></button>
       <button type="button" class="w-card" data-build="jacket"><b>Jacket only</b><span>No trousers</span></button>
-      <button type="button" class="w-card soon" data-build="pants" disabled><b>Trousers only</b><span>Coming soon</span></button>
+      <button type="button" class="w-card soon" data-build="pants" disabled><b>Trousers only</b><span>Not available yet &middot; In progress</span></button>
+      <button type="button" class="w-card soon" data-build="bekeshe" disabled><b>Bekeshe</b><span>Not available yet &middot; In progress</span></button>
+      <button type="button" class="w-card soon" data-build="coat" disabled><b>Coat</b><span>Not available yet &middot; In progress</span></button>
+      <button type="button" class="w-card soon" data-build="shirt" disabled><b>Shirt</b><span>Not available yet &middot; In progress</span></button>
     </div>
     <p class="hint w-note" id="wBuildNote"></p>
     <div class="w-actions"><button type="button" class="ghost dark" data-go="mode">Back</button></div>
@@ -218,6 +221,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=19"></script>
+<script src="js/designer.js?v=20"></script>
 </body>
 </html>

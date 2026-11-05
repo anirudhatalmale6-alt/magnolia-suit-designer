@@ -226,3 +226,5 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
   .w-cards, .w-cards.w-three, .w-prices { grid-template-columns: 1fr; }
   #howBtn { display: none; }
 }
+.w-card.soon span { color: #9a6b2e; font-weight: 500; }
+.w-card.soon:hover { border-color: var(--line); box-shadow: none; }
