@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '24';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '25';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -75,12 +75,24 @@
       ['notch', '5', 'flap', '', 'front_notch_sb3r2'], ['notch', '1', 'flap', '', 'front_notch_sb1'],
       ['shawl', '1', 'flap', '', 'front_shawl_sb1'], ['shawl', '3', 'jet', 'jet', 'front_shawl_sb3_jet_tjet'],
       ['peak', '2', 'flap', '', 'front_peak_sb'], ['peak', '3', 'flap', '', 'front_peak_sb3'], ['peak', '3', 'jet', 'jet', 'front_peak_sb3_jet_tjet'],
-      ['peak', 'db', 'flap', '', 'front_peak_db'], ['peak', 'db4', 'flap', '', 'front_peak_db4']],
+      ['peak', 'db', 'flap', '', 'front_peak_db'], ['peak', 'db4', 'flap', '', 'front_peak_db4'],
+      // 5-nov photos (jetted pockets)
+      ['peak', '5', 'jet', '', 'front_peak_sb3r2'], ['peak', '1', 'jet', '', 'front_peak_sb1'], ['shawl', '5', 'jet', '', 'front_shawl_sb3r2'],
+      ['shawl', '2', 'jet', '', 'front_shawl_sb'], ['shawl', 'db', 'jet', '', 'front_shawl_db'], ['shawl', 'db4', 'jet', '', 'front_shawl_db4']],
     three4: [['notch', '2', 'flap', '', 'three4'], ['notch', '2', 'slant', '', 'three4_slant'], ['notch', '2', 'patch', '', 'three4_patch'],
       ['notch', '2', 'jet', '', 'three4_jet'], ['notch', '2', 'jet', 'jet', 'three4_jet_tjet'], ['notch', '2', 'flap', 'flap', 'three4_tflap'],
       ['notch', '3', 'flap', '', 'three4_notch_sb3'], ['shawl', '1', 'flap', '', 'three4_shawl_sb1'],
-      ['peak', '2', 'flap', '', 'three4_peak_sb'], ['peak', '3', 'flap', '', 'three4_peak_sb3'], ['peak', 'db', 'flap', '', 'three4_peak_db']],
-    side: [['notch', '2', 'flap', '', 'side'], ['peak', '2', 'flap', '', 'side_peak_sb'], ['peak', 'db', 'flap', '', 'side_peak_db']]
+      ['peak', '2', 'flap', '', 'three4_peak_sb'], ['peak', '3', 'flap', '', 'three4_peak_sb3'], ['peak', 'db', 'flap', '', 'three4_peak_db'],
+      ['notch', '1', 'jet', '', 'three4_notch_sb1'], ['notch', '5', 'jet', '', 'three4_notch_sb3r2'], ['notch', 'db', 'jet', '', 'three4_notch_db'],
+      ['notch', 'db4', 'jet', '', 'three4_notch_db4'], ['peak', '1', 'jet', '', 'three4_peak_sb1'], ['peak', '5', 'jet', '', 'three4_peak_sb3r2'],
+      ['peak', 'db4', 'jet', '', 'three4_peak_db4'], ['shawl', '2', 'jet', '', 'three4_shawl_sb'], ['shawl', '3', 'jet', '', 'three4_shawl_sb3'],
+      ['shawl', '5', 'jet', '', 'three4_shawl_sb3r2'], ['shawl', 'db4', 'jet', '', 'three4_shawl_db4'], ['shawl', 'db', 'jet', '', 'three4_shawl_db']],
+    side: [['notch', '2', 'flap', '', 'side'], ['peak', '2', 'flap', '', 'side_peak_sb'], ['peak', 'db', 'flap', '', 'side_peak_db'],
+      ['notch', '1', 'jet', '', 'side_notch_sb1'], ['notch', '3', 'jet', '', 'side_notch_sb3'], ['notch', '5', 'jet', '', 'side_notch_sb3r2'],
+      ['notch', 'db', 'jet', '', 'side_notch_db'], ['notch', 'db4', 'jet', '', 'side_notch_db4'], ['peak', '1', 'jet', '', 'side_peak_sb1'],
+      ['peak', '3', 'jet', '', 'side_peak_sb3'], ['peak', '5', 'jet', '', 'side_peak_sb3r2'], ['peak', 'db4', 'jet', '', 'side_peak_db4'],
+      ['shawl', '1', 'jet', '', 'side_shawl_sb1'], ['shawl', '2', 'jet', '', 'side_shawl_sb'], ['shawl', '3', 'jet', '', 'side_shawl_sb3'],
+      ['shawl', '5', 'jet', '', 'side_shawl_sb3r2'], ['shawl', 'db4', 'jet', '', 'side_shawl_db4'], ['shawl', 'db', 'jet', '', 'side_shawl_db']]
   };
   function mapName() {
     const s = styleOf();
