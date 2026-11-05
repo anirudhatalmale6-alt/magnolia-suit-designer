@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '30';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '31';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -215,7 +215,8 @@
       if (!k) { O[p] = B[p]; O[p + 1] = B[p + 1]; O[p + 2] = B[p + 2]; O[p + 3] = 255; continue; }
       let u = st.U[i] % N, v = st.V[i] % N; if (u < 0) u += N; if (v < 0) v += N;
       const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0, x1 = (x0 + 1) % N, y1 = (y0 + 1) % N;
-      const a = (y0 * N + x0) * 3, b = (y0 * N + x1) * 3, c = (y1 * N + x0) * 3, d = (y1 * N + x1) * 3, sh = st.SH[i];
+      // at the soft edge the photo's light includes the white backdrop: never brighten the cloth there (pink fringe)
+      const a = (y0 * N + x0) * 3, b = (y0 * N + x1) * 3, c = (y1 * N + x0) * 3, d = (y1 * N + x1) * 3, sh = k < 0.98 ? Math.min(st.SH[i], 0.9) : st.SH[i];
       for (let ch = 0; ch < 3; ch++) {
         const top = T[a + ch] + (T[b + ch] - T[a + ch]) * fx, bot = T[c + ch] + (T[d + ch] - T[c + ch]) * fx;
         let lin = (top + (bot - top) * fy) * sh; if (lin > 1) lin = 1;
@@ -224,7 +225,7 @@
       O[p + 3] = 255;
     }
     if (st.LN) liningPass(st, O, 0, 0, 1);
-    ctx.putImageData(out, 0, 0); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1);
+    ctx.putImageData(out, 0, 0); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
   }
 
   // Zoomed view: redraw only the tapped area at ZOOM x the resolution, sampling the maps between pixels and a
@@ -254,7 +255,8 @@
           if (u < 0) u += N; if (v < 0) v += N;
           const tx0 = u | 0, ty0 = v | 0, tfx = u - tx0, tfy = v - ty0, tx1 = (tx0 + 1) % N, ty1 = (ty0 + 1) % N;
           const a = (ty0 * N + tx0) * 3, b = (ty0 * N + tx1) * 3, c = (ty1 * N + tx0) * 3, d = (ty1 * N + tx1) * 3;
-          const sh = (S[i00] * w00 + S[i01] * w01 + S[i10] * w10 + S[i11] * w11) / 128;
+          let sh = (S[i00] * w00 + S[i01] * w01 + S[i10] * w10 + S[i11] * w11) / 128;
+          if (k < 0.98) sh = Math.min(sh, 0.9);
           const f = ch => {
             const top = T[a + ch] + (T[b + ch] - T[a + ch]) * tfx, bot = T[c + ch] + (T[d + ch] - T[c + ch]) * tfx;
             let lin = (top + (bot - top) * tfy) * sh; if (lin > 1) lin = 1;
@@ -267,7 +269,67 @@
     }
     if (st.LN) liningPass(st, O, zx, zy, Z);
     ctx.putImageData(out, 0, 0);
-    ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z);
+    ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z); drawMonos(zx, zy, Z);
+  }
+
+  // ---------- monogram preview ----------
+  // Where each factory position sits on our photos: [view, x, y, angle in degrees]. Left/right = the wearer's.
+  const MONO_POS = { P01: ['front', 695, 572, 0], P02: ['front', 695, 610, 0], P03: ['front', 695, 606, 0], P04: ['open', 708, 968, 0],
+    P05: ['front', 610, 440, -20], P06: ['open', 740, 772, 0], P07: ['open', 285, 748, 0], P08: ['front', 695, 652, 0],
+    P09: ['open', 708, 862, 0], P10: ['open', 315, 840, 0], P11: ['open', 315, 840, 0], P12: ['open', 315, 840, 0], P13: ['open', 315, 840, 0],
+    P14: ['back', 512, 165, 0], P15: ['open', 710, 772, 0], P16: ['open', 315, 748, 0], P17: ['open', 690, 1150, 0], P18: ['open', 335, 1150, 0],
+    P19: ['front', 572, 560, -77], P20: ['front', 452, 560, 77] };
+  // the closest web font to each factory font (the embroidery itself uses the factory's own font)
+  const MONO_FONT = { 'Bank Gothic': 'Michroma', 'Bank Gothic Light BT': 'Michroma', 'Arial Black': 'Archivo Black', Arial: 'Arimo',
+    Bradley: 'Caveat', Constantia: 'Crimson Text', 'Monotype Corsiva': 'Italianno', 'Viner Hand ITC': 'Kalam', 'Harlow Solid Italic': 'Lobster',
+    'Lucida Handwriting': 'Dancing Script', Mistral: 'Marck Script', 'Kunstler Script': 'Great Vibes', 'Comic Book': 'Bangers',
+    Gradl: 'Poiret One', 'Lucida Calligraphy': 'Parisienne', 'Old English Text': 'UnifrakturMaguntia', 'Script MT Bold': 'Yesteryear', 'Times New Roman': 'Tinos' };
+  const monoFamily = m => MONO_FONT[((MONO.fonts.find(f => f.id === m.font) || {}).name)] || 'Tinos';
+  const monoImgs = {};
+  async function monoReady() {                     // fonts and symbol pictures used by the monograms on the current view
+    for (const m of state.monos) {
+      const pos = MONO_POS[m.pos]; if (!pos || pos[0] !== state.view) continue;
+      if (m.type === 'word' && m.text) try { await document.fonts.load(`40px "${monoFamily(m)}"`, m.text); } catch (e) { /* fallback font */ }
+      if (m.type === 'gallery' && m.gal && !monoImgs[m.gal]) {
+        const g = MONO.gallery.find(x => x.id === m.gal);
+        if (g) try { monoImgs[m.gal] = await loadImg(`mono/${g.img}?v=${VER}`); } catch (e) { /* no picture */ }
+      }
+    }
+  }
+  function monoTint(img, rgb) {                    // the symbol's dark lines in the thread colour, the white card removed
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height), D = d.data;
+    for (let p = 0; p < D.length; p += 4) {
+      const v = (D[p] + D[p + 1] + D[p + 2]) / 3; D[p + 3] = Math.max(0, Math.min(255, (225 - v) * 2.2));
+      D[p] = rgb[0]; D[p + 1] = rgb[1]; D[p + 2] = rgb[2];
+    }
+    x.putImageData(d, 0, 0); return c;
+  }
+  function drawMonos(zx, zy, Z) {
+    for (const m of state.monos) {
+      const pos = MONO_POS[m.pos]; if (!pos || pos[0] !== state.view) continue;
+      const t = m.colour && THREADS.find(x => x.id === m.colour);
+      const rgb = t ? t.rgb : [200, 170, 90];        // no colour chosen yet: a gold thread so the position is visible
+      const mm = parseFloat(((m.type === 'gallery' ? MONO.gHeights : MONO.heights).find(h => h.id === (m.type === 'gallery' ? m.gheight : m.height)) || {}).name) || (m.type === 'gallery' ? 20 : 10);
+      const capPx = mm / 10 * PX_PER_CM * Z, x = (pos[1] - zx) * Z, y = (pos[2] - zy) * Z;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(pos[3] * Math.PI / 180);
+      if (m.type === 'word' && m.text) {
+        ctx.font = `${Math.round(capPx / 0.7)}px "${monoFamily(m)}", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = Z; ctx.shadowOffsetY = Z * 0.6;     // raised stitches
+        ctx.fillStyle = `rgb(${rgb})`; ctx.fillText(m.text, 0, 0);
+      } else if (m.type === 'gallery' && monoImgs[m.gal]) {
+        const im = monoImgs[m.gal], h = capPx, w = h * im.width / im.height;
+        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = Z; ctx.shadowOffsetY = Z * 0.5;
+        ctx.drawImage(monoTint(im, rgb), -w / 2, -h / 2, w, h);
+      }
+      ctx.restore();
+    }
+  }
+  function showMono() {                            // after a monogram choice: go to its position, close up
+    const m = cm(), pos = m && MONO_POS[m.pos]; if (!pos) { render(); return; }
+    state.view = pos[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === pos[0]));
+    state.zoom = zoomBox(pos[1], pos[2], 3); render();
   }
 
   // ---------- lining on the open-jacket view ----------
@@ -287,7 +349,7 @@
   }
   function liningColour() {                        // flat linear colour, or null when the lining is printed
     const l = state.lining && LININGS.find(x => x.id === state.lining);
-    if (l) return l.kind === 'printed' || l.kind === 'positional' ? null : l.rgb.map(v => LIN[v]);
+    if (l) return null;                            // every lining shows its own photo (weave, jacquard, stripes, prints)
     const T = state.tile && state.tile.T; if (!T) return [0.2, 0.2, 0.22];
     const m = [0, 0, 0]; for (let i = 0; i < T.length; i += 3) { m[0] += T[i]; m[1] += T[i + 1]; m[2] += T[i + 2]; }
     return m.map(v => Math.min(1, v / (T.length / 3) * 1.6));    // tone on tone: a lighter shade of the cloth
@@ -391,7 +453,8 @@
       }
       if (state.button) await loadBtn(state.button);
       const lo = st.LN && state.lining && LININGS.find(x => x.id === state.lining);
-      if (lo && (lo.kind === 'printed' || lo.kind === 'positional')) await loadLinTex(lo, state.zoom ? state.zoom.z : 1);
+      if (lo) await loadLinTex(lo, state.zoom ? state.zoom.z : 1);
+      await monoReady();
       if (state.custom && state.zoom && state.ctileZ !== state.zoom.z) { state.ctile = linearTile(state.cup, 150 * state.zoom.z); state.ctileZ = state.zoom.z; }
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
@@ -659,6 +722,9 @@
   }
   const FRONT_BTN = [500, 940], SLEEVE_BTN = [70, 1250];      // where the buttons sit on the front photos
   // phones: a small copy of the jacket follows the customer down the page while the big picture is out of view
+  const onSummary = () => !!document.querySelector('.tabs button.on[data-tab=summary]');
+  let stageOff = false;                           // the summary has the big picture on top: no floating copy there
+  const updMini = () => { mini.hidden = !(stageOff && innerWidth <= 900 && !$('#designer').hidden && !onSummary()); };
   const mini = document.createElement('button'); mini.type = 'button'; mini.className = 'mini'; mini.hidden = true;
   mini.setAttribute('aria-label', 'Back to the jacket picture');
   const miniCv = document.createElement('canvas'); miniCv.width = 240; miniCv.height = 360; mini.appendChild(miniCv); document.body.appendChild(mini);
@@ -666,7 +732,7 @@
   mini.onclick = () => $('#stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
   if ('IntersectionObserver' in window) new IntersectionObserver(es => {
     const off = !es[0].isIntersecting;
-    mini.hidden = !(off && innerWidth <= 900 && !$('#designer').hidden);
+    stageOff = off; updMini();
   }, { threshold: 0.15 }).observe($('#stage'));
 
   // ---------- trims: buttons, thread colours, lining ----------
@@ -811,15 +877,17 @@
     $('#monoBox').innerHTML = html;
   }
   $('#monoType').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; cm().type = b.dataset.v; paintMono(); paintSummary(); };
-  $('#monoBox').oninput = e => { if (e.target.id !== 'monoText') return; cm().text = e.target.value; $('#monoCount').textContent = `${cm().text.length}/${MONO.maxText}`; paintSummary(); };
+  let monoT = 0;
+  $('#monoBox').oninput = e => { if (e.target.id !== 'monoText') return; cm().text = e.target.value; $('#monoCount').textContent = `${cm().text.length}/${MONO.maxText}`; paintSummary();
+    clearTimeout(monoT); monoT = setTimeout(() => { if (MONO_POS[cm().pos]) render(); }, 350); };
   $('#monoBox').onchange = e => { if (e.target.id !== 'monoDraw' || !e.target.files[0]) return; cm().drawing = e.target.files[0].name; paintMono(); paintSummary(); };
   $('#monoBox').onclick = e => {
     if (toggleStep(e)) return;
     const sk = e.target.closest('.sk');
     const parts = () => [...document.querySelectorAll('#monoBox [data-mstep], #monoBox .thread-row')];
-    if (sk) { const k = sk.closest('[data-mstep]').dataset.mstep; cm()[k] = sk.dataset.v || null; paintMono(); paintSummary();
+    if (sk) { const k = sk.closest('[data-mstep]').dataset.mstep; cm()[k] = sk.dataset.v || null; paintMono(); paintSummary(); showMono();
       const ps = parts(), i = ps.findIndex(x => x.dataset.mstep === k); goNext(ps[i + 1] || $('[data-next=trims]')); return; }
-    const c = e.target.closest('.pal [data-c]'); if (c) { cm().colour = c.dataset.c || null; paintMono(); paintSummary();
+    const c = e.target.closest('.pal [data-c]'); if (c) { cm().colour = c.dataset.c || null; paintMono(); paintSummary(); showMono();
       const ps = parts(), i = ps.findIndex(x => x.classList.contains('thread-row')); goNext(ps[i + 1]); return; }
   };
   function monoRows(rows) {
@@ -905,6 +973,7 @@
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
     $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
+    updMini();
     $$('.tab').forEach(p => { p.hidden = p.dataset.pane !== name; });
     $('.panel').scrollTop = 0; if (innerWidth <= 900) $('.tabs').scrollIntoView({ block: 'start' });
     paintProgress();
