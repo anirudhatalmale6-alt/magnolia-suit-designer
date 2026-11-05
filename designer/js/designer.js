@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '26';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '27';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -113,14 +113,22 @@
       const sc = (l === want.lapel) * 100 + (f === want.front) * 60 + (f.startsWith('db') === want.front.startsWith('db')) * 50 + (f.startsWith('db') && want.front.startsWith('db')) * 20 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
       if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name }; }
     }
+    let pk = null;
+    if ((best.p !== want.pocket || best.t !== want.ticket) && PK[state.view]) {
+      const P = PK[state.view].patches.find(x => x[0] === want.pocket && x[1] === want.ticket) ||
+        PK[state.view].patches.find(x => x[0] === want.pocket && best.p !== want.pocket);
+      const own = PK[state.view].patches.find(x => x[0] === best.p && x[1] === best.t) || PK[state.view].patches.find(x => x[0] === best.p);
+      if (P) { pk = P[2] + (own ? '+' + own[2] : ''); best.p = P[0]; best.t = P[1]; }
+    }
     const miss = [];
     if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
     if (best.f !== want.front) miss.push(((choiceOf('front') || {}).label || 'this front').toLowerCase());
     if (best.p !== want.pocket || best.t !== want.ticket) miss.push('these pockets');
     const note = miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '';
-    return { name: best.name, note };
+    return { name: best.name, pk, note };
   }
-  async function loadView(name) {
+  async function loadView(name, pk) {
+    if (pk) return views[name + '|' + pk] || (views[name + '|' + pk] = await patchView(await loadView(name), pk));
     if (views[name]) return views[name];
     const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
     const B = pixels(base), S = pixels(shade), Wp = pixels(warp), OVP = pixels(ov);
@@ -129,18 +137,60 @@
     let lsum = 0, lcnt = 0;
     for (let p = 0; p < OVP.length; p += 4) if (OVP[p + 3] > 128) { lsum += 0.299 * OVP[p] + 0.587 * OVP[p + 1] + 0.114 * OVP[p + 2]; lcnt++; }
     const n = W * H, U = new Float32Array(n), V = new Float32Array(n), A = new Float32Array(n), SH = new Float32Array(n);
-    const cx = W / 2, cy = H * 0.35;
     for (let i = 0, p = 0; i < n; i++, p += 4) {
       const a = B[p + 3];
       if (a === 255) continue;
-      const x = i % W, y = (i / W) | 0, u = x + (Wp[p] - 128), v = y + (Wp[p + 1] - 128);
-      const t = ANG[Wp[p + 2]] || 0, c = Math.cos(t), s = Math.sin(t);
-      U[i] = (u - cx) * c - (v - cy) * s + cx; V[i] = (u - cx) * s + (v - cy) * c + cy;
-      A[i] = 1 - a / 255; SH[i] = S[p] / 128;
+      A[i] = 1 - a / 255; uvAt(i, S, Wp, U, V, SH);
     }
     let LN = null;                                  // open-jacket views: lining mask (alpha) and its shading (red, 128 = x1.0)
     if (name.startsWith('open')) LN = pixels(await loadImg(`maps/${name}/lining.webp?v=${VER}`));
     return (views[name] = { B, S, Wp, U, V, A, SH, ov, OVP, meta, LN, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
+  }
+  // where pixel i of the cloth samples the fabric tile (warp offset, lapel grain rotation) and how lit it is
+  function uvAt(i, S, Wp, U, V, SH) {
+    const p = i * 4, cx = W / 2, cy = H * 0.35, x = i % W, y = (i / W) | 0, u = x + (Wp[p] - 128), v = y + (Wp[p + 1] - 128);
+    const t = ANG[Wp[p + 2]] || 0, c = Math.cos(t), s = Math.sin(t);
+    U[i] = (u - cx) * c - (v - cy) * s + cx; V[i] = (u - cx) * s + (v - cy) * c + cy; SH[i] = S[p] / 128;
+  }
+  // Pocket styles: the pocket area of a notch photo with that pocket (shading + fold offsets) is blended into
+  // this photo, moved to where this photo's own pocket sits. Buttons and the photo's outline stay its own.
+  let PK = {};
+  const pkImgs = {};
+  async function pkImg(f) { return pkImgs[f] || (pkImgs[f] = pixels(await loadImg(`maps/_pk/${f}.webp?v=${VER}`))); }
+  async function patchView(st, pk) {
+    const v = PK[state.view], [dn, tn] = pk.split('+'), [pw, ph] = v.size, [tdx, tdy] = st.meta.pk || [0, 0];
+    const Dp = v.patches.find(x => x[2] === dn), D = await pkImg(dn), Tp = tn && v.patches.find(x => x[2] === tn), T = Tp && await pkImg(tn);
+    const S = st.S.slice(), Wp = st.Wp.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
+    const ox = v.at[0] + tdx, oy = v.at[1] + tdy;            // patch origin on this photo
+    // per patch pixel: target index, donor value, weight = new pocket area + this photo's own pocket area
+    const n = pw * ph, idx = new Int32Array(n).fill(-1), w = new Float32Array(n), sd = new Float32Array(n), st0 = new Float32Array(n);
+    for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
+      const x = ox + px, y = oy + py, k = py * pw + px;
+      if (x < 0 || x >= W || y < 0 || y >= H) continue;
+      const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3]) continue;   // only on cloth, never over a button
+      let e = 1;                                        // fade out near the jacket outline (outlines differ per photo)
+      for (let d = 4; d <= 28 && e > 0; d += 4) if (!st.A[i - d] || !st.A[i + d]) e = Math.min(e, (d - 4) / 24);
+      if (st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
+      const qdy = py + Dp[3][1], qty = Tp ? py + Tp[3][1] : -1;   // each donor's pocket sits at its own offset
+      const a = qdy >= 0 && qdy < ph ? D[((qdy + ph) * pw + px) * 4] / 255 : 0;   // weight: bottom half of the image
+      const b = Tp && qty >= 0 && qty < ph ? T[((qty + ph) * pw + px) * 4 + 1] / 255 : 0;   // wide area: erase this photo's own pockets
+      idx[k] = i; w[k] = Math.max(a, b) * e; st0[k] = S[i * 4];
+      sd[k] = qdy >= 0 && qdy < ph ? D[(qdy * pw + px) * 4] : st0[k];
+    }
+    // brightness match: one ratio between this photo's cloth and the donor's, measured on plain cloth around the
+    // pockets (a local ratio picks up darts and folds and leaves bands)
+    let s1 = 0, s2 = 0;
+    for (let k = 0; k < n; k++) if (idx[k] >= 0 && w[k] < 0.05) { s1 += st0[k]; s2 += sd[k]; }
+    const g = Math.min(1.25, Math.max(0.8, (s1 + 1) / (s2 + 1)));
+    for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
+      const k = py * pw + px, i = idx[k]; if (i < 0 || w[k] <= 0) continue;
+      const p = i * 4, ww = w[k];
+      const qdy = py + Dp[3][1], q = qdy >= 0 && qdy < ph ? (qdy * pw + px) * 4 : -1;
+      S[p] = Math.min(255, st0[k] * (1 - ww) + sd[k] * g * ww);
+      if (q >= 0) { Wp[p] = Wp[p] * (1 - ww) + D[q + 1] * ww; Wp[p + 1] = Wp[p + 1] * (1 - ww) + D[q + 2] * ww; }
+      uvAt(i, S, Wp, U, V, SH);
+    }
+    return { ...st, S, Wp, U, V, SH, ovCache: {} };
   }
   const tilePx = {};
   async function loadTile(f, z = 1) {
@@ -328,7 +378,7 @@
     busy.hidden = false; busy.textContent = 'Updating…';
     $('#angleNote').hidden = !m.note; $('#angleNote').textContent = m.note || '';
     try {
-      const st = await loadView(m.name);
+      const st = await loadView(m.name, m.pk);
       if (!state.custom) {
         const f = state.fabric;
         state.tile = await loadTile(f);
@@ -907,6 +957,7 @@
   (async function init() {
     try {
       const get = async n => (await fetch(`${n}?v=${VER}`)).json();
+      try { PK = await get('maps/_pk/index.json'); } catch (e) { PK = {}; }
       [FABRICS, OPTS, BUTTONS, SLEEVES, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'sleeve_buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
