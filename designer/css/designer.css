@@ -239,3 +239,10 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
 .w-h3 { margin-top: 34px; }
 @media (max-width: 900px) { .w-contacts { grid-template-columns: 1fr; } }
 .w-contact { align-content: start; }
+@media (max-width: 900px) {
+  .w-cards.w-three { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .w-three .w-card:not(.soon) { grid-column: span 2; }
+  .w-three .w-card.soon { padding: 12px 14px; }
+  .w-three .w-card.soon b { font-size: 15.5px; }
+  .w-three .w-card.soon span { font-size: 12.5px; }
+}
