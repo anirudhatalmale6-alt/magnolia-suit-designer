@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '22';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '23';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -407,7 +407,7 @@
     };
     $('#grid').onclick = e => {
       const b = e.target.closest('[data-id]'); if (!b) return;
-      state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; paintSteps(); paintProgress();
+      state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; paintSteps(); paintProgress(); goNext($('[data-next=fabric]'));
       $$('#grid .fab').forEach(x => x.classList.toggle('on', x === b)); render();
     };
   }
@@ -447,6 +447,12 @@
       return stepRow(`data-hstep="${i}"`, h.title, state.hid[h.title] || '', list);
     }).join('');
   }
+  // after each choice, bring the next part into view so the customer always knows where to go
+  function goNext(el) { if (!el) return; setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120); }
+  function nextAfter(st, sel) {
+    const all = [...document.querySelectorAll(sel)], i = all.indexOf(st);
+    return all[i + 1] || null;
+  }
   function toggleStep(e) {
     const head = e.target.closest('.step-head'); if (!head) return false;
     const g = head.nextElementSibling, open = g.hidden;
@@ -454,14 +460,14 @@
   }
   function closeStep(tile) {
     const st = tile.closest('.step'); st.classList.remove('open'); st.querySelector('.sk-grid').hidden = true;
-    const r = st.getBoundingClientRect(); if (r.top < 0) st.scrollIntoView({ block: 'start' });
   }
   $('#staffHidden').onclick = e => {
     if (toggleStep(e)) return;
     const b = e.target.closest('.sk'); if (!b) return;
     const h = STAFF._opts._hidden[+b.closest('[data-hstep]').dataset.hstep];
+    const hi = +b.closest('[data-hstep]').dataset.hstep;
     if (b.dataset.v) state.hid[h.title] = b.dataset.v; else delete state.hid[h.title];
-    paintHidden(); paintSummary();
+    paintHidden(); paintSummary(); goNext(document.querySelector(`[data-hstep="${hi + 1}"]`) || $('[data-next=style]'));
   };
   function setOpt(id, v) {
     state.opts[id] = v;
@@ -479,6 +485,7 @@
     st.querySelector('.step-thumb').innerHTML = c && c.img ? skImg(c.img) : '';
     closeStep(b);
     setOpt(id, b.dataset.v);
+    goNext(nextAfter(document.querySelector(`[data-step="${id}"]`), '#styleSteps .step') || $('[data-next=style]'));
   };
 
   // ---------- trims: buttons, thread colours, lining ----------
@@ -498,8 +505,8 @@
     if (!state.sleeveSame) $('#sleeveGrid').innerHTML = btnTiles(SLEEVES, state.sleeveButton);
   }
   $('#btnMat').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; btnFilter = b.dataset.m; paintButtons(); };
-  $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); render(); };
-  $('#sleeveGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.sleeveButton = b.dataset.b || null; paintButtons(); render(); };
+  $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); render(); goNext($('#sleeveSame').closest('label')); };
+  $('#sleeveGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.sleeveButton = b.dataset.b || null; paintButtons(); render(); goNext($('#hThreads')); };
   $('#sleeveSame').onchange = e => { state.sleeveSame = e.target.checked; paintButtons(); render(); };
 
   const rgbCss = c => `rgb(${c.join(',')})`;
@@ -530,6 +537,10 @@
     } else state.thread[key] = v;
     paintThreads();
     if (key === 'button') render(); else paintSummary();
+    if (key === 'sleeve' && state.holeSel) return;            // picking hole by hole: stay here
+    const rows = [...document.querySelectorAll('#threadRows .pal')].map(p => p.closest('.thread-row'));
+    const i = rows.findIndex(r => r.querySelector(`[data-t="${key}"]`));
+    goNext(rows[i + 1] || $('#hLining'));
   };
   const liningName = id => `Lining ${parseInt(id.slice(1), 10)}`;
   const LIN_GROUPS = [['Plain', l => l.book && (l.kind === 'plain' || l.kind === 'bemberg')], ['Printed', l => l.book && l.kind === 'printed'],
@@ -554,8 +565,8 @@
     }
   }
   $('#sleeveLinSame').onchange = e => { state.sleeveLinSame = e.target.checked; paintLinings(); paintSummary(); };
-  $('#sleeveLinGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.sleeveLining = b.dataset.l || null; paintLinings(); paintSummary(); };
-  $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); };
+  $('#sleeveLinGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.sleeveLining = b.dataset.l || null; paintLinings(); paintSummary(); goNext($('#hMono')); };
+  $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); goNext($('#sleeveLinSame').closest('label')); };
 
   // ---------- contrast fabrics (undercollar melton, elbow patch suede) ----------
   const contrastName = id => { const c = CONTRAST.find(x => x.id === id); if (!c) return '';
@@ -623,8 +634,11 @@
   $('#monoBox').onclick = e => {
     if (toggleStep(e)) return;
     const sk = e.target.closest('.sk');
-    if (sk) { cm()[sk.closest('[data-mstep]').dataset.mstep] = sk.dataset.v || null; paintMono(); paintSummary(); return; }
-    const c = e.target.closest('.pal [data-c]'); if (c) { cm().colour = c.dataset.c || null; paintMono(); paintSummary(); return; }
+    const parts = () => [...document.querySelectorAll('#monoBox [data-mstep], #monoBox .thread-row')];
+    if (sk) { const k = sk.closest('[data-mstep]').dataset.mstep; cm()[k] = sk.dataset.v || null; paintMono(); paintSummary();
+      const ps = parts(), i = ps.findIndex(x => x.dataset.mstep === k); goNext(ps[i + 1] || $('[data-next=trims]')); return; }
+    const c = e.target.closest('.pal [data-c]'); if (c) { cm().colour = c.dataset.c || null; paintMono(); paintSummary();
+      const ps = parts(), i = ps.findIndex(x => x.classList.contains('thread-row')); goNext(ps[i + 1]); return; }
   };
   function monoRows(rows) {
     const used = state.monos.filter(m => m.type);

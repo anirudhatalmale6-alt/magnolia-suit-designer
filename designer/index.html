@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '22';
+    var V = '23';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=22">
+<link rel="stylesheet" href="css/designer.css?v=23">
 </head>
 <body>
 <header class="topbar">
@@ -45,7 +45,7 @@
         <div class="w-contact"><b>Jerusalem</b><small>Ramat Eshkol / Sanhedria area</small><span>Shloimy Braun</span>
           <a href="tel:+972533946336">+972 53-394-6336</a><a href="https://wa.me/972533946336" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:magnoliabespokeil@gmail.com">magnoliabespokeil@gmail.com</a></div>
         <div class="w-contact"><b>Lakewood, NJ</b><small>Serving the tri-state area</small><span>Ezriel Daum</span>
-          <a href="tel:+17328060550">(732) 806-0550</a><a href="mailto:magnoliabespoke@gmail.com">magnoliabespoke@gmail.com</a></div>
+          <a href="tel:+17328060550">(732) 806-0550</a><a href="https://wa.me/17328060550" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:magnoliabespoke@gmail.com">magnoliabespoke@gmail.com</a></div>
       </div>
       <p class="w-appt">In person is by appointment only. Call, text or WhatsApp to book.</p>
     </div>
@@ -72,7 +72,7 @@
         <div class="w-contact"><b>Jerusalem</b><small>Ramat Eshkol / Sanhedria area</small><span>Shloimy Braun</span>
           <a href="tel:+972533946336">+972 53-394-6336</a><a href="https://wa.me/972533946336" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:magnoliabespokeil@gmail.com">magnoliabespokeil@gmail.com</a></div>
         <div class="w-contact"><b>Lakewood, NJ</b><small>Serving the tri-state area</small><span>Ezriel Daum</span>
-          <a href="tel:+17328060550">(732) 806-0550</a><a href="mailto:magnoliabespoke@gmail.com">magnoliabespoke@gmail.com</a></div>
+          <a href="tel:+17328060550">(732) 806-0550</a><a href="https://wa.me/17328060550" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:magnoliabespoke@gmail.com">magnoliabespoke@gmail.com</a></div>
       </div>
       <p class="w-appt">In person is by appointment only. Call, text or WhatsApp to book.</p>
   </div>
@@ -175,15 +175,15 @@
       <label class="check"><input type="checkbox" id="sleeveSame" checked> Sleeve buttons the same as the front</label>
       <div id="sleeveBtnBox" hidden><p class="hint">Choose the sleeve buttons:</p><div class="grid btn-grid" id="sleeveGrid"></div></div>
 
-      <h3>Thread colours</h3>
+      <h3 id="hThreads">Thread colours</h3>
       <div id="threadRows"></div>
 
-      <h3>Lining</h3>
+      <h3 id="hLining">Lining</h3>
       <div class="grid lin-grid" id="linGrid"></div>
       <label class="check"><input type="checkbox" id="sleeveLinSame" checked> Sleeve lining the same as the body</label>
       <div id="sleeveLinBox" hidden><p class="hint">Choose the sleeve lining:</p><div class="grid lin-grid" id="sleeveLinGrid"></div></div>
 
-      <h3>Monogram</h3>
+      <h3 id="hMono">Monogram</h3>
       <div class="mono-tabs" id="monoTabs"></div>
       <div class="seg" id="monoType"><button type="button" data-v="" class="on">No monogram</button><button type="button" data-v="word">Letters</button><button type="button" data-v="gallery">Symbol</button><button type="button" data-v="drawing">Own drawing</button></div>
       <div id="monoBox"></div>
@@ -235,6 +235,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=22"></script>
+<script src="js/designer.js?v=23"></script>
 </body>
 </html>
