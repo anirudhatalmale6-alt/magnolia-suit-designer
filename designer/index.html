@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '20';
+    var V = '21';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=20">
+<link rel="stylesheet" href="css/designer.css?v=21">
 </head>
 <body>
 <header class="topbar">
@@ -41,7 +41,13 @@
       <h1>Your suit,<br><em>designed by you.</em></h1>
       <p class="w-lead">Choose the cloth, then every detail: lapels, pockets, buttons, lining and your monogram. You see your jacket change as you go.</p>
       <div class="w-actions"><button type="button" class="primary w-big" data-go="mode">Start designing &rsaquo;</button><button type="button" class="ghost dark" data-go="how">How it works</button></div>
-      <p class="w-where">Jerusalem &middot; Lakewood, NJ</p>
+      <div class="w-contacts">
+        <div class="w-contact"><b>Jerusalem</b><small>Ramat Eshkol / Sanhedria area</small><span>Shloimy Braun</span>
+          <a href="tel:+972533946336">+972 53-394-6336</a><a href="https://wa.me/972533946336" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:magnoliabespokeil@gmail.com">magnoliabespokeil@gmail.com</a></div>
+        <div class="w-contact"><b>Lakewood, NJ</b><small>Serving the tri-state area</small><span>Ezriel Daum</span>
+          <a href="tel:+17328060550">(732) 806-0550</a></div>
+      </div>
+      <p class="w-appt">In person is by appointment only. Call, text or WhatsApp to book.</p>
     </div>
   </div>
 
@@ -49,7 +55,7 @@
     <p class="w-kicker">How it works</p>
     <h2>From cloth to finished suit</h2>
     <ol class="w-steps">
-      <li><b>Choose how you design</b><span>In person at our Jerusalem or Lakewood shop, or online from home.</span></li>
+      <li><b>Choose how you design</b><span>In person in Jerusalem or Lakewood (by appointment only), or online from home.</span></li>
       <li><b>Choose what you're building</b><span>A full suit or a jacket. Trousers, bekeshe, coat and shirt are coming.</span></li>
       <li><b>Pick your fabric</b><span>Hundreds of cloths, including Italian. The fabric sets the price.</span></li>
       <li><b>Design every detail</b><span>Front, lapels, pockets, vents, sleeves, stitching, buttons, thread colours, lining and up to two monograms. Every choice has a picture.</span></li>
@@ -61,20 +67,28 @@
       <div><b>Online</b><span>Full suit from <strong>$395</strong></span></div>
     </div>
     <div class="w-actions"><button type="button" class="primary w-big" data-go="mode">Start designing &rsaquo;</button><button type="button" class="ghost dark" data-go="home">Back</button></div>
+    <h3 class="w-h3">Contact us</h3>
+    <div class="w-contacts">
+        <div class="w-contact"><b>Jerusalem</b><small>Ramat Eshkol / Sanhedria area</small><span>Shloimy Braun</span>
+          <a href="tel:+972533946336">+972 53-394-6336</a><a href="https://wa.me/972533946336" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:magnoliabespokeil@gmail.com">magnoliabespokeil@gmail.com</a></div>
+        <div class="w-contact"><b>Lakewood, NJ</b><small>Serving the tri-state area</small><span>Ezriel Daum</span>
+          <a href="tel:+17328060550">(732) 806-0550</a></div>
+      </div>
+      <p class="w-appt">In person is by appointment only. Call, text or WhatsApp to book.</p>
   </div>
 
   <div class="w-screen" data-w="mode" hidden>
     <p class="w-kicker">Let's begin</p>
     <h2>How would you like to design?</h2>
     <div class="w-cards">
-      <button type="button" class="w-card" data-mode="inperson"><b>In person</b><span>Design with us at the shop. Measurements taken in person.</span><em>Full suit from $445</em></button>
+      <button type="button" class="w-card" data-mode="inperson"><b>In person</b><span>By appointment only. Design with us and have your measurements taken in person.</span><em>Full suit from $445</em></button>
       <button type="button" class="w-card" data-mode="online"><b>Online</b><span>Design and order from home.</span><em>Full suit from $395</em></button>
     </div>
     <div class="w-locs" id="wLocs" hidden>
-      <p class="w-q">Which shop?</p>
+      <p class="w-q">Which shop? <span class="w-appt-inline">By appointment only</span></p>
       <div class="w-cards">
-        <button type="button" class="w-card" data-loc="jerusalem"><b>Jerusalem</b><span>Yam Suf St</span></button>
-        <button type="button" class="w-card" data-loc="lakewood"><b>Lakewood, NJ</b><span>Serving the tri-state area</span></button>
+        <button type="button" class="w-card" data-loc="jerusalem"><b>Jerusalem</b><span>Ramat Eshkol / Sanhedria area</span><em>Shloimy Braun &middot; +972 53-394-6336</em></button>
+        <button type="button" class="w-card" data-loc="lakewood"><b>Lakewood, NJ</b><span>Serving the tri-state area</span><em>Ezriel Daum &middot; (732) 806-0550</em></button>
       </div>
     </div>
     <div class="w-actions"><button type="button" class="ghost dark" data-go="home">Back</button></div>
@@ -221,6 +235,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=20"></script>
+<script src="js/designer.js?v=21"></script>
 </body>
 </html>

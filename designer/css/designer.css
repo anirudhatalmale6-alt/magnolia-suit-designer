@@ -228,3 +228,14 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
 }
 .w-card.soon span { color: #9a6b2e; font-weight: 500; }
 .w-card.soon:hover { border-color: var(--line); box-shadow: none; }
+.w-contacts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+.w-contact { border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 3px; background: var(--paper); font-size: 14px; }
+.w-contact b { font-size: 15.5px; }
+.w-contact small { color: var(--muted); font-size: 12.5px; }
+.w-contact a { color: var(--teal-d); text-decoration: none; font-weight: 500; word-break: break-all; }
+.w-contact a:hover { text-decoration: underline; }
+.w-appt { color: var(--muted); font-size: 13px; margin-top: 10px; }
+.w-appt-inline { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px; }
+.w-h3 { margin-top: 34px; }
+@media (max-width: 900px) { .w-contacts { grid-template-columns: 1fr; } }
+.w-contact { align-content: start; }
