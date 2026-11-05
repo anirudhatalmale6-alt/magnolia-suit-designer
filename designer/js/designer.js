@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '16';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '17';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -14,9 +14,11 @@
   const cv = $('#cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), busy = $('#busy');
   const state = { view: 'front', fabric: null, tile: null, custom: false, zoom: null,
     opts: {}, button: null, sleeveSame: true, sleeveButton: null, thread: { button: null, lapel: null, front: null, sleeve: [] },
-    lining: null, sleeveLinSame: true, sleeveLining: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null, hid: {} };
+    lining: null, sleeveLinSame: true, sleeveLining: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null, hid: {},
+    mono: { type: '', text: '', colour: null, font: null, pos: null, height: null, gal: null, gheight: null, drawing: '' },
+    remark: '', photos: [null, null, null], prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
-  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], LININGS = [], THREADS = [], CONTRAST = [];
+  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null;
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
                   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
@@ -349,7 +351,7 @@
     rows.push(['Front buttons', bt ? `${MAT[bt.mat] || 'Button'}, No. ${parseInt(bt.id.slice(1), 10)}` : 'As pictured (to be chosen)', bc ? bc.code : '']);
     rows.push(['Sleeve buttons', state.sleeveSame ? 'Same as the front' : (sbt ? `${MAT[sbt.mat] || 'Button'}, No. ${parseInt(sbt.id.slice(1), 10)}` : 'As pictured'),
       sc ? (sc.sleeve || sc.code) : '']);
-    const tn = k => state.thread[k] ? threadName(state.thread[k]) : 'Matching the cloth', tc = k => trimCode('threads', state.thread[k]) || '';
+    const tn = k => state.thread[k] ? threadName(state.thread[k]) : 'Matching the cloth', tc = k => { const yz = trimCode('threads', state.thread[k]); return yz ? `${yz}${STAFF._mono && STAFF._mono.yz[yz] ? ' · ' + STAFF._mono.yz[yz] : ''}` : ''; };
     rows.push(['Button thread', tn('button'), tc('button')]);
     rows.push(['Lapel buttonhole', tn('lapel'), tc('lapel')]);
     const n = sleeveHoles(), sl = state.thread.sleeve.slice(0, n);
@@ -365,6 +367,11 @@
       G ? `${G.undercollar} ${state.undercollar ? trimCode('contrast', state.undercollar) : G.undercollarMatch}` : '']);
     if (STAFF) rows.push(['Elbow patches', state.elbow ? `${state.elbow === 'A' ? 'Round elbow patch' : 'Round sleeve patch'}, ${contrastName(state.elbowFabric)}` : 'None',
       G && state.elbow ? `${G.elbow} ${state.elbow} · ${G.elbowFabric} ${trimCode('contrast', state.elbowFabric)}` : '']);
+    if (MONO) monoRows(rows);
+    rows.push(['<b>Remarks</b>', '', '', true]);
+    rows.push(['Remark', state.remark || 'None', '']);
+    const np = state.photos.filter(Boolean).length; if (np) rows.push(['Photos', `${np} added`, '']);
+    if (STAFF) { rows.push(['Pre-fitting', state.prefit, '']); rows.push(['Urgent', (URGENT.find(u => u[0] === state.urgent) || [])[1], '']); }
     if (STAFF && STAFF._opts._hidden) {                 // every hidden factory option, so the order sheet is complete
       rows.push(['<b>Staff only</b>', '', '', true]);
       for (const h of STAFF._opts._hidden) {
@@ -411,7 +418,7 @@
     chestPocket: 'The picture shows the standard chest pocket. Your choice goes on the order sheet.',
     vent: 'See it in the Back view.' };
   // every section is a row (current choice + its sketch) that opens into a grid of sketches, like the factory screen
-  const skImg = (img, alt) => img ? `<img src="sketch/${img}?v=${VER}" alt="" loading="lazy" onerror="this.replaceWith(document.createTextNode(''))">` : `<span class="sk-none">${esc(alt || '')}</span>`;
+  const skImg = (img, alt) => img ? `<img src="${img.includes('/') ? img : 'sketch/' + img}?v=${VER}" alt="" loading="lazy" onerror="this.replaceWith(document.createTextNode(''))">` : `<span class="sk-none">${esc(alt || '')}</span>`;
   function stepRow(attr, label, cur, list, hint) {
     const c = list.find(x => x.v === cur) || list[0];
     return `<div class="step" ${attr}><button type="button" class="step-head"><span class="step-thumb">${c && c.img ? skImg(c.img) : ''}</span>` +
@@ -569,6 +576,75 @@
     paintContrast(); paintSummary(); };
   $('#elbowGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.elbowFabric = b.dataset.c; paintContrast(); paintSummary(); };
 
+  // ---------- monogram (factory Monogram tab: letters, a gallery symbol, or the customer's own drawing) ----------
+  function paintMono() {
+    const m = state.mono, M = MONO;
+    $$('#monoType button').forEach(b => b.classList.toggle('on', b.dataset.v === m.type));
+    if (!m.type) { $('#monoBox').innerHTML = ''; return; }
+    const row = (key, label, cur, list) => stepRow(`data-mstep="${key}"`, label, cur, list);
+    let html = '';
+    if (m.type === 'word') {
+      html += `<label class="adv-row">Letters or text<input id="monoText" class="mono-text" maxlength="${M.maxText}" value="${esc(m.text)}" placeholder="e.g. J.D.R"></label><small id="monoCount">${m.text.length}/${M.maxText}</small>`;
+      html += row('font', 'Font', m.font || '', [{ v: '', label: 'Choose a font' }].concat(M.fonts.map(f => ({ v: f.id, label: f.name, img: f.img && 'mono/' + f.img }))));
+    }
+    if (m.type === 'gallery') {
+      html += row('gal', 'Symbol', m.gal || '', [{ v: '', label: 'Choose a symbol' }].concat(M.gallery.map(g => ({ v: g.id, label: g.name, img: g.img && 'mono/' + g.img }))));
+    }
+    if (m.type === 'drawing') {
+      html += `<label class="upload">${m.drawing ? `Drawing added: ${esc(m.drawing)} (tap to change)` : 'Upload your drawing or logo'}<input type="file" accept="image/*" id="monoDraw"></label>`;
+      html += `<p class="hint">We will contact you to confirm size and colours before ordering.</p>`;
+    }
+    if (m.type !== 'drawing') html += `<div class="thread-row"><b>Thread colour</b>${palette(m.colour, 'mono')}</div>`;
+    html += row('pos', 'Position', m.pos || '', [{ v: '', label: 'Choose a position' }].concat(M.positions.map(p => ({ v: p.id, label: p.name, img: p.img && 'mono/' + p.img }))));
+    const H = m.type === 'gallery' ? M.gHeights : M.heights;
+    html += `<div class="adv-row">Height<div class="seg" id="monoH">${H.map(h => `<button type="button" data-v="${h.id}" class="${(m.type === 'gallery' ? m.gheight : m.height) === h.id ? 'on' : ''}">${esc(h.name)}</button>`).join('')}</div></div>`;
+    $('#monoBox').innerHTML = html;
+  }
+  $('#monoType').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.mono.type = b.dataset.v; paintMono(); paintSummary(); };
+  $('#monoBox').oninput = e => { if (e.target.id !== 'monoText') return; state.mono.text = e.target.value; $('#monoCount').textContent = `${state.mono.text.length}/${MONO.maxText}`; paintSummary(); };
+  $('#monoBox').onchange = e => { if (e.target.id !== 'monoDraw' || !e.target.files[0]) return; state.mono.drawing = e.target.files[0].name; paintMono(); paintSummary(); };
+  $('#monoBox').onclick = e => {
+    if (toggleStep(e)) return;
+    const sk = e.target.closest('.sk');
+    if (sk) { state.mono[sk.closest('[data-mstep]').dataset.mstep] = sk.dataset.v || null; paintMono(); paintSummary(); return; }
+    const c = e.target.closest('.pal [data-c]'); if (c) { state.mono.colour = c.dataset.c || null; paintMono(); paintSummary(); return; }
+    const h = e.target.closest('#monoH [data-v]'); if (h) { state.mono[state.mono.type === 'gallery' ? 'gheight' : 'height'] = h.dataset.v; paintMono(); paintSummary(); }
+  };
+  function monoRows(rows) {
+    const m = state.mono, M = MONO, S = STAFF && STAFF._mono, code = (k, v) => S && v ? ` · ${S.groups[k]} ${v}` : '';
+    rows.push(['<b>Monogram</b>', '', '', true]);
+    if (!m.type) { rows.push(['Monogram', 'None', '']); return; }
+    const pick = (list, id) => (list.find(x => x.id === id) || {}).name;
+    if (m.type === 'word') {
+      rows.push(['Monogram text', m.text || 'Not entered yet', '']);
+      rows.push(['Font', pick(M.fonts, m.font) || 'To be chosen', S && m.font ? `${S.groups['Embroidery Font']} ${S.font[m.font]}` : '']);
+    }
+    if (m.type === 'gallery') rows.push(['Symbol', pick(M.gallery, m.gal) || 'To be chosen', S && m.gal ? 'Emb.gallery' : '']);
+    if (m.type === 'drawing') rows.push(['Own drawing', m.drawing || 'Not uploaded yet', S ? 'Customers Drawings' : '']);
+    if (m.type !== 'drawing') {
+      const yz = m.colour && STAFF && STAFF._trims ? STAFF._trims.threads[m.colour] : '';
+      rows.push(['Thread colour', m.colour ? threadName(m.colour) : 'To be chosen', S && m.colour ? `${yz} · ${S.groups['Embroidery Color']} ${S.colour[m.colour] || ''}` : '']);
+    }
+    rows.push(['Position', pick(M.positions, m.pos) || 'To be chosen', S && m.pos ? `${S.groups['Embroidery Position']} ${S.position[m.pos]}` : '']);
+    const hid = m.type === 'gallery' ? m.gheight : m.height, H = m.type === 'gallery' ? M.gHeights : M.heights;
+    rows.push(['Height', pick(H, hid) || 'Standard', S && hid ? `${S.groups['Embroidery Height']} ${hid}` : '']);
+  }
+
+  // ---------- remarks, photos, pre-fitting / urgent (factory "Remark" and "Pre-fitting / Urgent") ----------
+  const PREFIT = ['No', 'Pre-fitting', 'Unfinished Semi-Made Fitting', 'Canvas Shell Sample (No Return)', 'Blank display sample (no return afterwards)'];
+  const URGENT = [['normal', 'Normal (7 working days)'], ['urgent', 'Urgent (5 working days)']];
+  function paintExtras() {
+    $('#photoSlots').innerHTML = state.photos.map((p, i) => `<label class="photo-slot">${p ? `<img src="${p.url}" alt="">` : '<span>+ Photo</span>'}<input type="file" accept="image/*" data-ph="${i}"></label>`).join('');
+    $('#prefitSeg').innerHTML = PREFIT.map(v => `<button type="button" data-v="${esc(v)}" class="${state.prefit === v ? 'on' : ''}">${esc(v)}</button>`).join('');
+    $('#urgentSeg').innerHTML = URGENT.map(([v, l]) => `<button type="button" data-v="${v}" class="${state.urgent === v ? 'on' : ''}">${l}</button>`).join('');
+  }
+  $('#remark').oninput = e => { state.remark = e.target.value; $('#remarkCount').textContent = `${state.remark.length}/400`; paintSummary(); };
+  $('#photoSlots').onchange = e => { const i = e.target.dataset.ph, f = e.target.files[0]; if (i == null || !f) return;
+    if (state.photos[i]) URL.revokeObjectURL(state.photos[i].url);
+    state.photos[i] = { name: f.name, url: URL.createObjectURL(f) }; paintExtras(); paintSummary(); };
+  $('#prefitSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.prefit = b.dataset.v; paintExtras(); paintSummary(); };
+  $('#urgentSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.urgent = b.dataset.v; paintExtras(); paintSummary(); };
+
   // ---------- views / tabs ----------
   $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   $$('.tabs button').forEach(b => b.onclick = () => {
@@ -608,7 +684,7 @@
     $('#staffBadge').hidden = false; $('#staffBtn').textContent = 'Exit staff';
     $$('.staff-only').forEach(x => { x.hidden = false; });
     $('#q').placeholder = 'Search by number, colour, cloth or factory code';
-    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast();
+    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast(); paintMono();
   }
   function staffOff() {
     STAFF = null; store.set('mb_staff', '');
@@ -616,7 +692,7 @@
     $$('.staff-only').forEach(x => { x.hidden = true; });
     $('#q').placeholder = 'Search by number, colour or cloth (e.g. 1042, navy, cashmere)';
     if (state.custom) { state.custom = false; render(); }
-    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast();
+    paintGrid(); paintChosen(); paintSummary(); paintButtons(); paintLinings(); paintThreads(); paintStyle(); paintContrast(); paintMono();
   }
   $('#staffBtn').onclick = () => { if (STAFF) return staffOff(); $('#pwErr').hidden = true; $('#modal').hidden = false; $('#pw').value = ''; $('#pw').focus(); };
   $('#pwCancel').onclick = () => { $('#modal').hidden = true; };
@@ -644,11 +720,11 @@
   (async function init() {
     try {
       const get = async n => (await fetch(`${n}?v=${VER}`)).json();
-      [FABRICS, OPTS, BUTTONS, LININGS, THREADS, CONTRAST] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'linings.json', 'threads.json', 'contrast.json'].map(get));
+      [FABRICS, OPTS, BUTTONS, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
-    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); render();
+    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); render();
     const pw = store.get('mb_staff');
     if (pw) { try { staffOn(await unlock(pw), pw); } catch (e) { store.set('mb_staff', ''); } }
   })();

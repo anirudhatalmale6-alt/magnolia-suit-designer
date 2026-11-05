@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '16';
+    var V = '17';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -19,7 +19,7 @@
     } catch (e) {}
   })();
 </script>
-<link rel="stylesheet" href="css/designer.css?v=16">
+<link rel="stylesheet" href="css/designer.css?v=17">
 </head>
 <body>
 <header class="topbar">
@@ -100,6 +100,10 @@
       <label class="check"><input type="checkbox" id="sleeveLinSame" checked> Sleeve lining the same as the body</label>
       <div id="sleeveLinBox" hidden><p class="hint">Choose the sleeve lining:</p><div class="grid lin-grid" id="sleeveLinGrid"></div></div>
 
+      <h3>Monogram</h3>
+      <div class="seg" id="monoType"><button type="button" data-v="" class="on">No monogram</button><button type="button" data-v="word">Letters</button><button type="button" data-v="gallery">Symbol</button><button type="button" data-v="drawing">Own drawing</button></div>
+      <div id="monoBox"></div>
+
       <div class="staff-only adv" hidden>
         <h3>Staff only: contrast fabric</h3>
         <div class="thread-row"><b>Undercollar (collar felt)</b><div class="grid lin-grid" id="ucGrid"></div></div>
@@ -113,6 +117,15 @@
     <section class="tab" data-pane="summary" hidden>
       <h3>Your jacket</h3>
       <dl class="summary" id="summary"></dl>
+      <h3>Remarks</h3>
+      <textarea id="remark" class="remark" maxlength="400" placeholder="Anything we should know (max 400 characters)"></textarea>
+      <div class="remark-meta"><small id="remarkCount">0/400</small></div>
+      <div class="photo-slots" id="photoSlots"></div>
+      <div class="staff-only adv" hidden>
+        <h3>Staff only: pre-fitting / urgent</h3>
+        <div class="adv-row">Pre-fitting<div class="seg" id="prefitSeg"></div></div>
+        <div class="adv-row">Urgent<div class="seg" id="urgentSeg"></div></div>
+      </div>
       <p class="hint">In the full version this is where the customer reviews the price, adds measurements and sends the order. The order sheet will carry the factory codes for every choice.</p>
     </section>
   </aside>
@@ -136,6 +149,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=16"></script>
+<script src="js/designer.js?v=17"></script>
 </body>
 </html>
