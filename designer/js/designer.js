@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '15';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '16';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -410,17 +410,21 @@
   const STYLE_HINT = { lowerPocket: 'Flap, slanted, patch and jetted pockets show in the picture. Every style goes on the order sheet.',
     chestPocket: 'The picture shows the standard chest pocket. Your choice goes on the order sheet.',
     vent: 'See it in the Back view.' };
+  // every section is a row (current choice + its sketch) that opens into a grid of sketches, like the factory screen
+  const skImg = (img, alt) => img ? `<img src="sketch/${img}?v=${VER}" alt="" loading="lazy" onerror="this.replaceWith(document.createTextNode(''))">` : `<span class="sk-none">${esc(alt || '')}</span>`;
+  function stepRow(attr, label, cur, list, hint) {
+    const c = list.find(x => x.v === cur) || list[0];
+    return `<div class="step" ${attr}><button type="button" class="step-head"><span class="step-thumb">${c && c.img ? skImg(c.img) : ''}</span>` +
+      `<span class="step-txt"><b>${esc(label)}</b><small>${esc(c ? c.label : '')}</small></span><i class="step-arrow"></i></button>` +
+      `<div class="sk-grid" hidden>${list.map(x => `<button type="button" class="sk${x.v === cur ? ' on' : ''}${x.img ? '' : ' txt'}" data-v="${esc(x.v)}">${x.img ? skImg(x.img) : ''}<span>${esc(x.label)}</span></button>`).join('')}</div>` +
+      (hint ? `<p class="hint">${hint}</p>` : '') + '</div>';
+  }
   function paintStyle() {
     let sec = '', html = '';
     for (const o of OPTS) {
       if (o.section !== sec) { sec = o.section; html += `<p class="sec-title">${esc(sec)}</p>`; }
-      const cur = state.opts[o.id] || o.default;
-      const list = o.show.map(code => o.choices.find(c => c.code === code)).filter(Boolean);
-      html += `<div class="step" data-step="${o.id}"><h3>${esc(o.label)}</h3>`;
-      if (list.length <= 6) html += `<div class="seg">${list.map(c => `<button type="button" data-v="${esc(c.code)}" class="${c.code === cur ? 'on' : ''}">${esc(c.label)}</button>`).join('')}</div>`;
-      else html += `<select data-sel="${o.id}">${list.map(c => `<option value="${esc(c.code)}"${c.code === cur ? ' selected' : ''}>${esc(c.label)}</option>`).join('')}</select>`;
-      if (STYLE_HINT[o.id]) html += `<p class="hint">${STYLE_HINT[o.id]}</p>`;
-      html += '</div>';
+      const list = o.show.map(code => o.choices.find(c => c.code === code)).filter(Boolean).map(c => ({ v: c.code, label: c.label, img: c.img }));
+      html += stepRow(`data-step="${o.id}"`, o.label, state.opts[o.id] || o.default, list, STYLE_HINT[o.id]);
     }
     $('#styleSteps').innerHTML = html;
     paintHidden();
@@ -429,13 +433,27 @@
   function paintHidden() {
     const H = STAFF && STAFF._opts && STAFF._opts._hidden;
     $('#staffHidden').innerHTML = !H ? '' : H.map((h, i) => {
-      const cur = state.hid[h.title] || '';
-      return `<label class="adv-row">${esc(h.title)}<select data-hid="${i}"><option value="">${h.default ? `Default: ${esc(h.default)}` : 'Not set'}</option>` +
-        h.options.map(o => `<option value="${esc(o.name)}"${o.name === cur ? ' selected' : ''}>${esc(o.name)}</option>`).join('') + '</select></label>';
+      const list = [{ v: '', label: h.default ? `Default: ${h.default}` : 'Not set', img: (h.options.find(o => o.name === h.default) || {}).img }]
+        .concat(h.options.map(o => ({ v: o.name, label: o.name, img: o.img })));
+      return stepRow(`data-hstep="${i}"`, h.title, state.hid[h.title] || '', list);
     }).join('');
   }
-  $('#staffHidden').onchange = e => { const s = e.target.closest('[data-hid]'); if (!s) return;
-    const h = STAFF._opts._hidden[+s.dataset.hid]; if (s.value) state.hid[h.title] = s.value; else delete state.hid[h.title]; paintSummary(); };
+  function toggleStep(e) {
+    const head = e.target.closest('.step-head'); if (!head) return false;
+    const g = head.nextElementSibling, open = g.hidden;
+    head.closest('.step').classList.toggle('open', open); g.hidden = !open; return true;
+  }
+  function closeStep(tile) {
+    const st = tile.closest('.step'); st.classList.remove('open'); st.querySelector('.sk-grid').hidden = true;
+    const r = st.getBoundingClientRect(); if (r.top < 0) st.scrollIntoView({ block: 'start' });
+  }
+  $('#staffHidden').onclick = e => {
+    if (toggleStep(e)) return;
+    const b = e.target.closest('.sk'); if (!b) return;
+    const h = STAFF._opts._hidden[+b.closest('[data-hstep]').dataset.hstep];
+    if (b.dataset.v) state.hid[h.title] = b.dataset.v; else delete state.hid[h.title];
+    paintHidden(); paintSummary();
+  };
   function setOpt(id, v) {
     state.opts[id] = v;
     if (id === 'front' && DB_FRONTS.includes(v) && (state.opts.lapel || 'BK') === 'BK') { state.opts.lapel = '20'; paintStyle(); }   // double-breasted comes with a peak lapel
@@ -443,11 +461,16 @@
     if (['front', 'lapel', 'lowerPocket', 'ticket', 'vent'].includes(id)) render(); else paintSummary();
   }
   $('#styleSteps').onclick = e => {
-    const b = e.target.closest('.seg [data-v]'); if (!b) return;
-    b.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
-    setOpt(b.closest('[data-step]').dataset.step, b.dataset.v);
+    if (toggleStep(e)) return;
+    const b = e.target.closest('.sk'); if (!b) return;
+    const st = b.closest('[data-step]'), id = st.dataset.step;
+    st.querySelectorAll('.sk').forEach(x => x.classList.toggle('on', x === b));
+    const o = optOf(id), c = o.choices.find(x => x.code === b.dataset.v);
+    st.querySelector('.step-txt small').textContent = c ? c.label : '';
+    st.querySelector('.step-thumb').innerHTML = c && c.img ? skImg(c.img) : '';
+    closeStep(b);
+    setOpt(id, b.dataset.v);
   };
-  $('#styleSteps').onchange = e => { const s = e.target.closest('[data-sel]'); if (s) setOpt(s.dataset.sel, s.value); };
 
   // ---------- trims: buttons, thread colours, lining ----------
   const MAT = { Horn: 'Horn', Shell: 'Shell', Metal: 'Metal', Pes: 'Polyester', Bone: 'Bone', Fabric: 'Covered', '': 'Button' };

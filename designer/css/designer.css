@@ -146,3 +146,21 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
 .lin-grid .lin-h.warn { color: #9a4a1c; border-top: 1px solid var(--line); padding-top: 14px; }
 .angle-note { font-size: 11.5px; line-height: 1.35; padding: 5px 8px; max-width: 190px; background: rgba(255,255,255,.88); }
 @media (max-width: 900px) { .angle-note { max-width: 150px; font-size: 10.5px; top: 8px; right: 8px; } }
+/* sections with sketches (like the factory order screen) */
+.step { margin: 10px 0 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.step-head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 0; background: none; cursor: pointer; text-align: left; }
+.step-thumb { width: 52px; height: 52px; flex: none; border-radius: 8px; background: #fff; border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; }
+.step-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.step-txt { flex: 1; min-width: 0; }
+.step-txt b { display: block; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.step-txt small { display: block; font-size: 14.5px; color: var(--ink); margin-top: 2px; }
+.step-arrow { width: 10px; height: 10px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); margin-right: 6px; transition: transform .15s; }
+.step.open .step-arrow { transform: rotate(-135deg); }
+.step .hint { margin: 0 12px 10px; }
+.sk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; padding: 4px 12px 12px; }
+.sk { border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 12px; line-height: 1.3; color: var(--ink); text-align: center; }
+.sk img { width: 100%; aspect-ratio: 1; object-fit: contain; }
+.sk .sk-none { display: grid; place-items: center; width: 100%; aspect-ratio: 1; color: var(--muted); font-size: 11px; background: var(--paper); border-radius: 6px; padding: 4px; }
+.sk.on { border-color: var(--teal-d); box-shadow: 0 0 0 2px var(--teal-d) inset; }
+.adv .step { background: #fff; }
+.sk.txt { justify-content: center; min-height: 54px; }
