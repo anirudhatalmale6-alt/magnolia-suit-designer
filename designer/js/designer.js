@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '29';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '30';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -230,8 +230,8 @@
   // Zoomed view: redraw only the tapped area at ZOOM x the resolution, sampling the maps between pixels and a
   // finer copy of the fabric, so the weave shows real detail instead of enlarged pixels.
   const ZOOM = 3;
-  function drawZoom(st, tile, zx, zy) {
-    const T = tile.T, N = tile.n, Z = ZOOM, cx = W / 2, cy = H * 0.35;
+  function drawZoom(st, tile, zx, zy, Z = ZOOM) {
+    const T = tile.T, N = tile.n, cx = W / 2, cy = H * 0.35;
     const out = ctx.createImageData(W, H), O = out.data, B = st.B, S = st.S, Wp = st.Wp;
     for (let oy = 0, p = 0; oy < H; oy++) {
       const by = Math.min(zy + oy / Z, H - 1.001), y0 = by | 0, fy = by - y0, y1 = y0 + 1;
@@ -387,15 +387,17 @@
       if (!state.custom) {
         const f = state.fabric;
         state.tile = await loadTile(f);
-        if (state.zoom) state.ztile = await loadTile(f, ZOOM);
+        if (state.zoom) state.ztile = await loadTile(f, state.zoom.z);
       }
       if (state.button) await loadBtn(state.button);
       const lo = st.LN && state.lining && LININGS.find(x => x.id === state.lining);
-      if (lo && (lo.kind === 'printed' || lo.kind === 'positional')) await loadLinTex(lo, state.zoom ? ZOOM : 1);
+      if (lo && (lo.kind === 'printed' || lo.kind === 'positional')) await loadLinTex(lo, state.zoom ? state.zoom.z : 1);
+      if (state.custom && state.zoom && state.ctileZ !== state.zoom.z) { state.ctile = linearTile(state.cup, 150 * state.zoom.z); state.ctileZ = state.zoom.z; }
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
-        if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy); else draw(st);
+        if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy, state.zoom.z); else draw(st);
+        if (state.diagram && state.view === 'front' && !state.zoom) drawConstruction(st, state.diagram);
         paintMini();
         $('#stage').classList.toggle('zoom', !!state.zoom);
         $('#zoomHint').textContent = state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
@@ -593,20 +595,46 @@
     if (b.dataset.v) state.hid[h.title] = b.dataset.v; else delete state.hid[h.title];
     paintHidden(); paintSummary(); goNext(document.querySelector(`[data-hstep="${hi + 1}"]`) || $('[data-next=style]'));
   };
-  // where each style choice shows on the jacket: [view, zoom x, zoom y] (no x = whole jacket)
-  const SHOW = { front: ['front'], lapel: ['front'], lapelWidth: ['front', 420, 520], lapelHoleStyle: ['front', 640, 470],
-    lapelHole: ['front', 640, 470], collarBack: ['back', 512, 330], chestPocket: ['front', 690, 610], lowerPocket: ['front'],
-    ticket: ['front'], namecard: ['open'], vent: ['back'], cuffButtons: ['front', 70, 1250], kissing: ['front', 70, 1250],
-    sleeveHoleDir: ['front', 70, 1250], pick: ['front', 420, 560], shoulder: ['front', 250, 380], canvas: ['front'],
+  const zoomBox = (x, y, z = ZOOM) => ({ zx: Math.max(0, Math.min(W - W / z, x - W / z / 2)), zy: Math.max(0, Math.min(H - H / z, y - H / z / 2)), z });
+  // where each style choice shows on the jacket: [view, zoom x, zoom y, zoom] (no x = whole jacket).
+  // Sleeve choices use the side view, where the cuff buttons lie flat to the camera.
+  const SLEEVE = ['side', 530, 1255, 2];
+  const SHOW = { front: ['front'], lapel: ['front', 512, 560, 1.5], lapelWidth: ['front', 512, 560, 1.5], lapelHoleStyle: ['front', 620, 480, 2.2],
+    lapelHole: ['front', 620, 480, 2.2], collarBack: ['back', 512, 330, 2], chestPocket: ['front', 680, 620, 2], lowerPocket: ['front'],
+    ticket: ['front', 300, 960, 2.2], namecard: ['open'], vent: ['back'], cuffButtons: SLEEVE, kissing: SLEEVE, sleeveHoleDir: SLEEVE,
+    pick: ['front', 420, 560, 1.7], shoulder: ['front', 330, 520, 1.7], canvas: ['front'],
     facing: ['open'], liningStyle: ['open'], brandLabel: ['open'] };
   function showPart(id) {
     const s = SHOW[id]; if (!s) return;
     state.view = s[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === s[0]));
-    const Z = ZOOM;
-    state.zoom = s.length > 1 ? { zx: Math.max(0, Math.min(W - W / Z, s[1] - W / Z / 2)), zy: Math.max(0, Math.min(H - H / Z, s[2] - H / Z / 2)) } : null;
+    state.zoom = s.length > 1 ? zoomBox(s[1], s[2], s[3]) : null;
+  }
+  // construction: how much of the front is canvas (sewn in, floating) and how much is fused (glued interlining)
+  const diagMask = {};
+  function drawConstruction(st, kind) {
+    const full = /full/i.test(kind), half = !full && /half/i.test(kind), CUT = 820;   // half canvas: chest and lapels, to about the waist
+    const img = ctx.getImageData(0, 0, W, H), O = img.data;
+    for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i++) {
+      if (!st.A[i] || x < 175 || x > 850 || st.OVP[i * 4 + 3]) continue;       // front panels only (not the sleeves), never the buttons
+      const canvas = full || (half && y < CUT), c = canvas ? [26, 140, 145] : [214, 150, 40], a = st.A[i] * (((x + y) % 16) < 3 ? 0.7 : 0.32);
+      const p = i * 4; O[p] = O[p] * (1 - a) + c[0] * a; O[p + 1] = O[p + 1] * (1 - a) + c[1] * a; O[p + 2] = O[p + 2] * (1 - a) + c[2] * a;
+    }
+    ctx.putImageData(img, 0, 0);
+    const rows = full ? [['Canvas (sewn in): whole front', [26, 140, 145]]]
+      : half ? [['Canvas (sewn in): chest, lapels', [26, 140, 145]], ['Fused (glued): below', [214, 150, 40]]] : [['Fused (glued): whole front', [214, 150, 40]]];
+    ctx.save(); ctx.font = '600 40px system-ui, sans-serif';
+    const bw = Math.min(W - 20, 40 + Math.max(...rows.map(r => ctx.measureText(r[0]).width)) + 70), bh = 28 + rows.length * 60;
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillRect((W - bw) / 2, H - bh - 30, bw, bh);
+    rows.forEach(([t, c], k) => {
+      const y = H - bh - 30 + 22 + k * 60;
+      ctx.fillStyle = `rgb(${c})`; ctx.fillRect((W - bw) / 2 + 20, y, 44, 40);
+      ctx.fillStyle = '#222'; ctx.fillText(t, (W - bw) / 2 + 80, y + 33);
+    });
+    ctx.restore();
   }
   function setOpt(id, v) {
     state.opts[id] = v;
+    state.diagram = id === 'canvas' ? (choiceOf('canvas') || {}).label || '' : null;
     if (id === 'front' && DB_FRONTS.includes(v) && (state.opts.lapel || 'BK') === 'BK') { state.opts.lapel = '20'; paintStyle(); }   // double-breasted comes with a peak lapel
     if (id === 'cuffButtons') paintThreads();
     showPart(id); render();
@@ -627,7 +655,7 @@
   // show a part of the jacket close up (front view), e.g. the buttons right after choosing them
   function zoomTo(x, y) {
     state.view = 'front'; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'front'));
-    const Z = ZOOM; state.zoom = { zx: Math.max(0, Math.min(W - W / Z, x - W / Z / 2)), zy: Math.max(0, Math.min(H - H / Z, y - H / Z / 2)) };
+    state.zoom = zoomBox(x, y);
   }
   const FRONT_BTN = [500, 940], SLEEVE_BTN = [70, 1250];      // where the buttons sit on the front photos
   // phones: a small copy of the jacket follows the customer down the page while the big picture is out of view
@@ -917,9 +945,9 @@
   $('#stage').onclick = e => {
     if (e.target !== cv) return;
     if (state.zoom) { state.zoom = null; render(); return; }
-    const r = cv.getBoundingClientRect(), Z = ZOOM;
+    const r = cv.getBoundingClientRect();
     const bx = (e.clientX - r.left) / r.width * W, by = (e.clientY - r.top) / r.height * H;
-    state.zoom = { zx: Math.max(0, Math.min(W - W / Z, bx - W / Z / 2)), zy: Math.max(0, Math.min(H - H / Z, by - H / Z / 2)) };
+    state.zoom = zoomBox(bx, by);
     render();
   };
 
@@ -964,7 +992,7 @@
       const quad = (fx, fy, dx, dy) => { x.save(); x.translate(dx + (fx < 0 ? h : 0), dy + (fy < 0 ? h : 0)); x.scale(fx, fy); x.drawImage(img, sx, sy, s, s, 0, 0, h, h); x.restore(); };
       quad(1, 1, 0, 0); quad(-1, 1, h, 0); quad(1, -1, 0, h); quad(-1, -1, h, h);
       const up = x.getImageData(0, 0, TILE, TILE).data;
-      state.tile = linearTile(up, 150); state.ctile = linearTile(up, 150 * ZOOM); state.custom = true;
+      state.cup = up; state.tile = linearTile(up, 150); state.ctile = linearTile(up, 150 * ZOOM); state.ctileZ = ZOOM; state.custom = true;
       $$('#grid .fab').forEach(b => b.classList.remove('on')); URL.revokeObjectURL(img.src); render();
     };
     img.src = URL.createObjectURL(file);
