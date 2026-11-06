@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '32';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '33';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -63,10 +63,19 @@
     return { lapel, db: DB_FRONTS.includes(front), front };
   }
   // factory pocket / vent codes grouped by the look we have a photo for
-  const POCKET = { slant: 'G H I 9 10 23 25Y O Q R 13 14 24', jet: 'D E F K L N P T U V Y J S',
-    patch: '15 18 19 20 233 234 235 236 237 238 5 6 7 BE DJ HMD M S1' };
+  const POCKET = { slant: 'G H I 9 10 23 25Y', hacking: 'O Q R 13 14 24', jet: 'D E F K L N P T U V Y', slantjet: 'J S',
+    patch: '15 233 235 238 BE HMD M S1', patchflap: '18 234 237 DJ', patchtab: '5 6 7', pleat: '19 20 236' };
   const pocketLook = c => Object.keys(POCKET).find(k => POCKET[k].split(' ').includes(c)) || 'flap';
-  const ticketLook = c => c === 'D' ? '' : 'F G H I J'.split(' ').includes(c) ? 'flap' : 'jet';
+  const ticketLook = c => c === 'D' ? '' : 'F G H I J'.split(' ').includes(c) ? 'flap' : '25K 25Q EG YK'.split(' ').includes(c) ? 'card' : 'jet';
+  const POCKET_FALLBACK = { patchflap: 'patch', patchtab: 'patch', pleat: 'patch', slantjet: 'slant', hacking: 'slant' };   // views without that photo
+  const CHEST = { round: 'HXD G 233 BE C1', patchflap: '234', pleat: '235', barchetta: '237 238 I', none: 'H' };
+  const chestLook = c => Object.keys(CHEST).find(k => CHEST[k].split(' ').includes(c)) || 'welt';
+  // lapel width, shoulder and pick stitching: photos that show a specific one carry it as a 6th entry {w, sh, pick}
+  function extrasWanted() {
+    const cm = parseFloat(((choiceOf('lapelWidth') || {}).label || '')) || 7;
+    const sh = { A: 'natural', C: 'rollino', D: 'neapolitan', E: 'neapolitan' }[state.opts.shoulder || 'B'] || '';
+    return { w: cm <= 6.5 ? 'narrow' : cm >= 9 ? 'wide' : '', sh, pick: (state.opts.pick || 'A') !== 'A' ? 'pick' : '' };
+  }
   // photos by angle: [lapel, front, lower pocket look, ticket look] -> map folder
   const PHOTOS = {
     front: [['notch', '2', 'slant', '', 'front_notch_sb_slant'], ['notch', '2', 'patch', '', 'front_notch_sb_patch'],
@@ -78,7 +87,15 @@
       ['peak', 'db', 'flap', '', 'front_peak_db'], ['peak', 'db4', 'flap', '', 'front_peak_db4'],
       // 5-nov photos (jetted pockets)
       ['peak', '5', 'jet', '', 'front_peak_sb3r2'], ['peak', '1', 'jet', '', 'front_peak_sb1'], ['shawl', '5', 'jet', '', 'front_shawl_sb3r2'],
-      ['shawl', '2', 'jet', '', 'front_shawl_sb'], ['shawl', 'db', 'jet', '', 'front_shawl_db'], ['shawl', 'db4', 'jet', '', 'front_shawl_db4']],
+      ['shawl', '2', 'jet', '', 'front_shawl_sb'], ['shawl', 'db', 'jet', '', 'front_shawl_db'], ['shawl', 'db4', 'jet', '', 'front_shawl_db4'],
+      // 6-nov photos: lapel widths, shoulders, pick stitching and more fronts (a slightly wider, shorter jacket)
+      ['notch', '2', 'flap', '', 'front_n_narrow', { w: 'narrow' }], ['notch', '2', 'flap', '', 'front_n_wide', { w: 'wide' }],
+      ['peak', '3', 'flap', '', 'front_peak_narrow', { w: 'narrow' }], ['peak', '3', 'flap', '', 'front_peak_wide', { w: 'wide' }],
+      ['shawl', '2', 'flap', '', 'front_shawl_narrow', { w: 'narrow' }], ['shawl', '2', 'flap', '', 'front_shawl_wide', { w: 'wide' }],
+      ['notch', '2', 'flap', '', 'front_n_sh_natural', { sh: 'natural' }], ['notch', '2', 'flap', '', 'front_n_sh_rollino', { sh: 'rollino' }],
+      ['notch', '2', 'flap', '', 'front_n_sh_neapolitan', { sh: 'neapolitan' }], ['notch', '2', 'flap', '', 'front_n_pick', { pick: 'pick' }],
+      ['notch', 'db4', 'flap', '', 'front_notch_db4n'], ['notch', 'db', 'flap', '', 'front_notch_dbn'], ['notch', '4', 'flap', '', 'front_n_sb4'],
+      ['notch', '27', 'flap', '', 'front_n_sb5'], ['notch', 'db61', 'flap', '', 'front_n_db61'], ['notch', 'db21', 'flap', '', 'front_n_db21']],
     three4: [['notch', '2', 'flap', '', 'three4'], ['notch', '2', 'slant', '', 'three4_slant'], ['notch', '2', 'patch', '', 'three4_patch'],
       ['notch', '2', 'jet', '', 'three4_jet'], ['notch', '2', 'jet', 'jet', 'three4_jet_tjet'], ['notch', '2', 'flap', 'flap', 'three4_tflap'],
       ['notch', '3', 'flap', '', 'three4_notch_sb3'], ['shawl', '1', 'flap', '', 'three4_shawl_sb1'],
@@ -95,41 +112,61 @@
       ['shawl', '5', 'jet', '', 'side_shawl_sb3r2'], ['shawl', 'db4', 'jet', '', 'side_shawl_db4'], ['shawl', 'db', 'jet', '', 'side_shawl_db']]
   };
   function mapName() {
-    const s = styleOf();
+    const s = styleOf(), miss = [], hid = t => (state.hid[t] || '');
+    const say = () => miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '';
     if (state.view === 'back') {
-      const v = state.opts.vent || 'C';
-      return { name: v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : 'back', note: '' };
+      const v = state.opts.vent || 'C', turned = (state.opts.collarBack || 'A') === 'B';
+      const name = v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : v === 'D' ? 'back_inner_belt' : v === 'F' ? 'back_fixed_belt' : turned ? 'back_collar' : 'back';
+      if (turned && name !== 'back_collar') miss.push('the collar turned back with this vent');
+      return { name, note: say() };
     }
-    if (state.view === 'open') {                    // two inside photos so far: notch and shawl, single-breasted
-      const miss = [s.lapel === 'peak' ? 'peak lapel' : '', s.db ? 'double-breasted' : ''].filter(Boolean);
-      return { name: s.lapel === 'shawl' ? 'open_shawl' : 'open_notch',
-        note: miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '' };
+    if (state.view === 'open') {                    // inside photos: lining style first, then the inside details staff chose
+      const ls = state.opts.liningStyle || 'A';
+      let name = ls === 'C' ? 'open_unlined' : ls === 'B' ? 'open_half' : /piping/i.test(hid('Columbia stitching/Piping')) ? 'open_piping'
+        : hid('Pen pocket') && hid('Pen pocket') !== 'None' ? 'open_pen' : hid('Inner ticket pocket') && hid('Inner ticket pocket') !== 'None' ? 'open_ticket' : '';
+      if (!name) { name = s.lapel === 'shawl' ? 'open_shawl' : 'open_notch'; if (s.lapel === 'peak') miss.push('peak lapel'); if (s.db) miss.push('double-breasted'); }
+      return { name, note: say() };
     }
-    const want = { lapel: s.lapel, front: s.db ? (['8', '9', '11'].includes(s.front) ? 'db4' : 'db') : s.front,
+    if (state.view === 'side' && state.elbow) {    // elbow patches: one side photo (notch, 2 buttons)
+      if (s.lapel !== 'notch' || s.db || s.front !== '2') miss.push('this front with elbow patches');
+      return { name: 'side_elbow', note: say() };
+    }
+    const F = s.front, ex = extrasWanted();
+    const want = { lapel: s.lapel, front: s.db ? ({ 8: 'db21', 9: 'db4', 11: 'db4', 10: 'db61' }[F] || 'db') : F === '26' ? '27' : F,
       pocket: pocketLook(state.opts.lowerPocket || 'B'), ticket: ticketLook(state.opts.ticket || 'D') };
-    // the lapel and closure matter most, then the pocket shape, then the ticket pocket
-    let best = null, bestScore = -1;
-    for (const [l, f, p, t, name] of PHOTOS[state.view]) {
-      const sc = (l === want.lapel) * 100 + (f === want.front) * 60 + (f.startsWith('db') === want.front.startsWith('db')) * 50 + (f.startsWith('db') && want.front.startsWith('db')) * 20 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
-      if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name }; }
+    // the lapel and closure matter most, then lapel width / shoulder, then the pocket shape, then the ticket pocket
+    let best = null, bestScore = -1e9;
+    for (const [l, f, p, t, name, e = {}] of PHOTOS[state.view]) {
+      let sc = (l === want.lapel) * 100 + (f === want.front) * 60 + (f.startsWith('db') === want.front.startsWith('db')) * 50 + (f.startsWith('db') && want.front.startsWith('db')) * 20 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
+      for (const d of ['w', 'sh', 'pick']) if (e[d]) sc += e[d] === ex[d] ? 40 : -1000;
+      if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name, e }; }
     }
-    let pk = null;
-    const sx = s.db ? (state.view === 'front' ? 14 : 14) : 0;   // double-breasted: pockets further from the buttons
-    if ((best.p !== want.pocket || best.t !== want.ticket || sx) && PK[state.view]) {
-      const P = PK[state.view].patches.find(x => x[0] === want.pocket && x[1] === want.ticket) ||
-        PK[state.view].patches.find(x => x[0] === want.pocket && best.p !== want.pocket);
-      const own = PK[state.view].patches.find(x => x[0] === best.p && x[1] === best.t) || PK[state.view].patches.find(x => x[0] === best.p);
-      const Pw = P || (sx && PK[state.view].patches.find(x => x[0] === want.pocket && x[1] === want.ticket));
+    // pockets the photo does not have: laid in from a pocket photo (closest style where this angle has none)
+    let pk = null, ck = null;
+    const V = PK[state.view], has = (p, t) => V && V.patches.some(x => x[0] === p && (t === undefined || x[1] === t));
+    let wp = want.pocket, wt = want.ticket;
+    if (!has(wp)) wp = POCKET_FALLBACK[wp] || wp;
+    if (wt === 'card' && !has(wp, 'card') && !V?.patches.some(x => x[1] === 'card')) wt = 'jet';
+    const sx = s.db ? 14 : 0;                       // double-breasted: pockets further from the buttons
+    if ((best.p !== wp || best.t !== wt || sx) && V) {
+      const P = V.patches.find(x => x[0] === wp && x[1] === wt) || V.patches.find(x => x[0] === wp && best.p !== wp);
+      const own = V.patches.find(x => x[0] === best.p && x[1] === best.t) || V.patches.find(x => x[0] === best.p);
+      const Pw = P || (sx && V.patches.find(x => x[0] === wp && x[1] === wt));
       if (Pw) { pk = Pw[2] + (own ? '+' + own[2] : '') + (sx ? '@' + sx : ''); best.p = Pw[0]; best.t = Pw[1]; }
     }
-    const miss = [];
+    const chest = chestLook(state.opts.chestPocket || 'B');
+    if (chest !== 'welt') {
+      if (PKC[state.view]) ck = `chest_${chest}+chest_welt`; else miss.push('this chest pocket');
+    }
     if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
     if (best.f !== want.front) miss.push(((choiceOf('front') || {}).label || 'this front').toLowerCase());
     if (best.p !== want.pocket || best.t !== want.ticket) miss.push('these pockets');
-    const note = miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '';
-    return { name: best.name, pk, note };
+    if (ex.w && best.e.w !== ex.w) miss.push(`${ex.w} lapel`);
+    if (ex.sh && best.e.sh !== ex.sh) miss.push('this shoulder');
+    return { name: best.name, pk, ck, note: say() };
   }
-  async function loadView(name, pk) {
+  async function loadView(name, pk, ck) {
+    if (ck) return views[name + '|' + pk + '|' + ck] || (views[name + '|' + pk + '|' + ck] = await patchView(await loadView(name, pk), ck, 'pkc'));
     if (pk) return views[name + '|' + pk] || (views[name + '|' + pk] = await patchView(await loadView(name), pk));
     if (views[name]) return views[name];
     const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
@@ -145,7 +182,7 @@
       A[i] = 1 - a / 255; uvAt(i, S, Wp, U, V, SH);
     }
     let LN = null;                                  // open-jacket views: lining mask (alpha) and its shading (red, 128 = x1.0)
-    if (name.startsWith('open')) LN = pixels(await loadImg(`maps/${name}/lining.webp?v=${VER}`));
+    if (name.startsWith('open') && name !== 'open_unlined') LN = pixels(await loadImg(`maps/${name}/lining.webp?v=${VER}`));
     return (views[name] = { B, S, Wp, U, V, A, SH, ov, OVP, meta, LN, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
   }
   // where pixel i of the cloth samples the fabric tile (warp offset, lapel grain rotation) and how lit it is
@@ -156,30 +193,33 @@
   }
   // Pocket styles: the pocket area of a notch photo with that pocket (shading + fold offsets) is blended into
   // this photo, moved to where this photo's own pocket sits. Buttons and the photo's outline stay its own.
-  let PK = {};
+  let PK = {}, PKC = {};
   const pkImgs = {};
   async function pkImg(f) { return pkImgs[f] || (pkImgs[f] = pixels(await loadImg(`maps/_pk/${f}.webp?v=${VER}`))); }
-  async function patchView(st, pk) {
-    const v = PK[state.view], [pkf, sxs] = pk.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size, [tdx, tdy] = st.meta.pk || [0, 0];
-    const sx = +sxs || 0, split = state.view === 'front' ? pw / 2 : 209;   // left / right pocket (three-quarter: far / near)
+  // kind 'pk': lower pockets (left and right pocket move separately), 'pkc': the chest pocket
+  async function patchView(st, pk, kind = 'pk') {
+    const v = (kind === 'pkc' ? PKC : PK)[state.view], [pkf, sxs] = pk.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
+    const off = st.meta[kind] || [0, 0, 0], tdy = off[1], tdx = px => px < split ? off[0] : (off[2] ?? off[0]);
+    const sx = +sxs || 0, split = kind === 'pkc' ? 1e9 : state.view === 'front' ? pw / 2 : 209;   // left / right pocket (three-quarter: far / near)
     const dxOf = px => !sx ? 0 : px < split ? (state.view === 'front' ? -sx : 0) : sx;
     const Dp = v.patches.find(x => x[2] === dn), D = await pkImg(dn), Tp = tn && v.patches.find(x => x[2] === tn), T = Tp && await pkImg(tn);
+    const ddx = (P, px) => px < split ? P[3][0] : (P[3][2] ?? P[3][0]);
     const S = st.S.slice(), Wp = st.Wp.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
-    const ox = v.at[0] + tdx, oy = v.at[1] + tdy;            // patch origin on this photo
     // per patch pixel: target index, donor value, weight = new pocket area + this photo's own pocket area
     const n = pw * ph, dsx = new Int32Array(n), idx = new Int32Array(n).fill(-1), w = new Float32Array(n), sd = new Float32Array(n), st0 = new Float32Array(n);
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
-      const x = ox + px, y = oy + py, k = py * pw + px;
+      const x = v.at[0] + tdx(px) + px, y = v.at[1] + tdy + py, k = py * pw + px;
       if (x < 0 || x >= W || y < 0 || y >= H) continue;
       const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3]) continue;   // only on cloth, never over a button
       let e = 1;                                        // fade out near the jacket outline (outlines differ per photo)
       for (let d = 4; d <= 28 && e > 0; d += 4) if (!st.A[i - d] || !st.A[i + d]) e = Math.min(e, (d - 4) / 24);
-      if (st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
+      if (kind === 'pk' && st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
       const qdy = py + Dp[3][1], qty = Tp ? py + Tp[3][1] : -1;   // each donor's pocket sits at its own offset
-      const pxd = px - dxOf(px), okd = pxd >= 0 && pxd < pw && qdy >= 0 && qdy < ph;
+      const pxd = px - dxOf(px) + ddx(Dp, px), okd = pxd >= 0 && pxd < pw && qdy >= 0 && qdy < ph;
+      const ptx = Tp ? px + ddx(Tp, px) : -1;
       dsx[k] = pxd;
       const a = okd ? D[((qdy + ph) * pw + pxd) * 4] / 255 : 0;   // weight: bottom half of the image
-      const b = Tp && qty >= 0 && qty < ph ? T[((qty + ph) * pw + px) * 4 + 1] / 255 : 0;   // wide area: erase this photo's own pockets
+      const b = Tp && qty >= 0 && qty < ph && ptx >= 0 && ptx < pw ? T[((qty + ph) * pw + ptx) * 4 + 1] / 255 : 0;   // wide area: erase this photo's own pocket
       idx[k] = i; w[k] = Math.max(a, b) * e; st0[k] = S[i * 4];
       sd[k] = okd ? D[(qdy * pw + pxd) * 4] : st0[k];
     }
@@ -356,6 +396,9 @@
       const outer = pid === 2 ? x1 : x0, w = x1 - x0;               // about 40 % in from the lapel's outer edge
       return { x: outer + (pid === 2 ? -1 : 1) * w * 0.4, y, w };
     };
+    if (st.meta.lapelL && state.view === 'front') {   // the photo already shows a lapel buttonhole: draw over it
+      const [x, y] = st.meta.lapelL; return (st.lapelGeo = { L: { x, y, w: 60 }, R: { x: 1024 - x, y, w: 60 } });
+    }
     return (st.lapelGeo = state.view === 'front' ? { L: at(2), R: at(3) } : null);   // L = the wearer's left lapel
   }
   function lapelHoles(st) {
@@ -557,7 +600,7 @@
     busy.hidden = false; busy.textContent = 'Updating…';
     $('#angleNote').hidden = !m.note; $('#angleNote').textContent = m.note || '';
     try {
-      const st = cuffView(await loadView(m.name, m.pk));
+      const st = cuffView(await loadView(m.name, m.pk, m.ck));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), h = g && (g.L || g.R); state.zoomAt = null;
         if (h) state.zoom = zoomBox(h.x - 20, h.y + 60, 3);
@@ -774,7 +817,9 @@
     const h = STAFF._opts._hidden[+b.closest('[data-hstep]').dataset.hstep];
     const hi = +b.closest('[data-hstep]').dataset.hstep;
     if (b.dataset.v) state.hid[h.title] = b.dataset.v; else delete state.hid[h.title];
-    paintHidden(); paintSummary(); goNext(document.querySelector(`[data-hstep="${hi + 1}"]`) || $('[data-next=style]'));
+    paintHidden(); paintSummary();
+    if (['Pen pocket', 'Inner ticket pocket', 'Columbia stitching/Piping'].includes(h.title)) showInside();   // inside details: open the jacket
+    goNext(document.querySelector(`[data-hstep="${hi + 1}"]`) || $('[data-next=style]'));
   };
   const zoomBox = (x, y, z = ZOOM) => ({ zx: Math.max(0, Math.min(W - W / z, x - W / z / 2)), zy: Math.max(0, Math.min(H - H / z, y - H / z / 2)), z });
   // where each style choice shows on the jacket: [view, zoom x, zoom y, zoom] (no x = whole jacket).
@@ -817,7 +862,6 @@
   function setOpt(id, v) {
     state.opts[id] = v;
     state.diagram = id === 'canvas' ? (choiceOf('canvas') || {}).label || '' : null;
-    if (id === 'front' && DB_FRONTS.includes(v) && (state.opts.lapel || 'BK') === 'BK') { state.opts.lapel = '20'; paintStyle(); }   // double-breasted comes with a peak lapel
     if (id === 'cuffButtons') paintThreads();
     showPart(id); render();
   }
@@ -952,6 +996,7 @@
   }
   $('#ucGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.undercollar = b.dataset.c || null; paintContrast(); paintSummary(); };
   $('#elbowSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.elbow = b.dataset.v;
+    state.view = 'side'; state.zoom = null; $$('#views button').forEach(x => x.classList.toggle('on', x.dataset.view === 'side')); render();
     if (state.elbow && !state.elbowFabric) state.elbowFabric = (CONTRAST.find(c => c.kind === 'suede') || {}).id || null;
     paintContrast(); paintSummary(); };
   $('#elbowGrid').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; state.elbowFabric = b.dataset.c; paintContrast(); paintSummary(); };
@@ -1135,7 +1180,7 @@
     if (state.zoom) { state.zoom = null; render(); return; }
     const r = cv.getBoundingClientRect();
     const bx = (e.clientX - r.left) / r.width * W, by = (e.clientY - r.top) / r.height * H;
-    state.zoom = zoomBox(bx, by);
+    state.zoom = zoomBox(bx, by, 5);                 // tap: close enough to see the weave
     render();
   };
 
@@ -1191,6 +1236,7 @@
     try {
       const get = async n => (await fetch(`${n}?v=${VER}`)).json();
       try { PK = await get('maps/_pk/index.json'); } catch (e) { PK = {}; }
+      try { PKC = await get('maps/_pk/chest.json'); } catch (e) { PKC = {}; }
       [FABRICS, OPTS, BUTTONS, SLEEVES, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'sleeve_buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
