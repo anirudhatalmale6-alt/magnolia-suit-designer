@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '36';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '37';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -74,7 +74,8 @@
   function extrasWanted() {
     const cm = parseFloat(((choiceOf('lapelWidth') || {}).label || '')) || 7;
     const sh = { A: 'natural', C: 'rollino', D: 'neapolitan', E: 'neapolitan' }[state.opts.shoulder || 'B'] || '';
-    return { w: cm <= 6.5 ? 'narrow' : cm >= 9 ? 'wide' : '', sh, pick: (state.opts.pick || 'A') !== 'A' ? 'pick' : '' };
+    const ch = chestLook(state.opts.chestPocket || 'B');
+    return { w: cm <= 6.5 ? 'narrow' : cm >= 9 ? 'wide' : '', sh, pick: (state.opts.pick || 'A') !== 'A' ? 'pick' : '', chest: ch === 'welt' ? '' : ch };
   }
   // photos by angle: [lapel, front, lower pocket look, ticket look] -> map folder
   const LAPEL_PHOTOS = { BA: 'notch', BB: 'peak', BC: 'notch', BD: 'peak', 12: 'peak', 13: 'notch', 14: 'peak', 15: 'peak', 17: 'peak',
@@ -113,7 +114,9 @@
       ['notch', '2', 'patchtab', '', 'three4_n_patchtab'], ['notch', '2', 'pleat', '', 'three4_n_pleat'], ['notch', '2', 'hacking', '', 'three4_n_hacking'],
       ['notch', '2', 'flap', 'card', 'three4_n_card'], ['notch', '2', 'flap', '', 'three4_n_narrow', { w: 'narrow' }], ['notch', '2', 'flap', '', 'three4_n_wide', { w: 'wide' }],
       ['notch', '2', 'flap', '', 'three4_n_sh_natural', { sh: 'natural' }], ['notch', '2', 'flap', '', 'three4_n_sh_rollino', { sh: 'rollino' }],
-      ['notch', '2', 'flap', '', 'three4_n_sh_neapolitan', { sh: 'neapolitan' }], ['notch', '2', 'flap', '', 'three4_n_pick', { pick: 'pick' }]],
+      ['notch', '2', 'flap', '', 'three4_n_sh_neapolitan', { sh: 'neapolitan' }], ['notch', '2', 'flap', '', 'three4_n_pick', { pick: 'pick' }],
+      ['notch', '2', 'patchflap', '', 'three4_n_patchflap'], ['notch', '2', 'slantjet', '', 'three4_n_slantjet'],
+      ...['round', 'patchflap', 'barchetta', 'pleat', 'none'].map(c => ['notch', '2', 'flap', '', 'three4_n_chest_' + c, { chest: c }])],
     side: [['notch', '2', 'flap', '', 'side'], ['peak', '2', 'flap', '', 'side_peak_sb'], ['peak', 'db', 'flap', '', 'side_peak_db'],
       ['notch', '1', 'jet', '', 'side_notch_sb1'], ['notch', '3', 'jet', '', 'side_notch_sb3'], ['notch', '5', 'jet', '', 'side_notch_sb3r2'],
       ['notch', 'db', 'jet', '', 'side_notch_db'], ['notch', 'db4', 'jet', '', 'side_notch_db4'], ['peak', '1', 'jet', '', 'side_peak_sb1'],
@@ -168,7 +171,7 @@
     let best = null, bestScore = -1e9;
     for (const [l, f, p, t, name, e = {}] of PHOTOS[state.view]) {
       let sc = (l === want.lapel) * 100 + (f === want.front) * 60 + (f.startsWith('db') === want.front.startsWith('db')) * 50 + (f.startsWith('db') && want.front.startsWith('db')) * 20 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
-      for (const d of ['w', 'sh', 'pick']) if (e[d]) sc += e[d] === ex[d] ? 40 : -1000;
+      for (const d of ['w', 'sh', 'pick', 'chest']) if (e[d]) sc += e[d] === ex[d] ? 40 : -1000;
       if (e.lap) sc += e.lap === (state.opts.lapel || 'BK') ? 250 : -1000;      // a photo of exactly this lapel shape
       if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name, e }; }
     }
@@ -187,7 +190,7 @@
     }
     const chest = chestLook(state.opts.chestPocket || 'B');
     if (chest !== 'welt') {
-      if (PKC[state.view]) ck = `chest_${chest}+chest_welt`; else miss.push('this chest pocket');
+      if (best.e.chest === chest) { /* the photo shows this chest pocket */ } else if (PKC[state.view]) ck = `chest_${chest}+chest_welt`; else miss.push('this chest pocket');
     }
     if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
     else if (state.view === 'front' && LAPEL_PHOTOS[state.opts.lapel] && best.e.lap !== state.opts.lapel) miss.push('this lapel shape');
