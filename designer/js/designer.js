@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '37';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '38';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -80,7 +80,7 @@
   // photos by angle: [lapel, front, lower pocket look, ticket look] -> map folder
   const LAPEL_PHOTOS = { BA: 'notch', BB: 'peak', BC: 'notch', BD: 'peak', 12: 'peak', 13: 'notch', 14: 'peak', 15: 'peak', 17: 'peak',
     19: 'peak', 216: 'shawl', 22: 'peak', 23: 'peak', 24: 'shawl', 25: 'shawl', 27: 'shawl', 28: 'shawl', 30: 'peak', 31: 'notch',
-    AD: 'peak', AE: 'notch', BG: 'notch', BI: 'notch', BJ: 'peak', BL: 'notch', BM: 'peak', BN: 'notch', BT: 'notch', 'HA279-118': 'notch' };
+    AD: 'peak', AE: 'notch', BG: 'notch', BI: 'notch', BL: 'notch', BM: 'peak', BN: 'notch', BT: 'notch', 'HA279-118': 'notch' };
   const PHOTOS = {
     front: [['notch', '2', 'slant', '', 'front_notch_sb_slant'], ['notch', '2', 'patch', '', 'front_notch_sb_patch'],
       ['notch', '2', 'jet', '', 'front_notch_sb_jet'], ['notch', '2', 'flap', 'jet', 'front_notch_sb_tjet'], ['notch', '2', 'flap', 'flap', 'front_notch_sb_tflap'],
@@ -132,18 +132,19 @@
   };
   // close-ups of the lapel (photo list 2, section G): shown while the lapel buttonhole or pick stitching is chosen
   const CLOSE_HOLE = { B: 'B', D: 'D', H: 'H', I: 'I', J: 'J', M: 'M', N: 'N', X: 'X', 15: '15', 16: '16', 17: '17', 32: '32', W: 'W', Y: 'Y', 34: '34',
-    CA: 'sq', C: 'sq', K: 'thin', 18: 'rome', 4: 'rome', 5: 'rome', 7: 'rome', Z: 'rome', 33: 'x', 1: 'milanese', 2: 'milanese', 3: 'milanese', O: 'milanese' };
-  const CLOSE_PICK = { B: 'B', C: 'C', D: 'D', E: 'E', F: 'F', G: 'G', H: 'H' };
+    CA: 'sq', C: 'sq', K: 'thin~', 18: 'rome', 4: 'rome', 5: 'rome', 7: 'rome', Z: 'rome', 33: 'x', 1: 'milanese', 2: 'milanese', 3: 'milanese', O: 'milanese' };
+  const CLOSE_PICK = { B: 'B', C: 'C', D: 'D', E: 'E', F: 'F', G: 'G', H: 'H~' };   // '~': closest photo, not the exact style
   function closeName() {
-    if (state.closeup === 'lapelHoleStyle') { const c = state.opts.lapelHoleStyle || 'A'; return c === 'A' ? null : { name: 'close_hole_' + (CLOSE_HOLE[c] || 'B'), exact: !!CLOSE_HOLE[c] }; }
-    if (state.closeup === 'pick') { const c = state.opts.pick || 'A'; return c === 'A' ? null : { name: 'close_pick_' + (CLOSE_PICK[c] || 'B'), exact: !!CLOSE_PICK[c] }; }
+    const pick = (tab, c, pre, dflt) => { const v = tab[c] || ''; return { name: pre + (v.replace('~', '') || dflt), exact: !!v && !v.endsWith('~') }; };
+    if (state.closeup === 'lapelHoleStyle') { const c = state.opts.lapelHoleStyle || 'A'; return c === 'A' ? null : pick(CLOSE_HOLE, c, 'close_hole_', 'B'); }
+    if (state.closeup === 'pick') { const c = state.opts.pick || 'A'; return c === 'A' ? null : pick(CLOSE_PICK, c, 'close_pick_', 'B'); }
     return null;
   }
   function mapName() {
     const s = styleOf(), miss = [], hid = t => (state.hid[t] || '');
     const say = () => miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '';
     const cl = state.view === 'front' && closeName();
-    if (cl) { if (!cl.exact) miss.push('this buttonhole style'); return { name: cl.name, note: say() }; }
+    if (cl) { if (!cl.exact) miss.push(state.closeup === 'pick' ? 'this stitching' : 'this buttonhole style'); return { name: cl.name, note: say() }; }
     if (state.view === 'back') {
       const v = state.opts.vent || 'C', turned = (state.opts.collarBack || 'A') === 'B';
       const name = v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : v === 'D' ? 'back_inner_belt' : v === 'F' ? 'back_fixed_belt' : turned ? 'back_collar' : 'back';
@@ -158,6 +159,8 @@
       if (!name && s.db) name = 'open_db';
       if (!name && card) name = card;
       if (!name) { name = s.lapel === 'shawl' ? 'open_shawl' : 'open_notch'; if (s.lapel === 'peak') miss.push('peak lapel'); }
+      if ((state.opts.facing || 'B') !== 'B') miss.push('this facing');
+      if ((state.opts.brandLabel || 'A') !== 'A') miss.push('the label position');
       return { name, note: say() };
     }
     if (state.view === 'side' && state.elbow) {    // elbow patches: one side photo (notch, 2 buttons)
@@ -193,7 +196,7 @@
       if (best.e.chest === chest) { /* the photo shows this chest pocket */ } else if (PKC[state.view]) ck = `chest_${chest}+chest_welt`; else miss.push('this chest pocket');
     }
     if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
-    else if (state.view === 'front' && LAPEL_PHOTOS[state.opts.lapel] && best.e.lap !== state.opts.lapel) miss.push('this lapel shape');
+    else if (!['BK', '20', 'D'].includes(state.opts.lapel || 'BK') && best.e.lap !== state.opts.lapel) miss.push('this lapel shape');
     if (best.f !== want.front) miss.push(((choiceOf('front') || {}).label || 'this front').toLowerCase());
     if (best.p !== want.pocket || best.t !== want.ticket) miss.push('these pockets');
     if (ex.w && best.e.w !== ex.w) miss.push(`${ex.w} lapel`);
