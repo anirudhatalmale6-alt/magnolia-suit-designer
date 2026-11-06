@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '33';
+    var V = '34';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -20,7 +20,7 @@
   })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Archivo+Black&family=Arimo&family=Caveat&family=Crimson+Text&family=Italianno&family=Kalam&family=Dancing+Script&family=Marck+Script&family=Great+Vibes&family=Bangers&family=Poiret+One&family=Parisienne&family=UnifrakturMaguntia&family=Yesteryear&family=Tinos&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=33">
+<link rel="stylesheet" href="css/designer.css?v=34">
 </head>
 <body>
 <header class="topbar">
@@ -204,10 +204,15 @@
     <section class="tab" data-pane="summary" hidden>
       <h3>Your jacket</h3>
       <dl class="summary" id="summary"></dl>
+      <h3>Your photos <span class="req">required</span></h3>
+      <p class="hint">Three photos of yourself, standing straight in fitted clothes: from the front, the side and the back. Your tailor uses them with your measurements. The order can't be sent without them.</p>
+      <div class="photo-slots body-slots" id="bodySlots"></div>
+      <p class="hint warn" id="bodyMissing"></p>
       <h3>Remarks</h3>
       <p class="hint">Any special request for your tailor. We note every request, but special requests are not guaranteed.</p>
       <textarea id="remark" class="remark" maxlength="400" placeholder="Anything we should know (max 400 characters)"></textarea>
       <div class="remark-meta"><small id="remarkCount">0/400</small></div>
+      <p class="hint">Optional: up to 3 photos of anything you'd like to show us (a style you like, a detail).</p>
       <div class="photo-slots" id="photoSlots"></div>
       <div class="staff-only adv" hidden>
         <h3>Staff only: pre-fitting / urgent</h3>
@@ -237,6 +242,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=33"></script>
+<script src="js/designer.js?v=34"></script>
 </body>
 </html>

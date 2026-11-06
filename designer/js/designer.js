@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '33';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '34';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -16,7 +16,7 @@
     opts: {}, button: null, sleeveSame: true, sleeveButton: null, thread: { button: null, lapel: null, front: null, sleeve: [] },
     lining: null, sleeveLinSame: true, sleeveLining: null, holeSel: 0, undercollar: null, elbow: '', elbowFabric: null, hid: {},
     monos: [], monoSel: 0, fabricPicked: false, reached: 0, mode: '', location: '', build: '',
-    remark: '', photos: [null, null, null], prefit: 'No', urgent: 'normal' };
+    remark: '', photos: [null, null, null], body: { front: null, side: null, back: null }, prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
   let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null;
 
@@ -722,7 +722,9 @@
     if (MONO) monoRows(rows);
     rows.push(['<b>Remarks</b>', '', '', true]);
     rows.push(['Remark', state.remark || 'None', '']);
-    const np = state.photos.filter(Boolean).length; if (np) rows.push(['Photos', `${np} added`, '']);
+    const nb = BODY.filter(([k]) => state.body[k]).length;
+    rows.push(['Your photos (front, side, back)', nb === 3 ? 'All 3 added' : `${nb} of 3 added (required)`, '']);
+    const np = state.photos.filter(Boolean).length; if (np) rows.push(['Other photos', `${np} added`, '']);
     if (STAFF) { rows.push(['Pre-fitting', state.prefit, '']); rows.push(['Urgent', (URGENT.find(u => u[0] === state.urgent) || [])[1], '']); }
     if (STAFF && STAFF._opts._hidden) {                 // every hidden factory option, so the order sheet is complete
       rows.push(['<b>Staff only</b>', '', '', true]);
@@ -1081,7 +1083,12 @@
   // ---------- remarks, photos, pre-fitting / urgent (factory "Remark" and "Pre-fitting / Urgent") ----------
   const PREFIT = ['No', 'Pre-fitting', 'Unfinished Semi-Made Fitting', 'Canvas Shell Sample (No Return)', 'Blank display sample (no return afterwards)'];
   const URGENT = [['normal', 'Normal (7 working days)'], ['urgent', 'Urgent (5 working days)']];
+  const BODY = [['front', 'Front'], ['side', 'Side'], ['back', 'Back']];
+  const bodyMissing = () => BODY.filter(([k]) => !state.body[k]).map(([, l]) => l.toLowerCase());
   function paintExtras() {
+    $('#bodySlots').innerHTML = BODY.map(([k, l]) => `<label class="photo-slot${state.body[k] ? ' done' : ''}">${state.body[k] ? `<img src="${state.body[k].url}" alt="">` : `<span>+ ${l}</span>`}<b class="slot-cap">${l}</b><input type="file" accept="image/*" data-body="${k}"></label>`).join('');
+    const miss = bodyMissing();
+    $('#bodyMissing').textContent = miss.length ? `Still needed: ${miss.join(', ')} photo${miss.length > 1 ? 's' : ''}.` : '';
     $('#photoSlots').innerHTML = state.photos.map((p, i) => `<label class="photo-slot">${p ? `<img src="${p.url}" alt="">` : '<span>+ Photo</span>'}<input type="file" accept="image/*" data-ph="${i}"></label>`).join('');
     $('#prefitSeg').innerHTML = PREFIT.map(v => `<button type="button" data-v="${esc(v)}" class="${state.prefit === v ? 'on' : ''}">${esc(v)}</button>`).join('');
     $('#urgentSeg').innerHTML = URGENT.map(([v, l]) => `<button type="button" data-v="${v}" class="${state.urgent === v ? 'on' : ''}">${l}</button>`).join('');
@@ -1090,6 +1097,11 @@
   $('#photoSlots').onchange = e => { const i = e.target.dataset.ph, f = e.target.files[0]; if (i == null || !f) return;
     if (state.photos[i]) URL.revokeObjectURL(state.photos[i].url);
     state.photos[i] = { name: f.name, url: URL.createObjectURL(f) }; paintExtras(); paintSummary(); };
+  $('#bodySlots').onchange = e => { const k = e.target.dataset.body, f = e.target.files[0]; if (!k || !f) return;
+    if (state.body[k]) URL.revokeObjectURL(state.body[k].url);
+    state.body[k] = { name: f.name, url: URL.createObjectURL(f) }; paintExtras(); paintSummary(); };
+  // sending the order (Phase 4) checks this first: no order without the three body photos
+  window.magnoliaOrderReady = () => bodyMissing().length === 0;
   $('#prefitSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.prefit = b.dataset.v; paintExtras(); paintSummary(); };
   $('#urgentSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.urgent = b.dataset.v; paintExtras(); paintSummary(); };
 
