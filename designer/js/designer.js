@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '35';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '36';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -18,7 +18,7 @@
     monos: [], monoSel: 0, fabricPicked: false, reached: 0, mode: '', location: '', build: '',
     remark: '', photos: [null, null, null], body: { front: null, side: null, back: null }, prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
-  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null;
+  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null, SUGG = null;
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
                   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
@@ -795,8 +795,62 @@
     $('#grid').onclick = e => {
       const b = e.target.closest('[data-id]'); if (!b) return;
       state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; paintSteps(); paintProgress(); goNext($('[data-next=fabric]'));
+      store.set('mb_look', ''); paintSugg(); paintTips();
       $$('#grid .fab').forEach(x => x.classList.toggle('on', x === b)); render();
     };
+  }
+
+  // ---------- designer suggestions: ready-made looks + pairing tips ----------
+  function paintSugg() {
+    const box = $('#suggBox'); if (!box) return;
+    const looks = SUGG && SUGG.looks ? SUGG.looks.filter(L => FABRICS.some(f => f.id === L.fabric)) : [];
+    if (!looks.length) { box.hidden = true; return; }
+    box.hidden = false;
+    $('#suggRow').innerHTML = looks.map(L => {
+      const b = BUTTONS.find(x => x.id === L.button), lo = LININGS.find(x => x.id === L.lining);
+      const pair = [L.buttonLabel || (b ? `${MAT[b.mat] || 'Button'}` : ''), L.liningLabel || (lo ? (lo.name || liningName(lo.id)) : '')].filter(Boolean).join(' \u00b7 ');
+      return `<button type="button" class="sugg-card${store.get('mb_look') === L.id ? ' on' : ''}" data-look="${L.id}" title="${esc(L.why || '')}">
+        <img src="thumbs/${L.fabric}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160">
+        <b>${esc(L.name)}</b><small>${esc(L['for'] || '')}</small><small class="pair">${esc(pair)}</small></button>`;
+    }).join('');
+  }
+  function applyLook(L) {
+    const f = FABRICS.find(x => x.id === L.fabric); if (!f) return;
+    state.fabric = f; state.custom = false; state.fabricPicked = true;
+    state.opts = Object.assign({}, state.opts, L.opts || {});      // the look's style on top of the customer's own choices
+    state.button = L.button || null;
+    state.sleeveSame = !L.sleeveButton; state.sleeveButton = L.sleeveButton || null;
+    state.lining = L.lining || null;
+    state.sleeveLinSame = !L.sleeveLining; state.sleeveLining = L.sleeveLining || null;
+    state.zoom = null; state.zoomAt = null; state.view = 'front';
+    $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'front'));
+    store.set('mb_look', L.id);
+    paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintTips(); paintSugg();
+    state.reached = Math.max(state.reached, 1); paintSteps(); showTab('style'); render();
+    const note = $('#lookNote');
+    if (note) { note.innerHTML = `<b>${esc(L.name)}:</b> ${esc(L.why || '')} Set for you: the cloth${L.opts && (L.opts.front || L.opts.lapel) ? ', that style' : ''}, the buttons and the lining. Your thread colours, monogram and remarks stay as they were - and you can still change anything.`; note.hidden = false; }
+    toast(`"${L.name}" is set - fabric, style, buttons and lining.`);
+  }
+  $('#suggRow') && ($('#suggRow').onclick = e => {
+    const c = e.target.closest('[data-look]'); if (!c || !SUGG) return;
+    const L = SUGG.looks.find(x => x.id === c.dataset.look); if (L) applyLook(L);
+  });
+  function tipsFor(f) {
+    if (!SUGG || !f || !SUGG.tips) return null;
+    for (const r of SUGG.tips) {
+      const w = r.when || {};
+      if (w.use && !w.use.includes(f.use)) continue;
+      if (w.colour && !w.colour.includes(f.colour)) continue;
+      if (w.pattern && !w.pattern.includes(f.pattern)) continue;
+      return r;
+    }
+    return null;
+  }
+  function paintTips() {
+    const r = state.custom ? null : tipsFor(state.fabric);
+    const bt = $('#btnTip'), lt = $('#linTip');
+    if (bt) { bt.hidden = !(r && r.buttons); if (r && r.buttons) bt.innerHTML = `<b>Designer tip for this cloth:</b> ${esc(r.buttons)}`; }
+    if (lt) { lt.hidden = !(r && r.linings); if (r && r.linings) lt.innerHTML = `<b>Designer tip for this cloth:</b> ${esc(r.linings)}`; }
   }
 
   // ---------- style (factory options) ----------
@@ -949,8 +1003,8 @@
   function paintButtons() {
     const mats = Object.keys(MAT).filter(m => BUTTONS.some(b => b.mat === m));
     $('#btnMat').innerHTML = ['<button type="button" class="chip' + (!btnFilter ? ' on' : '') + '" data-m="">All</button>']
-      .concat(mats.map(m => `<button type="button" class="chip${btnFilter === m ? ' on' : ''}" data-m="${m}">${m ? MAT[m] : 'Other'}</button>`)).join('');
-    const list = BUTTONS.filter(b => !btnFilter || b.mat === btnFilter);
+      .concat(mats.map(m => `<button type="button" class="chip${btnFilter === (m || '__other') ? ' on' : ''}" data-m="${m || '__other'}">${m ? MAT[m] : 'Other'}</button>`)).join('');
+    const list = BUTTONS.filter(b => !btnFilter || (btnFilter === '__other' ? !b.mat : b.mat === btnFilter));
     $('#btnGrid').innerHTML = btnTiles(list, state.button);
     $('#sleeveBtnBox').hidden = state.sleeveSame;
     if (!state.sleeveSame) $('#sleeveGrid').innerHTML = btnTiles(SLEEVES, state.sleeveButton);
@@ -1187,6 +1241,7 @@
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
+    const ln = $('#lookNote'); if (ln) ln.hidden = true;
     $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
     updMini();
     $$('.tab').forEach(p => { p.hidden = p.dataset.pane !== name; });
@@ -1277,6 +1332,7 @@
       quad(1, 1, 0, 0); quad(-1, 1, h, 0); quad(1, -1, 0, h); quad(-1, -1, h, h);
       const up = x.getImageData(0, 0, TILE, TILE).data;
       state.cup = up; state.tile = linearTile(up, 150); state.ctile = linearTile(up, 150 * ZOOM); state.ctileZ = ZOOM; state.custom = true;
+      paintTips();
       $$('#grid .fab').forEach(b => b.classList.remove('on')); URL.revokeObjectURL(img.src); render();
     };
     img.src = URL.createObjectURL(file);
@@ -1289,10 +1345,11 @@
       try { PK = await get('maps/_pk/index.json'); } catch (e) { PK = {}; }
       try { PKC = await get('maps/_pk/chest.json'); } catch (e) { PKC = {}; }
       [FABRICS, OPTS, BUTTONS, SLEEVES, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'sleeve_buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
+      try { SUGG = await get('suggestions.json'); } catch (e) { SUGG = null; }
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
-    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); paintSteps();
+    setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); paintSteps(); paintSugg(); paintTips();
     let flow = null; try { flow = JSON.parse(store.get('mb_flow') || 'null'); } catch (e) { flow = null; }
     if (flow && flow.build) { Object.assign(state, flow); startDesigner(); } else showWelcome('home');
     const pw = store.get('mb_staff');

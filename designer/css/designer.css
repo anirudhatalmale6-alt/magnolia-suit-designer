@@ -256,3 +256,16 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
 .slot-cap { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font-size: 12px; font-weight: 600; color: var(--ink, #222); }
 .photo-slot.done .slot-cap { color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
 .hint.warn { color: #a33; }
+/* ---------- designer suggestions ---------- */
+.sugg-box { margin: 0 0 14px; padding: 12px 12px 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.sugg-box h3 { margin: 0 0 4px; }
+.sugg-box .hint { margin: 0 0 10px; }
+.sugg-row { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+.sugg-card { flex: 0 0 148px; scroll-snap-align: start; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 6px 6px 8px; cursor: pointer; text-align: left; }
+.sugg-card img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; background: var(--paper); }
+.sugg-card b { display: block; font-size: 12px; margin-top: 6px; font-weight: 600; line-height: 1.25; }
+.sugg-card small { display: block; font-size: 11px; color: var(--muted); line-height: 1.3; margin-top: 2px; }
+.sugg-card small.pair { color: var(--teal-dd); }
+.sugg-card.on { outline: 2px solid var(--teal-d); }
+.tip { margin: 0 0 10px; padding: 9px 12px; border-left: 3px solid var(--teal); background: var(--mist); border-radius: 0 10px 10px 0; font-size: 13px; line-height: 1.45; color: var(--ink); }
+.tip b { font-weight: 600; }

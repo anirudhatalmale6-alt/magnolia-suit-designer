@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '35';
+    var V = '36';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -20,7 +20,7 @@
   })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Archivo+Black&family=Arimo&family=Caveat&family=Crimson+Text&family=Italianno&family=Kalam&family=Dancing+Script&family=Marck+Script&family=Great+Vibes&family=Bangers&family=Poiret+One&family=Parisienne&family=UnifrakturMaguntia&family=Yesteryear&family=Tinos&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=35">
+<link rel="stylesheet" href="css/designer.css?v=36">
 </head>
 <body>
 <header class="topbar">
@@ -139,6 +139,11 @@
     <div class="chosen" id="chosen"></div>
 
     <section class="tab" data-pane="fabric">
+      <div class="sugg-box" id="suggBox" hidden>
+        <h3>Designer suggestions</h3>
+        <p class="hint">Not sure what goes together? Our designer put these looks together - fabric, buttons, thread and lining. Tap one to make it yours, then change anything you like.</p>
+        <div class="sugg-row" id="suggRow"></div>
+      </div>
       <input class="search" id="q" type="search" placeholder="Search by number, colour or cloth (e.g. 1042, navy, cashmere)" autocomplete="off">
       <div class="filters">
         <div class="chips" id="colours" aria-label="Colour"></div>
@@ -161,6 +166,7 @@
     </section>
 
     <section class="tab" data-pane="style" hidden>
+      <p class="tip" id="lookNote" hidden></p>
       <div id="styleSteps"></div>
       <div class="staff-only adv" hidden>
         <h3>Staff only: hidden factory options</h3>
@@ -172,6 +178,7 @@
 
     <section class="tab" data-pane="trims" hidden>
       <h3>Buttons</h3>
+      <p class="tip" id="btnTip" hidden></p>
       <div class="chips" id="btnMat"></div>
       <div class="grid btn-grid" id="btnGrid"></div>
       <label class="check"><input type="checkbox" id="sleeveSame" checked> Sleeve buttons the same as the front</label>
@@ -181,6 +188,7 @@
       <div id="threadRows"></div>
 
       <h3 id="hLining">Lining</h3>
+      <p class="tip" id="linTip" hidden></p>
       <div class="grid lin-grid" id="linGrid"></div>
       <label class="check"><input type="checkbox" id="sleeveLinSame" checked> Sleeve lining the same as the body</label>
       <div id="sleeveLinBox" hidden><p class="hint">Choose the sleeve lining:</p><div class="grid lin-grid" id="sleeveLinGrid"></div></div>
@@ -242,6 +250,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=35"></script>
+<script src="js/designer.js?v=36"></script>
 </body>
 </html>

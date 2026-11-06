@@ -1,0 +1,230 @@
+{
+  "looks": [
+    {
+      "id": "classic-navy",
+      "name": "The Classic Navy",
+      "for": "Business, every day",
+      "fabric": "MB-1129",
+      "button": "B003",
+      "lining": "L021",
+      "why": "Dark horn buttons keep a navy suit quiet and business-like, and a navy lining keeps the inside as clean as the outside.",
+      "buttonLabel": "Dark horn",
+      "liningLabel": "Navy"
+    },
+    {
+      "id": "charcoal-workhorse",
+      "name": "The Charcoal Workhorse",
+      "for": "Business, autumn and winter",
+      "fabric": "MB-1049",
+      "button": "B007",
+      "lining": "L001",
+      "why": "Charcoal goes with every shirt you own. Dark horn buttons and a grey lining keep it sharp with no fuss.",
+      "buttonLabel": "Dark horn",
+      "liningLabel": "Grey"
+    },
+    {
+      "id": "boardroom-stripe",
+      "name": "The Boardroom Stripe",
+      "for": "Big meetings",
+      "fabric": "MB-1063",
+      "button": "B017",
+      "lining": "L052",
+      "opts": {
+        "lapel": "20"
+      },
+      "why": "A peak lapel and dark horn buttons sharpen a stripe. The lining stays quiet - the cloth does the talking.",
+      "buttonLabel": "Dark horn",
+      "liningLabel": "Navy"
+    },
+    {
+      "id": "double-breasted",
+      "name": "The Double-Breasted",
+      "for": "A stronger silhouette",
+      "fabric": "MB-1042",
+      "button": "B013",
+      "lining": "L021",
+      "opts": {
+        "front": "10",
+        "lapel": "20"
+      },
+      "why": "A peak lapel gives double-breasted its classic shape. Dark horn buttons keep the stronger silhouette timeless.",
+      "buttonLabel": "Dark horn",
+      "liningLabel": "Navy"
+    },
+    {
+      "id": "black-tie",
+      "name": "The Black Tie",
+      "for": "Weddings, formal evenings",
+      "fabric": "MB-1110",
+      "button": "B135",
+      "lining": "L088",
+      "opts": {
+        "front": "1",
+        "lapel": "D"
+      },
+      "why": "Covered buttons and a shawl collar are the classic black-tie signals, and a black lining keeps it formal.",
+      "buttonLabel": "Covered black",
+      "liningLabel": "Black"
+    },
+    {
+      "id": "navy-blazer",
+      "name": "The Navy Blazer",
+      "for": "Smart casual",
+      "fabric": "MB-1012",
+      "button": "B068",
+      "lining": "L114",
+      "why": "Gold metal buttons are the classic blazer signal. A paisley lining adds personality only you know is there.",
+      "buttonLabel": "Gold metal",
+      "liningLabel": "Navy paisley"
+    },
+    {
+      "id": "summer-tan",
+      "name": "The Summer Tan",
+      "for": "Summer, daytime",
+      "fabric": "MB-1392",
+      "button": "B067",
+      "lining": "L048",
+      "why": "Light horn buttons and a cream lining keep a tan suit feeling light and easy.",
+      "buttonLabel": "Light horn",
+      "liningLabel": "Cream"
+    },
+    {
+      "id": "country-check",
+      "name": "The Country Check",
+      "for": "Weekends",
+      "fabric": "MB-1151",
+      "button": "B102",
+      "lining": "L028",
+      "why": "Corozo is a natural nut button that suits earthy checks. The paisley lining picks up the brown in the cloth.",
+      "buttonLabel": "Corozo",
+      "liningLabel": "Brown paisley"
+    },
+    {
+      "id": "light-grey-wedding",
+      "name": "The Light Grey Wedding",
+      "for": "Weddings, spring",
+      "fabric": "MB-1194",
+      "button": "B048",
+      "lining": "L126",
+      "why": "Shell buttons and a soft pink lining give a light grey suit a gentle, dressed-up feel.",
+      "buttonLabel": "Shell",
+      "liningLabel": "Soft pink"
+    },
+    {
+      "id": "burgundy-statement",
+      "name": "The Burgundy Statement",
+      "for": "Parties, evenings",
+      "fabric": "MB-1020",
+      "button": "B014",
+      "lining": "L115",
+      "why": "Dark horn buttons ground the strong colour, and the paisley lining carries the statement inside.",
+      "buttonLabel": "Dark horn",
+      "liningLabel": "Burgundy paisley"
+    },
+    {
+      "id": "green-herringbone",
+      "name": "The Green Herringbone",
+      "for": "Smart casual",
+      "fabric": "MB-1159",
+      "button": "B012",
+      "lining": "L083",
+      "why": "Brown horn and a camel lining warm up green cloth - an easy smart-casual combination.",
+      "buttonLabel": "Brown horn",
+      "liningLabel": "Camel"
+    },
+    {
+      "id": "cream-summer",
+      "name": "The Cream Summer",
+      "for": "Summer events",
+      "fabric": "MB-1241",
+      "button": "B042",
+      "lining": "L133",
+      "why": "Bone buttons stay light, and a pale blue lining is a fresh surprise against cream.",
+      "buttonLabel": "Bone",
+      "liningLabel": "Pale blue"
+    }
+  ],
+  "tips": [
+    {
+      "when": {
+        "use": [
+          "Blazer"
+        ]
+      },
+      "buttons": "Metal buttons are the classic blazer choice; horn tones it down toward a suit jacket.",
+      "linings": "A blazer can carry a bolder lining - paisley or even a picture lining."
+    },
+    {
+      "when": {
+        "colour": [
+          "burgundy",
+          "green",
+          "red"
+        ]
+      },
+      "buttons": "Dark horn buttons ground a strong colour; brighter buttons would compete with the cloth.",
+      "linings": "A paisley that picks up the cloth colour carries the statement inside. Tone-on-tone calms it down."
+    },
+    {
+      "when": {
+        "colour": [
+          "brown",
+          "tan"
+        ]
+      },
+      "buttons": "Light horn, corozo or bone buttons suit warm cloth; dark buttons can sit heavy on tan.",
+      "linings": "Cream, camel or a warm paisley lining keeps the warm feel."
+    },
+    {
+      "when": {
+        "colour": [
+          "cream"
+        ]
+      },
+      "buttons": "Bone, shell or light horn buttons keep cream light. Dark buttons give it more contrast.",
+      "linings": "Pale blue, sand or cream linings keep it fresh for summer."
+    },
+    {
+      "when": {
+        "colour": [
+          "light grey"
+        ]
+      },
+      "buttons": "Shell or light horn buttons keep light grey soft; dark horn sharpens it.",
+      "linings": "A soft colour inside - pink, sky or cream - suits a wedding. Grey keeps it business."
+    },
+    {
+      "when": {
+        "pattern": [
+          "check",
+          "stripe",
+          "herringbone",
+          "corduroy",
+          "textured"
+        ]
+      },
+      "buttons": "The cloth already has a pattern, so plain horn or corozo buttons usually sit best.",
+      "linings": "A plain lining in a colour from the pattern works well; a print would fight with the cloth."
+    },
+    {
+      "when": {
+        "colour": [
+          "navy",
+          "charcoal",
+          "black",
+          "grey"
+        ],
+        "pattern": [
+          "solid"
+        ]
+      },
+      "buttons": "Dark horn or corozo buttons keep a dark solid suit quiet and business-like. Metal buttons push it toward a blazer look.",
+      "linings": "Tone-on-tone keeps it strict. A quiet paisley adds personality that only shows when the jacket comes off."
+    },
+    {
+      "when": {},
+      "buttons": "Horn and corozo are the safe, classic buttons for most cloths.",
+      "linings": "Tone-on-tone is always safe; a print adds personality inside."
+    }
+  ]
+}
