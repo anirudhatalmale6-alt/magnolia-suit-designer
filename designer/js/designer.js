@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '31';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '32';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -225,7 +225,7 @@
       O[p + 3] = 255;
     }
     if (st.LN) liningPass(st, O, 0, 0, 1);
-    ctx.putImageData(out, 0, 0); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
+    ctx.putImageData(out, 0, 0); drawCuffHoles(st, 0, 0, 1); drawLapelHoles(st, 0, 0, 1); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
   }
 
   // Zoomed view: redraw only the tapped area at ZOOM x the resolution, sampling the maps between pixels and a
@@ -268,8 +268,120 @@
       }
     }
     if (st.LN) liningPass(st, O, zx, zy, Z);
-    ctx.putImageData(out, 0, 0);
+    ctx.putImageData(out, 0, 0); drawCuffHoles(st, zx, zy, Z); drawLapelHoles(st, zx, zy, Z);
     ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z); drawMonos(zx, zy, Z);
+  }
+
+  // ---------- sleeve buttons (side and three-quarter views) ----------
+  // The photo's 4 kissing buttons are replaced by the chosen number, kissing or spaced, copied from the photo's
+  // own bottom button, so they keep its light. Holes are drawn under them, straight or slanted.
+  function cuffOpts() {
+    return { n: +(state.opts.cuffButtons || '4') || 0, kiss: (state.opts.kissing || 'B') === 'A', slant: (state.opts.sleeveHoleDir || 'A') === 'B',
+      holes: (state.opts.sleeveHoleDir || 'A') !== 'Z' };
+  }
+  function cuffView(st) {
+    const c = st.meta.cuff; if (!c) return st;
+    const o = cuffOpts(), key = o.n + '|' + o.kiss;
+    st.cuffs = st.cuffs || {};
+    if (st.cuffs[key]) return st.cuffs[key];
+    const [ax, ay] = c.a, [bx, by] = c.b, r = c.r, L = Math.hypot(ax - bx, ay - by), dx = (ax - bx) / L, dy = (ay - by) / L;   // d: up the sleeve
+    // copies: the plain view reads A / SH / U / V, the zoomed view reads the photo's alpha (B) and shade (S)
+    const A = st.A.slice(), OVP = new Uint8ClampedArray(st.OVP), B = new Uint8ClampedArray(st.B), S = new Uint8ClampedArray(st.S), SH = st.SH.slice(), U = st.U.slice(), V = st.V.slice();
+    const segDist = (x, y) => { const t = Math.max(-r, Math.min(L + r, (x - bx) * dx + (y - by) * dy)); return Math.hypot(x - (bx + dx * t), y - (by + dy * t)); };
+    const x0 = Math.floor(Math.min(ax, bx) - r - 20), x1 = Math.ceil(Math.max(ax, bx) + r + 20), y0 = Math.floor(Math.min(ay, by) - r - 20), y1 = Math.ceil(Math.max(ay, by) + r + 20);
+    // the photo's light on the cloth right around the buttons
+    let ss = 0, sn = 0;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * W + x, dd = segDist(x, y);
+      if (dd > r + 5 && dd < r + 16 && st.A[i] > 0.99 && !st.OVP[i * 4 + 3]) { ss += st.SH[i]; sn++; }
+    }
+    const sh = sn ? ss / sn : 1;
+    // the sprite: the bottom button as photographed
+    const R = Math.ceil(r + 3), spr = [];
+    for (let y = -R; y <= R; y++) for (let x = -R; x <= R; x++) {
+      const X = Math.round(bx) + x, Y = Math.round(by) + y, q = (Y * W + X) * 4;
+      if (x * x + y * y <= R * R && st.OVP[q + 3]) spr.push([x, y, st.OVP[q], st.OVP[q + 1], st.OVP[q + 2], st.OVP[q + 3]]);
+    }
+    // clear the photo's buttons: cloth there, in the light around them
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const i = y * W + x, p = i * 4;
+      const dd = segDist(x, y);
+      if (dd <= r + 4 && (OVP[p + 3] || A[i] < 0.99) && (st.B[p] + st.B[p + 1] + st.B[p + 2]) / 3 < 150) {
+        OVP[p + 3] = 0; A[i] = 1; B[p + 3] = 0; S[p] = Math.min(255, sh * 128); uvAt(i, S, st.Wp, U, V, SH);
+      } else if (dd <= 2.3 * r + 6 && A[i] > 0.99 && !OVP[p + 3]) {   // the old buttons' shadows and holes fade into the cloth's light
+        const w = Math.min(1, (2.3 * r + 6 - dd) / 6);
+        S[p] = Math.min(255, S[p] * (1 - w) + sh * 128 * w); SH[i] = SH[i] * (1 - w) + sh * w;
+      }
+    }
+    // the chosen buttons, from the cuff edge up
+    const sp = L / 3 * (o.kiss ? 1 : 1.45), centres = [];
+    for (let k = 0; k < o.n; k++) centres.push([bx + dx * sp * k, by + dy * sp * k]);
+    for (const [cx, cy] of centres) for (const [x, y, r8, g8, b8, a8] of spr) {
+      const X = Math.round(cx) + x, Y = Math.round(cy) + y, q = (Y * W + X) * 4;
+      if (a8 > OVP[q + 3]) { OVP[q] = r8; OVP[q + 1] = g8; OVP[q + 2] = b8; OVP[q + 3] = a8; }
+    }
+    const ov = document.createElement('canvas'); ov.width = W; ov.height = H;
+    const ox = ov.getContext('2d'), im = ox.createImageData(W, H); im.data.set(OVP); ox.putImageData(im, 0, 0);
+    let ex = -dy, ey = dx;
+    if (ex > 0) { ex = -ex; ey = -ey; }                      // as in the photos: towards the vent, on the left of the buttons
+    return (st.cuffs[key] = { ...st, A, B, S, OVP, SH, U, V, ov, ovCache: {}, cuffAt: { centres, r, ex, ey, dx, dy } });
+  }
+  function drawCuffHoles(st, zx, zy, Z) {
+    const c = st.cuffAt, o = cuffOpts(); if (!c || !o.holes || !c.centres.length) return;
+    const t = threadRGB('button');
+    let { ex, ey } = c;
+    if (o.slant) { const a = 0.45 * Math.sign(ex * c.dy - ey * c.dx || 1), cs = Math.cos(a), sn = Math.sin(a); [ex, ey] = [ex * cs - ey * sn, ex * sn + ey * cs]; }
+    ctx.save(); ctx.lineCap = 'round';
+    for (const [cx, cy] of c.centres) {                // a buttonhole: stitched edge (thread colour) round a dark slit
+      const x = (cx - zx) * Z, y = (cy - zy) * Z, l = c.r * 1.9 * Z, x2 = x + ex * l, y2 = y + ey * l;
+      ctx.strokeStyle = t ? `rgba(${t},0.95)` : 'rgba(0,0,0,0.28)'; ctx.lineWidth = Math.max(2.5, 2.6 * Z);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = Math.max(0.8, 0.8 * Z);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2 - ex * Z, y2 - ey * Z); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---------- lapel buttonhole (front views) ----------
+  // Placed a quarter of the way down each lapel, 40 % in from its outer edge, sloping up towards the edge.
+  function lapelGeo(st) {
+    if (st.lapelGeo !== undefined) return st.lapelGeo;
+    const at = pid => {
+      let top = -1, bot = -1;
+      for (let y = 150; y < 1100; y++) { let c = 0; for (let x = 150; x < 880; x++) if (st.Wp[(y * W + x) * 4 + 2] === pid) c++; if (c >= 6) { if (top < 0) top = y; bot = y; } }
+      if (top < 0) return null;
+      const y = Math.round(top + (bot - top) * 0.24); let x0 = W, x1 = -1;
+      for (let x = 150; x < 880; x++) if (st.Wp[(y * W + x) * 4 + 2] === pid) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
+      if (x1 <= x0) return null;
+      const outer = pid === 2 ? x1 : x0, w = x1 - x0;               // about 40 % in from the lapel's outer edge
+      return { x: outer + (pid === 2 ? -1 : 1) * w * 0.4, y, w };
+    };
+    return (st.lapelGeo = state.view === 'front' ? { L: at(2), R: at(3) } : null);   // L = the wearer's left lapel
+  }
+  function lapelHoles(st) {
+    const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; if (!g || pos === 'Z') return [];
+    const sides = { A: ['L'], B: ['R'], C: ['L'], D: ['L', 'R'], E: ['L', 'R'] }[pos] || ['L'], dbl = pos === 'C' || pos === 'E', out = [];
+    for (const k of sides) { const h = g[k]; if (!h) continue; out.push({ ...h, side: k }); if (dbl) out.push({ ...h, y: h.y + 20, side: k }); }
+    return out;
+  }
+  function drawLapelHoles(st, zx, zy, Z) {
+    const holes = lapelHoles(st); if (!holes.length) return;
+    const style = state.opts.lapelHoleStyle || 'A', hand = /Handmade/i.test((choiceOf('lapelHoleStyle') || {}).label || '');
+    const t = threadRGB('lapel'), len = 2.3 * PX_PER_CM;            // a 2.3 cm buttonhole
+    ctx.save(); ctx.lineCap = 'round';
+    for (const h of holes) {
+      const a = (h.side === 'L' ? -1 : 1) * 0.3, dx = Math.cos(a) * (h.side === 'L' ? 1 : -1), dy = Math.sin(a) * (h.side === 'L' ? 1 : -1);
+      const x = (h.x - zx) * Z, y = (h.y - zy) * Z, hx = dx * len / 2 * Z, hy = dy * len / 2 * Z;
+      ctx.strokeStyle = t ? `rgb(${t})` : 'rgba(0,0,0,0.5)'; ctx.lineWidth = (hand ? 3.6 : 2.8) * Z;
+      ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = Z; ctx.shadowOffsetY = 0.4 * Z;
+      ctx.beginPath(); ctx.moveTo(x - hx, y - hy); ctx.lineTo(x + hx, y + hy); ctx.stroke();
+      if (style !== 'A' && !/Square/i.test((choiceOf('lapelHoleStyle') || {}).label || '')) {   // round (keyhole) end towards the edge
+        ctx.beginPath(); ctx.arc(x + hx, y + hy, (hand ? 2.2 : 1.8) * Z, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
+      }
+      ctx.shadowColor = 'transparent'; ctx.strokeStyle = t ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.18)'; ctx.lineWidth = 0.8 * Z;
+      ctx.beginPath(); ctx.moveTo(x - hx * 0.85, y - hy * 0.85); ctx.lineTo(x + hx * 0.85, y + hy * 0.85); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // ---------- monogram preview ----------
@@ -445,7 +557,11 @@
     busy.hidden = false; busy.textContent = 'Updating…';
     $('#angleNote').hidden = !m.note; $('#angleNote').textContent = m.note || '';
     try {
-      const st = await loadView(m.name, m.pk);
+      const st = cuffView(await loadView(m.name, m.pk));
+      if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
+        const g = lapelGeo(st), h = g && (g.L || g.R); state.zoomAt = null;
+        if (h) state.zoom = zoomBox(h.x - 20, h.y + 60, 3);
+      }
       if (!state.custom) {
         const f = state.fabric;
         state.tile = await loadTile(f);
@@ -459,9 +575,11 @@
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
+        // phones: the small floating copy always shows the whole jacket, even while the big one is zoomed on a detail
+        if (state.zoom && innerWidth <= 900) { draw(st); paintMini(); }
         if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy, state.zoom.z); else draw(st);
         if (state.diagram && state.view === 'front' && !state.zoom) drawConstruction(st, state.diagram);
-        paintMini();
+        if (!(state.zoom && innerWidth <= 900)) paintMini();
         $('#stage').classList.toggle('zoom', !!state.zoom);
         $('#zoomHint').textContent = state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
         if (my === ticket) busy.hidden = true;
@@ -662,15 +780,16 @@
   // where each style choice shows on the jacket: [view, zoom x, zoom y, zoom] (no x = whole jacket).
   // Sleeve choices use the side view, where the cuff buttons lie flat to the camera.
   const SLEEVE = ['side', 530, 1255, 2];
-  const SHOW = { front: ['front'], lapel: ['front', 512, 560, 1.5], lapelWidth: ['front', 512, 560, 1.5], lapelHoleStyle: ['front', 620, 480, 2.2],
-    lapelHole: ['front', 620, 480, 2.2], collarBack: ['back', 512, 330, 2], chestPocket: ['front', 680, 620, 2], lowerPocket: ['front'],
+  const SHOW = { front: ['front'], lapel: ['front', 512, 560, 1.5], lapelWidth: ['front', 512, 560, 1.5], lapelHoleStyle: ['front', 'lapelhole'],
+    lapelHole: ['front', 'lapelhole'], collarBack: ['back', 512, 330, 2], chestPocket: ['front', 680, 620, 2], lowerPocket: ['front'],
     ticket: ['front', 300, 960, 2.2], namecard: ['open'], vent: ['back'], cuffButtons: SLEEVE, kissing: SLEEVE, sleeveHoleDir: SLEEVE,
     pick: ['front', 420, 560, 1.7], shoulder: ['front', 330, 520, 1.7], canvas: ['front'],
     facing: ['open'], liningStyle: ['open'], brandLabel: ['open'] };
   function showPart(id) {
     const s = SHOW[id]; if (!s) return;
     state.view = s[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === s[0]));
-    state.zoom = s.length > 1 ? zoomBox(s[1], s[2], s[3]) : null;
+    state.zoomAt = s[1] === 'lapelhole' ? 'lapelhole' : null;
+    state.zoom = s.length > 2 ? zoomBox(s[1], s[2], s[3]) : null;
   }
   // construction: how much of the front is canvas (sewn in, floating) and how much is fused (glued interlining)
   const diagMask = {};
