@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '34';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '35';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -77,6 +77,9 @@
     return { w: cm <= 6.5 ? 'narrow' : cm >= 9 ? 'wide' : '', sh, pick: (state.opts.pick || 'A') !== 'A' ? 'pick' : '' };
   }
   // photos by angle: [lapel, front, lower pocket look, ticket look] -> map folder
+  const LAPEL_PHOTOS = { BA: 'notch', BB: 'peak', BC: 'notch', BD: 'peak', 12: 'peak', 13: 'notch', 14: 'peak', 15: 'peak', 17: 'peak',
+    19: 'peak', 216: 'shawl', 22: 'peak', 23: 'peak', 24: 'shawl', 25: 'shawl', 27: 'shawl', 28: 'shawl', 30: 'peak', 31: 'notch',
+    AD: 'peak', AE: 'notch', BG: 'notch', BI: 'notch', BJ: 'peak', BL: 'notch', BM: 'peak', BN: 'notch', BT: 'notch', 'HA279-118': 'notch' };
   const PHOTOS = {
     front: [['notch', '2', 'slant', '', 'front_notch_sb_slant'], ['notch', '2', 'patch', '', 'front_notch_sb_patch'],
       ['notch', '2', 'jet', '', 'front_notch_sb_jet'], ['notch', '2', 'flap', 'jet', 'front_notch_sb_tjet'], ['notch', '2', 'flap', 'flap', 'front_notch_sb_tflap'],
@@ -95,7 +98,9 @@
       ['notch', '2', 'flap', '', 'front_n_sh_natural', { sh: 'natural' }], ['notch', '2', 'flap', '', 'front_n_sh_rollino', { sh: 'rollino' }],
       ['notch', '2', 'flap', '', 'front_n_sh_neapolitan', { sh: 'neapolitan' }], ['notch', '2', 'flap', '', 'front_n_pick', { pick: 'pick' }],
       ['notch', 'db4', 'flap', '', 'front_notch_db4n'], ['notch', 'db', 'flap', '', 'front_notch_dbn'], ['notch', '4', 'flap', '', 'front_n_sb4'],
-      ['notch', '27', 'flap', '', 'front_n_sb5'], ['notch', 'db61', 'flap', '', 'front_n_db61'], ['notch', 'db21', 'flap', '', 'front_n_db21']],
+      ['notch', '27', 'flap', '', 'front_n_sb5'], ['notch', 'db61', 'flap', '', 'front_n_db61'], ['notch', 'db21', 'flap', '', 'front_n_db21'],
+      // the manufacturer's other lapel shapes (photo list 2, section F): one photo each
+      ...Object.entries(LAPEL_PHOTOS).map(([code, fam]) => [fam, '2', 'flap', '', 'front_lap_' + code.replace('-', '_'), { lap: code }])],
     three4: [['notch', '2', 'flap', '', 'three4'], ['notch', '2', 'slant', '', 'three4_slant'], ['notch', '2', 'patch', '', 'three4_patch'],
       ['notch', '2', 'jet', '', 'three4_jet'], ['notch', '2', 'jet', 'jet', 'three4_jet_tjet'], ['notch', '2', 'flap', 'flap', 'three4_tflap'],
       ['notch', '3', 'flap', '', 'three4_notch_sb3'], ['shawl', '1', 'flap', '', 'three4_shawl_sb1'],
@@ -103,17 +108,39 @@
       ['notch', '1', 'jet', '', 'three4_notch_sb1'], ['notch', '5', 'jet', '', 'three4_notch_sb3r2'], ['notch', 'db', 'jet', '', 'three4_notch_db'],
       ['notch', 'db4', 'jet', '', 'three4_notch_db4'], ['peak', '1', 'jet', '', 'three4_peak_sb1'], ['peak', '5', 'jet', '', 'three4_peak_sb3r2'],
       ['peak', 'db4', 'jet', '', 'three4_peak_db4'], ['shawl', '2', 'jet', '', 'three4_shawl_sb'], ['shawl', '3', 'jet', '', 'three4_shawl_sb3'],
-      ['shawl', '5', 'jet', '', 'three4_shawl_sb3r2'], ['shawl', 'db4', 'jet', '', 'three4_shawl_db4'], ['shawl', 'db', 'jet', '', 'three4_shawl_db']],
+      ['shawl', '5', 'jet', '', 'three4_shawl_sb3r2'], ['shawl', 'db4', 'jet', '', 'three4_shawl_db4'], ['shawl', 'db', 'jet', '', 'three4_shawl_db'],
+      // photo list 2, section B: a second three-quarter jacket (own photos, no pocket transplant)
+      ['notch', '2', 'patchtab', '', 'three4_n_patchtab'], ['notch', '2', 'pleat', '', 'three4_n_pleat'], ['notch', '2', 'hacking', '', 'three4_n_hacking'],
+      ['notch', '2', 'flap', 'card', 'three4_n_card'], ['notch', '2', 'flap', '', 'three4_n_narrow', { w: 'narrow' }], ['notch', '2', 'flap', '', 'three4_n_wide', { w: 'wide' }],
+      ['notch', '2', 'flap', '', 'three4_n_sh_natural', { sh: 'natural' }], ['notch', '2', 'flap', '', 'three4_n_sh_rollino', { sh: 'rollino' }],
+      ['notch', '2', 'flap', '', 'three4_n_sh_neapolitan', { sh: 'neapolitan' }], ['notch', '2', 'flap', '', 'three4_n_pick', { pick: 'pick' }]],
     side: [['notch', '2', 'flap', '', 'side'], ['peak', '2', 'flap', '', 'side_peak_sb'], ['peak', 'db', 'flap', '', 'side_peak_db'],
       ['notch', '1', 'jet', '', 'side_notch_sb1'], ['notch', '3', 'jet', '', 'side_notch_sb3'], ['notch', '5', 'jet', '', 'side_notch_sb3r2'],
       ['notch', 'db', 'jet', '', 'side_notch_db'], ['notch', 'db4', 'jet', '', 'side_notch_db4'], ['peak', '1', 'jet', '', 'side_peak_sb1'],
       ['peak', '3', 'jet', '', 'side_peak_sb3'], ['peak', '5', 'jet', '', 'side_peak_sb3r2'], ['peak', 'db4', 'jet', '', 'side_peak_db4'],
       ['shawl', '1', 'jet', '', 'side_shawl_sb1'], ['shawl', '2', 'jet', '', 'side_shawl_sb'], ['shawl', '3', 'jet', '', 'side_shawl_sb3'],
-      ['shawl', '5', 'jet', '', 'side_shawl_sb3r2'], ['shawl', 'db4', 'jet', '', 'side_shawl_db4'], ['shawl', 'db', 'jet', '', 'side_shawl_db']]
+      ['shawl', '5', 'jet', '', 'side_shawl_sb3r2'], ['shawl', 'db4', 'jet', '', 'side_shawl_db4'], ['shawl', 'db', 'jet', '', 'side_shawl_db'],
+      // photo list 2, section C: pockets and shoulders seen from the side (notch, 2 buttons)
+      ['notch', '2', 'patch', '', 'side_patch'], ['notch', '2', 'patchtab', '', 'side_patchtab'], ['notch', '2', 'slant', '', 'side_slant'],
+      ['notch', '2', 'slantjet', '', 'side_slantjet'], ['notch', '2', 'patchflap', '', 'side_patchflap'], ['notch', '2', 'pleat', '', 'side_pleat'],
+      ['notch', '2', 'jet', '', 'side_jet'], ['notch', '2', 'flap', 'flap', 'side_tflap'], ['notch', '2', 'hacking', '', 'side_hacking'],
+      ['notch', '2', 'flap', '', 'side_sh_natural', { sh: 'natural' }], ['notch', '2', 'flap', '', 'side_sh_rollino', { sh: 'rollino' }],
+      ['notch', '2', 'flap', '', 'side_sh_neapolitan', { sh: 'neapolitan' }]]
   };
+  // close-ups of the lapel (photo list 2, section G): shown while the lapel buttonhole or pick stitching is chosen
+  const CLOSE_HOLE = { B: 'B', D: 'D', H: 'H', I: 'I', J: 'J', M: 'M', N: 'N', X: 'X', 15: '15', 16: '16', 17: '17', 32: '32', W: 'W', Y: 'Y', 34: '34',
+    CA: 'sq', C: 'sq', K: 'thin', 18: 'rome', 4: 'rome', 5: 'rome', 7: 'rome', Z: 'rome', 33: 'x', 1: 'milanese', 2: 'milanese', 3: 'milanese', O: 'milanese' };
+  const CLOSE_PICK = { B: 'B', C: 'C', D: 'D', E: 'E', F: 'F', G: 'G', H: 'H' };
+  function closeName() {
+    if (state.closeup === 'lapelHoleStyle') { const c = state.opts.lapelHoleStyle || 'A'; return c === 'A' ? null : { name: 'close_hole_' + (CLOSE_HOLE[c] || 'B'), exact: !!CLOSE_HOLE[c] }; }
+    if (state.closeup === 'pick') { const c = state.opts.pick || 'A'; return c === 'A' ? null : { name: 'close_pick_' + (CLOSE_PICK[c] || 'B'), exact: !!CLOSE_PICK[c] }; }
+    return null;
+  }
   function mapName() {
     const s = styleOf(), miss = [], hid = t => (state.hid[t] || '');
     const say = () => miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '';
+    const cl = state.view === 'front' && closeName();
+    if (cl) { if (!cl.exact) miss.push('this buttonhole style'); return { name: cl.name, note: say() }; }
     if (state.view === 'back') {
       const v = state.opts.vent || 'C', turned = (state.opts.collarBack || 'A') === 'B';
       const name = v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : v === 'D' ? 'back_inner_belt' : v === 'F' ? 'back_fixed_belt' : turned ? 'back_collar' : 'back';
@@ -124,7 +151,10 @@
       const ls = state.opts.liningStyle || 'A';
       let name = ls === 'C' ? 'open_unlined' : ls === 'B' ? 'open_half' : /piping/i.test(hid('Columbia stitching/Piping')) ? 'open_piping'
         : hid('Pen pocket') && hid('Pen pocket') !== 'None' ? 'open_pen' : hid('Inner ticket pocket') && hid('Inner ticket pocket') !== 'None' ? 'open_ticket' : '';
-      if (!name) { name = s.lapel === 'shawl' ? 'open_shawl' : 'open_notch'; if (s.lapel === 'peak') miss.push('peak lapel'); if (s.db) miss.push('double-breasted'); }
+      const card = { A: 'open_card_l', B: 'open_card_r', C: 'open_card_both' }[state.opts.namecard || 'D'];
+      if (!name && s.db) name = 'open_db';
+      if (!name && card) name = card;
+      if (!name) { name = s.lapel === 'shawl' ? 'open_shawl' : 'open_notch'; if (s.lapel === 'peak') miss.push('peak lapel'); }
       return { name, note: say() };
     }
     if (state.view === 'side' && state.elbow) {    // elbow patches: one side photo (notch, 2 buttons)
@@ -139,6 +169,7 @@
     for (const [l, f, p, t, name, e = {}] of PHOTOS[state.view]) {
       let sc = (l === want.lapel) * 100 + (f === want.front) * 60 + (f.startsWith('db') === want.front.startsWith('db')) * 50 + (f.startsWith('db') && want.front.startsWith('db')) * 20 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
       for (const d of ['w', 'sh', 'pick']) if (e[d]) sc += e[d] === ex[d] ? 40 : -1000;
+      if (e.lap) sc += e.lap === (state.opts.lapel || 'BK') ? 250 : -1000;      // a photo of exactly this lapel shape
       if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name, e }; }
     }
     // pockets the photo does not have: laid in from a pocket photo (closest style where this angle has none)
@@ -148,7 +179,7 @@
     if (!has(wp)) wp = POCKET_FALLBACK[wp] || wp;
     if (wt === 'card' && !has(wp, 'card') && !V?.patches.some(x => x[1] === 'card')) wt = 'jet';
     const sx = s.db ? 14 : 0;                       // double-breasted: pockets further from the buttons
-    if ((best.p !== wp || best.t !== wt || sx) && V) {
+    if ((best.p !== wp || best.t !== wt || sx) && V && !best.name.startsWith('three4_n_')) {
       const P = V.patches.find(x => x[0] === wp && x[1] === wt) || V.patches.find(x => x[0] === wp && best.p !== wp);
       const own = V.patches.find(x => x[0] === best.p && x[1] === best.t) || V.patches.find(x => x[0] === best.p);
       const Pw = P || (sx && V.patches.find(x => x[0] === wp && x[1] === wt));
@@ -159,6 +190,7 @@
       if (PKC[state.view]) ck = `chest_${chest}+chest_welt`; else miss.push('this chest pocket');
     }
     if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
+    else if (state.view === 'front' && LAPEL_PHOTOS[state.opts.lapel] && best.e.lap !== state.opts.lapel) miss.push('this lapel shape');
     if (best.f !== want.front) miss.push(((choiceOf('front') || {}).label || 'this front').toLowerCase());
     if (best.p !== want.pocket || best.t !== want.ticket) miss.push('these pockets');
     if (ex.w && best.e.w !== ex.w) miss.push(`${ex.w} lapel`);
@@ -462,6 +494,7 @@
     x.putImageData(d, 0, 0); return c;
   }
   function drawMonos(zx, zy, Z) {
+    if (state.view === 'front' && closeName()) return;   // positions are for the full jacket, not the close-ups
     for (const m of state.monos) {
       const pos = MONO_POS[m.pos]; if (!pos || pos[0] !== state.view) continue;
       const t = m.colour && THREADS.find(x => x.id === m.colour);
@@ -608,7 +641,9 @@
       if (!state.custom) {
         const f = state.fabric;
         state.tile = await loadTile(f);
-        if (state.zoom) state.ztile = await loadTile(f, state.zoom.z);
+        const sc = st.meta.scale || 1;                // close-up photos show the cloth magnified
+        if (sc !== 1) state.tile = await loadTile(f, sc);
+        if (state.zoom) state.ztile = await loadTile(f, state.zoom.z * sc);
       }
       if (state.button) await loadBtn(state.button);
       const lo = st.LN && state.lining && LININGS.find(x => x.id === state.lining);
@@ -837,6 +872,10 @@
     state.view = s[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === s[0]));
     state.zoomAt = s[1] === 'lapelhole' ? 'lapelhole' : null;
     state.zoom = s.length > 2 ? zoomBox(s[1], s[2], s[3]) : null;
+    state.closeup = (id === 'lapelHoleStyle' || id === 'pick') ? id : null;
+    if (state.closeup && closeName()) {               // the close-up photo, centred on the buttonhole / the stitched lapel edge
+      state.zoomAt = null; state.zoom = state.closeup === 'pick' ? zoomBox(760, 560, 1.7) : zoomBox(850, 420, 2.4);
+    }
   }
   // construction: how much of the front is canvas (sewn in, floating) and how much is fused (glued interlining)
   const diagMask = {};
@@ -1144,7 +1183,7 @@
   }
 
   // ---------- views / tabs ----------
-  $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+  $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; state.closeup = null; state.zoom = null; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
