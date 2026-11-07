@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '38';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '39';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -470,7 +470,7 @@
   const MONO_POS = { P01: ['front', 695, 572, 0], P02: ['front', 695, 610, 0], P03: ['front', 695, 606, 0], P04: ['open', 708, 968, 0],
     P05: ['front', 610, 440, -20], P06: ['open', 740, 772, 0], P07: ['open', 285, 748, 0], P08: ['front', 695, 652, 0],
     P09: ['open', 708, 862, 0], P10: ['open', 315, 840, 0], P11: ['open', 315, 840, 0], P12: ['open', 315, 840, 0], P13: ['open', 315, 840, 0],
-    P14: ['back', 512, 165, 0], P15: ['open', 710, 772, 0], P16: ['open', 315, 748, 0], P17: ['open', 690, 1150, 0], P18: ['open', 335, 1150, 0],
+    P14: ['melton', 512, 0, 0], P15: ['open', 710, 772, 0], P16: ['open', 315, 748, 0], P17: ['open', 690, 1150, 0], P18: ['open', 335, 1150, 0],
     P19: ['front', 572, 560, -77], P20: ['front', 452, 560, 77] };
   // the closest web font to each factory font (the embroidery itself uses the factory's own font)
   const MONO_FONT = { 'Bank Gothic': 'Michroma', 'Bank Gothic Light BT': 'Michroma', 'Arial Black': 'Archivo Black', Arial: 'Arimo',
@@ -481,7 +481,7 @@
   const monoImgs = {};
   async function monoReady() {                     // fonts and symbol pictures used by the monograms on the current view
     for (const m of state.monos) {
-      const pos = MONO_POS[m.pos]; if (!pos || pos[0] !== state.view) continue;
+      const pos = MONO_POS[m.pos]; if (!pos || (pos[0] !== state.view && !(state.melton && pos[0] === 'melton'))) continue;
       if (m.type === 'word' && m.text) try { await document.fonts.load(`40px "${monoFamily(m)}"`, m.text); } catch (e) { /* fallback font */ }
       if (m.type === 'gallery' && m.gal && !monoImgs[m.gal]) {
         const g = MONO.gallery.find(x => x.id === m.gal);
@@ -521,9 +521,69 @@
     }
   }
   function showMono() {                            // after a monogram choice: go to its position, close up
-    const m = cm(), pos = m && MONO_POS[m.pos]; if (!pos) { render(); return; }
+    const m = cm(), pos = m && MONO_POS[m.pos]; state.melton = !!pos && pos[0] === 'melton';
+    if (!pos) { render(); return; }
+    if (state.melton) {                              // under the collar: the back view with the collar turned up, drawn close
+      state.view = 'back'; state.zoom = null; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'back')); render(); return;
+    }
     state.view = pos[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === pos[0]));
     state.zoom = zoomBox(pos[1], pos[2], 3); render();
+  }
+
+  // Positions on the under collar: the melton is only seen with the collar turned up, so draw that part close up
+  // (the middle ~24 cm of the collar, about 42 px per cm): the felt piece, its roll line, and the monogram in the stand.
+  function clothRGB() {
+    const px = state.fabric && tilePx[state.fabric.id]; if (!px) return [60, 62, 72];
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < px.length; i += 64) { r += LIN[px[i]]; g += LIN[px[i + 1]]; b += LIN[px[i + 2]]; n++; }
+    return [r, g, b].map(v => Math.round(255 * Math.pow(v / n, 1 / 2.2)));
+  }
+  function drawMelton() {
+    const k = W / 24, cloth = clothRGB(), uc = state.undercollar && CONTRAST.find(c => c.id === state.undercollar);
+    const mel = uc ? uc.rgb : cloth.map(v => Math.round(v * 0.88 + 22));     // no contrast melton: one matched to the cloth (felt reads a touch lighter)
+    const seamY = x => 980 - 0.00016 * (x - W / 2) ** 2, topY = x => 560 - 0.00005 * (x - W / 2) ** 2, foldY = x => seamY(x) - 3 * k;
+    ctx.save();
+    ctx.fillStyle = '#f3f0ea'; ctx.fillRect(0, 0, W, H);
+    const path = (f, g) => { ctx.beginPath(); ctx.moveTo(0, f(0)); for (let x = 16; x <= W; x += 16) ctx.lineTo(x, f(x)); for (let x = W; x >= 0; x -= 16) ctx.lineTo(x, g(x)); ctx.closePath(); };
+    path(seamY, () => H); ctx.fillStyle = `rgb(${cloth.map(v => Math.round(v * 0.7))})`; ctx.fill();   // the back of the jacket, in the collar's shadow
+    const sh = ctx.createLinearGradient(0, 940, 0, 1300); sh.addColorStop(0, 'rgba(0,0,0,0.55)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sh; ctx.fill();
+    path(topY, seamY); ctx.fillStyle = `rgb(${mel})`; ctx.fill();                                  // the melton
+    const lt = ctx.createLinearGradient(0, 560, 0, 980); lt.addColorStop(0, 'rgba(0,0,0,0.25)'); lt.addColorStop(0.55, 'rgba(255,255,255,0.06)'); lt.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = lt; ctx.fill();
+    const img = ctx.getImageData(0, 0, W, H), D = img.data;                                        // felt: a fine, soft grain
+    for (let y = 400; y < 1000; y++) for (let x = 0; x < W; x++) {
+      if (y < topY(x) || y > seamY(x)) continue;
+      const p = (y * W + x) * 4, n = (Math.random() - 0.5) * 22 + ((x * 7 + y * 13) % 5 - 2);
+      const lift = (y - topY(x)) < 40 ? -18 * (1 - (y - topY(x)) / 40) : 0;                   // the collar's top edge rolls away
+      D[p] = Math.max(0, Math.min(255, D[p] + n + lift)); D[p + 1] = Math.max(0, Math.min(255, D[p + 1] + n + lift)); D[p + 2] = Math.max(0, Math.min(255, D[p + 2] + n + lift));
+    }
+    ctx.putImageData(img, 0, 0);
+    ctx.setLineDash([14, 10]); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.35)';  // the roll line (where the collar folds)
+    ctx.beginPath(); ctx.moveTo(0, foldY(0)); for (let x = 16; x <= W; x += 16) ctx.lineTo(x, foldY(x)); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.35)';                // the zigzag stitch onto the jacket
+    ctx.beginPath(); for (let x = 0, u = 0; x <= W; x += 9, u ^= 1) { const y = seamY(x) - 10 - u * 9; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+    for (const m of state.monos) {                                                                 // the letters, centred in the stand
+      const pos = MONO_POS[m.pos]; if (!pos || pos[0] !== 'melton') continue;
+      const t = m.colour && THREADS.find(x => x.id === m.colour), rgb = t ? t.rgb : [200, 170, 90];
+      const mm = parseFloat(((m.type === 'gallery' ? MONO.gHeights : MONO.heights).find(h => h.id === (m.type === 'gallery' ? m.gheight : m.height)) || {}).name) || (m.type === 'gallery' ? 20 : 10);
+      const cap = mm / 10 * k, x = W / 2, y = seamY(x) - 1.5 * k;
+      ctx.save(); ctx.translate(x, y); ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;
+      if (m.type === 'word' && m.text) {
+        ctx.font = `${Math.round(cap / 0.7)}px "${monoFamily(m)}", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        while (ctx.measureText(m.text).width > W * 0.9 && cap > 8) { ctx.font = ctx.font.replace(/^\d+/, d => Math.round(d * 0.9)); }
+        ctx.fillStyle = `rgb(${rgb})`; ctx.fillText(m.text, 0, 0);
+      } else if (m.type === 'gallery' && monoImgs[m.gal]) {
+        const im = monoImgs[m.gal], w = cap * im.width / im.height; ctx.drawImage(monoTint(im, rgb), -w / 2, -cap / 2, w, cap);
+      }
+      ctx.restore();
+    }
+    ctx.shadowColor = 'transparent'; ctx.font = '600 38px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#333';
+    ctx.fillText('Under the collar, with the collar turned up', W / 2, 300);
+    ctx.font = '32px system-ui, sans-serif'; ctx.fillStyle = '#666';
+    ctx.fillText(uc ? `Melton: ${contrastName(uc.id)}` : 'Melton matched to your cloth', W / 2, 350);
+    ctx.fillText('Collar edge', W / 2, topY(W / 2) - 20);
+    ctx.restore();
   }
 
   // ---------- lining on the open-jacket view ----------
@@ -664,6 +724,7 @@
         if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy, state.zoom.z); else draw(st);
         if (state.diagram && state.view === 'front' && !state.zoom) drawConstruction(st, state.diagram);
         if (!(state.zoom && innerWidth <= 900)) paintMini();
+        if (state.melton && state.view === 'back' && !state.zoom) drawMelton();
         $('#stage').classList.toggle('zoom', !!state.zoom);
         $('#zoomHint').textContent = state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
         if (my === ticket) busy.hidden = true;
@@ -961,7 +1022,7 @@
     ctx.restore();
   }
   function setOpt(id, v) {
-    state.opts[id] = v;
+    state.opts[id] = v; state.melton = false;
     state.diagram = id === 'canvas' ? (choiceOf('canvas') || {}).label || '' : null;
     if (id === 'cuffButtons') paintThreads();
     showPart(id); render();
@@ -1243,7 +1304,7 @@
   }
 
   // ---------- views / tabs ----------
-  $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; state.closeup = null; state.zoom = null; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+  $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; state.closeup = null; state.zoom = null; state.melton = false; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
@@ -1289,6 +1350,7 @@
   $('#swModal').onclick = e => { if (e.target.id === 'swModal') $('#swModal').hidden = true; };
   $('#stage').onclick = e => {
     if (e.target !== cv) return;
+    if (state.melton) { state.melton = false; render(); return; }
     if (state.zoom) { state.zoom = null; render(); return; }
     const r = cv.getBoundingClientRect();
     const bx = (e.clientX - r.left) / r.width * W, by = (e.clientY - r.top) / r.height * H;
