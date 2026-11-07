@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '39';
+    var V = '40';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -20,7 +20,7 @@
   })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Archivo+Black&family=Arimo&family=Caveat&family=Crimson+Text&family=Italianno&family=Kalam&family=Dancing+Script&family=Marck+Script&family=Great+Vibes&family=Bangers&family=Poiret+One&family=Parisienne&family=UnifrakturMaguntia&family=Yesteryear&family=Tinos&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=39">
+<link rel="stylesheet" href="css/designer.css?v=40">
 </head>
 <body>
 <header class="topbar">
@@ -177,12 +177,13 @@
     </section>
 
     <section class="tab" data-pane="trims" hidden>
-      <h3>Buttons</h3>
+      <h3>Front buttons</h3>
       <p class="tip" id="btnTip" hidden></p>
       <div class="chips" id="btnMat"></div>
       <div class="grid btn-grid" id="btnGrid"></div>
-      <label class="check"><input type="checkbox" id="sleeveSame" checked> Sleeve buttons the same as the front</label>
-      <div id="sleeveBtnBox" hidden><p class="hint">Choose the sleeve buttons:</p><div class="grid btn-grid" id="sleeveGrid"></div></div>
+      <h3>Sleeve buttons</h3>
+      <div class="seg" id="sleeveSeg"><button type="button" data-v="same" class="on">Same as the front buttons</button><button type="button" data-v="diff">Choose different</button></div>
+      <div id="sleeveBtnBox" hidden><div class="chips" id="sleeveMat"></div><div class="grid btn-grid" id="sleeveGrid"></div></div>
 
       <h3 id="hThreads">Thread colours</h3>
       <div id="threadRows"></div>
@@ -250,6 +251,6 @@
   </form>
 </div>
 
-<script src="js/designer.js?v=39"></script>
+<script src="js/designer.js?v=40"></script>
 </body>
 </html>

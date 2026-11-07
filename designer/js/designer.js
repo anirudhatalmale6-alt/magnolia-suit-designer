@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '39';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '40';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -579,7 +579,7 @@
       ctx.restore();
     }
     ctx.shadowColor = 'transparent'; ctx.font = '600 38px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#333';
-    ctx.fillText('Under the collar, with the collar turned up', W / 2, 300);
+    ctx.fillText('Melton collar (collar turned up)', W / 2, 300);
     ctx.font = '32px system-ui, sans-serif'; ctx.fillStyle = '#666';
     ctx.fillText(uc ? `Melton: ${contrastName(uc.id)}` : 'Melton matched to your cloth', W / 2, 350);
     ctx.fillText('Collar edge', W / 2, topY(W / 2) - 20);
@@ -984,8 +984,8 @@
   // Sleeve choices use the side view, where the cuff buttons lie flat to the camera.
   const SLEEVE = ['side', 530, 1255, 2];
   const SHOW = { front: ['front'], lapel: ['front', 512, 560, 1.5], lapelWidth: ['front', 512, 560, 1.5], lapelHoleStyle: ['front', 'lapelhole'],
-    lapelHole: ['front', 'lapelhole'], collarBack: ['back', 512, 330, 2], chestPocket: ['front', 680, 620, 2], lowerPocket: ['front'],
-    ticket: ['front', 300, 960, 2.2], namecard: ['open'], vent: ['back'], cuffButtons: SLEEVE, kissing: SLEEVE, sleeveHoleDir: SLEEVE,
+    lapelHole: ['front', 'lapelhole'], collarBack: ['back', 512, 330, 2], chestPocket: ['front', 690, 610, 2.8], lowerPocket: ['front', 300, 1000, 2.6],
+    ticket: ['front', 285, 960, 3.5], namecard: ['open'], vent: ['back', 512, 1250, 2], cuffButtons: SLEEVE, kissing: SLEEVE, sleeveHoleDir: SLEEVE,
     pick: ['front', 420, 560, 1.7], shoulder: ['front', 330, 520, 1.7], canvas: ['front'],
     facing: ['open'], liningStyle: ['open'], brandLabel: ['open'] };
   function showPart(id) {
@@ -1062,24 +1062,31 @@
 
   // ---------- trims: buttons, thread colours, lining ----------
   const MAT = { Horn: 'Horn', Corozo: 'Corozo', Shell: 'Shell', Metal: 'Metal', Pes: 'Polyester', Bone: 'Bone', Wood: 'Wood', Fabric: 'Covered', '': 'Button' };
-  let btnFilter = '';
+  let btnFilter = '', sleeveFilter = '';
   function btnTiles(list, cur) {
     return `<button type="button" class="fab${!cur ? ' on' : ''}" data-b=""><span class="ph round">Standard</span><b>As pictured</b></button>` +
       list.map(b => `<button type="button" class="fab${b.id === cur ? ' on' : ''}" data-b="${b.id}"><img src="buttons/${b.id}.png?v=${VER}" alt="" loading="lazy" width="96" height="96"><b>${esc(MAT[b.mat] || 'Button')}</b>${trimCode('buttons', b.id) ? `<small class="code">${esc(trimCode('buttons', b.id).code)}</small>` : ''}</button>`).join('');
   }
+  const matChips = cur => ['<button type="button" class="chip' + (!cur ? ' on' : '') + '" data-m="">All</button>']
+    .concat(Object.keys(MAT).filter(m => BUTTONS.some(b => b.mat === m))
+      .map(m => `<button type="button" class="chip${cur === (m || '__other') ? ' on' : ''}" data-m="${m || '__other'}">${m ? MAT[m] : 'Other'}</button>`)).join('');
+  const byMat = f => BUTTONS.filter(b => !f || (f === '__other' ? !b.mat : b.mat === f));
   function paintButtons() {
-    const mats = Object.keys(MAT).filter(m => BUTTONS.some(b => b.mat === m));
-    $('#btnMat').innerHTML = ['<button type="button" class="chip' + (!btnFilter ? ' on' : '') + '" data-m="">All</button>']
-      .concat(mats.map(m => `<button type="button" class="chip${btnFilter === (m || '__other') ? ' on' : ''}" data-m="${m || '__other'}">${m ? MAT[m] : 'Other'}</button>`)).join('');
-    const list = BUTTONS.filter(b => !btnFilter || (btnFilter === '__other' ? !b.mat : b.mat === btnFilter));
-    $('#btnGrid').innerHTML = btnTiles(list, state.button);
+    $('#btnMat').innerHTML = matChips(btnFilter);
+    $('#btnGrid').innerHTML = btnTiles(byMat(btnFilter), state.button);
+    $$('#sleeveSeg button').forEach(b => b.classList.toggle('on', (b.dataset.v === 'same') === state.sleeveSame));
     $('#sleeveBtnBox').hidden = state.sleeveSame;
-    if (!state.sleeveSame) $('#sleeveGrid').innerHTML = btnTiles(SLEEVES, state.sleeveButton);
+    if (!state.sleeveSame) {
+      $('#sleeveMat').innerHTML = matChips(sleeveFilter);
+      $('#sleeveGrid').innerHTML = btnTiles(byMat(sleeveFilter), state.sleeveButton);
+    }
   }
   $('#btnMat').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; btnFilter = b.dataset.m; paintButtons(); };
-  $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); if (state.button) zoomTo(...FRONT_BTN); render(); goNext($('#sleeveSame').closest('label')); };
+  $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); if (state.button) zoomTo(...FRONT_BTN); render(); goNext($('#sleeveSeg')); };
   $('#sleeveGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.sleeveButton = b.dataset.b || null; paintButtons(); if (state.sleeveButton) zoomTo(...SLEEVE_BTN); render(); goNext($('#hThreads')); };
-  $('#sleeveSame').onchange = e => { state.sleeveSame = e.target.checked; paintButtons(); render(); };
+  $('#sleeveSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.sleeveSame = b.dataset.v === 'same';
+    paintButtons(); paintSummary(); if (!state.sleeveSame) zoomTo(...SLEEVE_BTN); render(); };
+  $('#sleeveMat').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; sleeveFilter = b.dataset.m; paintButtons(); };
 
   const rgbCss = c => `rgb(${c.join(',')})`;
   function palette(cur, key) {
