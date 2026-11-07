@@ -269,3 +269,4 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
 .sugg-card.on { outline: 2px solid var(--teal-d); }
 .tip { margin: 0 0 10px; padding: 9px 12px; border-left: 3px solid var(--teal); background: var(--mist); border-radius: 0 10px 10px 0; font-size: 13px; line-height: 1.45; color: var(--ink); }
 .tip b { font-weight: 600; }
+.pic-note { margin: 6px 4px 2px; padding: 7px 10px; border-radius: 8px; background: #fbf4e6; color: #6b5420; font-size: 12.5px; line-height: 1.4; }

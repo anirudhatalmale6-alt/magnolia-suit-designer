@@ -1,9 +1,21 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '40';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '41';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
   const OUTN = 4096, GAM = new Uint8Array(OUTN + 1); for (let i = 0; i <= OUTN; i++) GAM[i] = Math.round(255 * Math.pow(i / OUTN, 1 / 2.2));
+  // cloth: highlights roll off softly (like a camera) instead of clipping to flat white on light cloth; input 0..2
+  const TONE = new Uint8Array(2 * OUTN + 1);
+  for (let i = 0; i <= 2 * OUTN; i++) { let x = i / OUTN; if (x > 0.7) x = 0.7 + 0.3 * (1 - Math.exp(-(x - 0.7) / 0.3)); TONE[i] = Math.round(255 * Math.pow(x, 1 / 2.2)); }
+  // the photos' shading was taken on dark navy cloth; on light cloth the same contrast reads as blotches and glare,
+  // so it is softened as the cloth gets lighter (dark cloth: unchanged)
+  const shLuts = {};
+  function shadeLut(tile) {
+    const L = tile.L || 0, g = 1 - 0.38 * Math.max(0, Math.min(1, (L - 0.08) / 0.4)), key = g.toFixed(3);
+    if (shLuts[key]) return shLuts[key];
+    const t = new Float32Array(1025); for (let j = 0; j <= 1024; j++) t[j] = Math.pow(j / 256, g);
+    return (shLuts[key] = t);
+  }
   const COLOURS = { navy: '#1f2a44', black: '#111', charcoal: '#3b3d42', grey: '#7d7f84', 'light grey': '#c4c5c8', blue: '#3c5a8a',
     brown: '#5a3f2c', tan: '#b49a7e', burgundy: '#5c1f2a', red: '#c4545e', green: '#4f5e52', cream: '#ece6da' };
   const SEASONS = { '26FW': 'Autumn / Winter', '26SS': 'Spring / Summer' };
@@ -18,7 +30,7 @@
     monos: [], monoSel: 0, fabricPicked: false, reached: 0, mode: '', location: '', build: '',
     remark: '', photos: [null, null, null], body: { front: null, side: null, back: null }, prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
-  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null, SUGG = null;
+  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null, SUGG = null, EXTRAS = { opts: {}, lining: {} };
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
                   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
@@ -50,7 +62,8 @@
         const o = (y * n + x) * 3; t[o] = R / wsum; t[o + 1] = G / wsum; t[o + 2] = Bc / wsum;
       }
     }
-    return { T: t, n };
+    let L = 0; for (let o = 0; o < t.length; o += 3) L += 0.2126 * t[o] + 0.7152 * t[o + 1] + 0.0722 * t[o + 2];
+    return { T: t, n, L: L / (n * n) };
   }
 
   // ---------- which photo to show ----------
@@ -136,13 +149,18 @@
   const CLOSE_PICK = { B: 'B', C: 'C', D: 'D', E: 'E', F: 'F', G: 'G', H: 'H~' };   // '~': closest photo, not the exact style
   function closeName() {
     const pick = (tab, c, pre, dflt) => { const v = tab[c] || ''; return { name: pre + (v.replace('~', '') || dflt), exact: !!v && !v.endsWith('~') }; };
-    if (state.closeup === 'lapelHoleStyle') { const c = state.opts.lapelHoleStyle || 'A'; return c === 'A' ? null : pick(CLOSE_HOLE, c, 'close_hole_', 'B'); }
+    if (state.closeup === 'lapelHoleStyle') { const c = (choiceOf('lapelHoleStyle') || {}).code || 'A'; return c === 'A' ? null : pick(CLOSE_HOLE, c, 'close_hole_', 'B'); }
     if (state.closeup === 'pick') { const c = state.opts.pick || 'A'; return c === 'A' ? null : pick(CLOSE_PICK, c, 'close_pick_', 'B'); }
     return null;
   }
+  const SIZE_ONLY = { lowerPocket: ['A', 'C', '11', '12', '22'], chestPocket: ['A', 'C'], ticket: ['G', 'H', 'I', 'J'], namecard: ['E', 'F'],
+    lapelHoleStyle: ['5', '7', 'Z', '18'] };
   function mapName() {
     const s = styleOf(), miss = [], hid = t => (state.hid[t] || '');
-    const say = () => miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '';
+    const sizes = [];                              // choices that differ only in size: same picture, exact size on the order
+    for (const [id, codes] of Object.entries(SIZE_ONLY)) { const c = state.opts[id]; if (c && codes.includes(c)) sizes.push(((choiceOf(id) || {}).label || '').toLowerCase()); }
+    const say = () => (miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '') +
+      (sizes.length ? `${miss.length ? ' ' : ''}The picture shows the style; the exact size (${sizes.join(', ')}) goes on the order.` : '');
     const cl = state.view === 'front' && closeName();
     if (cl) { if (!cl.exact) miss.push(state.closeup === 'pick' ? 'this stitching' : 'this buttonhole style'); return { name: cl.name, note: say() }; }
     if (state.view === 'back') {
@@ -167,16 +185,28 @@
       if (s.lapel !== 'notch' || s.db || s.front !== '2') miss.push('this front with elbow patches');
       return { name: 'side_elbow', note: say() };
     }
-    const F = s.front, ex = extrasWanted();
+    const F = s.front, ex = extrasWanted(), exW = ex.w;
+    if (state.view === 'front') ex.w = '';          // first look for the photo as if the width were standard
     const want = { lapel: s.lapel, front: s.db ? ({ 8: 'db21', 9: 'db4', 11: 'db4', 10: 'db61' }[F] || 'db') : F === '26' ? '27' : F,
       pocket: pocketLook(state.opts.lowerPocket || 'B'), ticket: ticketLook(state.opts.ticket || 'D') };
+    if (F === '6') want.front = '3';                // 4 roll 3: three buttons show, the top one sits in the lapel roll
+    if (F === 'Z998') want.front = '2';             // the customer's own buttons: a 2-button front
     // the lapel and closure matter most, then lapel width / shoulder, then the pocket shape, then the ticket pocket
-    let best = null, bestScore = -1e9;
-    for (const [l, f, p, t, name, e = {}] of PHOTOS[state.view]) {
-      let sc = (l === want.lapel) * 100 + (f === want.front) * 60 + (f.startsWith('db') === want.front.startsWith('db')) * 50 + (f.startsWith('db') && want.front.startsWith('db')) * 20 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
-      for (const d of ['w', 'sh', 'pick', 'chest']) if (e[d]) sc += e[d] === ex[d] ? 40 : -1000;
-      if (e.lap) sc += e.lap === (state.opts.lapel || 'BK') ? 250 : -1000;      // a photo of exactly this lapel shape
-      if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name, e }; }
+    const pickPhoto = () => {
+      let best = null, bestScore = -1e9;
+      for (const [l, f, p, t, name, e = {}] of PHOTOS[state.view]) {
+        let sc = (l === want.lapel) * 100 + (f === want.front) * 60 + (f.startsWith('db') === want.front.startsWith('db')) * 50 + (f.startsWith('db') && want.front.startsWith('db')) * 20 + (p === want.pocket) * 10 + (t === want.ticket) * 3;
+        for (const d of ['w', 'sh', 'pick', 'chest']) if (e[d]) sc += e[d] === ex[d] ? 40 : -1000;
+        if (e.lap) sc += e.lap === (state.opts.lapel || 'BK') ? 250 : -1000;      // a photo of exactly this lapel shape
+        if (sc > bestScore) { bestScore = sc; best = { l, f, p, t, name, e }; }
+      }
+      return best;
+    };
+    let best = pickPhoto(), lw = 0;
+    const cmW = parseFloat(((choiceOf('lapelWidth') || {}).label || '')) || LAPEL_CM;
+    if (state.view === 'front') {
+      if (LAPEL_IDS.has(best.name)) { if (Math.abs(cmW - LAPEL_CM) > 0.2) lw = Math.round(cmW / LAPEL_CM * 100) / 100; }
+      else if (exW) { ex.w = exW; best = pickPhoto(); }   // no marked lapels on this photo: the narrow / wide photo
     }
     // pockets the photo does not have: laid in from a pocket photo (closest style where this angle has none)
     let pk = null, ck = null;
@@ -198,14 +228,18 @@
     if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
     else if (!['BK', '20', 'D'].includes(state.opts.lapel || 'BK') && best.e.lap !== state.opts.lapel) miss.push('this lapel shape');
     if (best.f !== want.front) miss.push(((choiceOf('front') || {}).label || 'this front').toLowerCase());
-    if (best.p !== want.pocket || best.t !== want.ticket) miss.push('these pockets');
+    else if (F === '6') miss.push('the 4th button in the lapel roll');
+    if (best.p !== want.pocket || best.t !== want.ticket || ['2', 'SA'].includes(state.opts.lowerPocket)) miss.push('these pockets');
+    if (['D', 'E', 'F', 'J', 'BC', 'R'].includes(state.opts.chestPocket)) miss.push('this chest pocket');
     if (ex.w && best.e.w !== ex.w) miss.push(`${ex.w} lapel`);
     if (ex.sh && best.e.sh !== ex.sh) miss.push('this shoulder');
-    return { name: best.name, pk, ck, note: say() };
+    return { name: best.name, pk, ck, lw, note: say() };
   }
-  async function loadView(name, pk, ck) {
-    if (ck) return views[name + '|' + pk + '|' + ck] || (views[name + '|' + pk + '|' + ck] = await patchView(await loadView(name, pk), ck, 'pkc'));
-    if (pk) return views[name + '|' + pk] || (views[name + '|' + pk] = await patchView(await loadView(name), pk));
+  async function loadView(name, pk, ck, lw) {
+    const lk = lw ? '~' + lw : '';
+    if (ck) return views[name + lk + '|' + pk + '|' + ck] || (views[name + lk + '|' + pk + '|' + ck] = await patchView(await loadView(name, pk, null, lw), ck, 'pkc'));
+    if (pk) return views[name + lk + '|' + pk] || (views[name + lk + '|' + pk] = await patchView(await loadView(name, null, null, lw), pk));
+    if (lw) return views[name + lk] || (views[name + lk] = widthView(await loadView(name), lw));
     if (views[name]) return views[name];
     const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
     const B = pixels(base), S = pixels(shade), Wp = pixels(warp), OVP = pixels(ov);
@@ -219,15 +253,141 @@
       if (a === 255) continue;
       A[i] = 1 - a / 255; uvAt(i, S, Wp, U, V, SH);
     }
+    let ovImg = ov;
+    if (name.startsWith('back')) {                  // back photos: the 'buttons' mask caught the sleeve's shadows, not buttons;
+      for (let i = 0; i < n; i++) {                 // seen from behind the sleeve buttons barely show, so this becomes plain cloth
+        const p = i * 4; if (!OVP[p + 3]) continue;
+        let sum = 0, c = 0, x = i % W, y = (i / W) | 0;
+        for (let r = 2; r <= 14 && !c; r += 3) for (let yy = Math.max(0, y - r); yy <= Math.min(H - 1, y + r); yy++) for (let xx = Math.max(0, x - r); xx <= Math.min(W - 1, x + r); xx++) {
+          const j = yy * W + xx, q = j * 4; if (A[j] >= 1 && !OVP[q + 3]) { sum += S[q]; c++; }
+        }
+        A[i] = 1; S[p] = c ? sum / c : 128; uvAt(i, S, Wp, U, V, SH);
+      }
+      for (let p = 3; p < OVP.length; p += 4) OVP[p] = 0;
+      ovImg = document.createElement('canvas'); ovImg.width = W; ovImg.height = H;
+    }
+    cleanPhoto(B, A, S, Wp, U, V, SH, OVP);
     let LN = null;                                  // open-jacket views: lining mask (alpha) and its shading (red, 128 = x1.0)
     if (name.startsWith('open') && name !== 'open_unlined') LN = pixels(await loadImg(`maps/${name}/lining.webp?v=${VER}`));
-    return (views[name] = { B, S, Wp, U, V, A, SH, ov, OVP, meta, LN, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
+    return (views[name] = { B, S, Wp, U, V, A, SH, ov: ovImg, OVP, meta, LN, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
+  }
+  // The photo around the cloth: its off-white backdrop (with faint marks left by the photo) becomes one clean colour,
+  // and at the soft cloth edge the photo's own dark navy is replaced by what lies behind it (backdrop, mannequin),
+  // so light cloth gets no dark outline.
+  const BGC = 254;
+  function cleanPhoto(B, A, S, Wp, U, V, SH, OVP) {
+    const n = W * H, bg = new Uint8Array(n), q = new Int32Array(n); let qh = 0, qt = 0;
+    const light = i => { if (A[i]) return false; const p = i * 4, r = B[p], g = B[p + 1], b = B[p + 2];
+      return r + g + b > 690 && Math.max(r, g, b) - Math.min(r, g, b) < 14; };
+    const seed = i => { if (!bg[i] && light(i)) { bg[i] = 1; q[qt++] = i; } };
+    for (let x = 0; x < W; x++) { seed(x); seed((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { seed(y * W); seed(y * W + W - 1); }
+    for (let i = 0; i < n; i += 7) {                // backdrop seen through gaps (between arm and body): very bright, neutral
+      if (bg[i] || A[i]) continue; const p = i * 4, r = B[p], g = B[p + 1], b = B[p + 2];
+      if (r + g + b > 735 && Math.max(r, g, b) - Math.min(r, g, b) < 8) seed(i);
+    }
+    while (qh < qt) {                              // grow over the backdrop; a step in brightness (an object's edge) stops it
+      const i = q[qh++], x = i % W, p = i * 4, l0 = B[p] + B[p + 1] + B[p + 2];
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) {
+        if (j < 0 || j >= n || bg[j] || !light(j)) continue;
+        const pj = j * 4; if (Math.abs(B[pj] + B[pj + 1] + B[pj + 2] - l0) > 12) continue;
+        bg[j] = 1; q[qt++] = j;
+      }
+    }
+    for (let i = 0; i < n; i++) if (bg[i]) { const p = i * 4; B[p] = B[p + 1] = B[p + 2] = BGC; }
+    // the photo's deepest shadows on its navy cloth (arm/body gaps, around buttons) were left as photo pixels:
+    // invisible on navy, black holes on light cloth. They become cloth, as dark as the photo shows them.
+    const dark = i => { if (A[i] || bg[i] || OVP[i * 4 + 3]) return false; const p = i * 4, r = B[p], g = B[p + 1], b = B[p + 2];
+      return r + g + b < 300 && b - r > -8; };
+    qh = qt = 0;
+    for (let i = 0; i < n; i++) if (A[i] >= 1 && OVP[i * 4 + 3] === 0) {
+      const x = i % W;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) if (j >= 0 && j < n && !bg[j] && dark(j)) { bg[j] = 2; q[qt++] = j; }
+    }
+    while (qh < qt) {
+      const i = q[qh++], x = i % W;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) if (j >= 0 && j < n && !bg[j] && dark(j)) { bg[j] = 2; q[qt++] = j; }
+    }
+    for (let k = 0; k < qt; k++) {
+      const i = q[k], p = i * 4, l = 0.2126 * LIN[B[p]] + 0.7152 * LIN[B[p + 1]] + 0.0722 * LIN[B[p + 2]];
+      A[i] = 1; S[p] = Math.round(128 * Math.max(0.2, Math.min(1, l / 0.03))); uvAt(i, S, Wp, U, V, SH);
+    }
+    for (let i = 0; i < n; i++) {                  // soft edge: what lies behind = mean of the nearest non-cloth pixels
+      const k = A[i]; if (k <= 0 || k >= 1) continue;
+      const x = i % W, y = (i / W) | 0;
+      for (let r = 1; r <= 3; r++) {
+        let R = 0, G = 0, Bb = 0, c = 0;
+        for (let yy = Math.max(0, y - r); yy <= Math.min(H - 1, y + r); yy++) for (let xx = Math.max(0, x - r); xx <= Math.min(W - 1, x + r); xx++) {
+          const j = yy * W + xx; if (A[j]) continue; const pj = j * 4; R += B[pj]; G += B[pj + 1]; Bb += B[pj + 2]; c++;
+        }
+        if (c) { const p = i * 4; B[p] = R / c; B[p + 1] = G / c; B[p + 2] = Bb / c; break; }
+      }
+    }
   }
   // where pixel i of the cloth samples the fabric tile (warp offset, lapel grain rotation) and how lit it is
   function uvAt(i, S, Wp, U, V, SH) {
     const p = i * 4, cx = W / 2, cy = H * 0.35, x = i % W, y = (i / W) | 0, u = x + (Wp[p] - 128), v = y + (Wp[p + 1] - 128);
     const t = ANG[Wp[p + 2]] || 0, c = Math.cos(t), s = Math.sin(t);
     U[i] = (u - cx) * c - (v - cy) * s + cx; V[i] = (u - cx) * s + (v - cy) * c + cy; SH[i] = S[p] / 128;
+  }
+  // Lapel width: the photos show a 7 cm lapel. On photos where the lapels are marked (warp blue 2 / 3), each lapel
+  // is stretched or narrowed row by row from its fold edge (by the opening) outwards, carrying its own edge shadow.
+  // Wider: the lapel lies over more of the chest. Narrower: the chest next to it closes the gap.
+  const LAPEL_IDS = new Set(["front_n_card", "front_n_chest_barchetta", "front_n_chest_none", "front_n_chest_patchflap", "front_n_chest_pleat", "front_n_chest_round", "front_n_hacking", "front_n_jet_tflap", "front_n_patch_tflap", "front_n_patchflap", "front_n_patchtab", "front_n_pick", "front_n_pleat", "front_n_sb4", "front_n_sb5", "front_n_sh_natural", "front_n_sh_neapolitan", "front_n_sh_rollino", "front_n_slant_tflap", "front_n_slantjet", "front_notch_sb", "front_notch_sb1", "front_notch_sb3", "front_notch_sb3_jet_tjet", "front_notch_sb3_patch", "front_notch_sb3r2", "front_notch_sb_jet", "front_notch_sb_patch", "front_notch_sb_slant", "front_notch_sb_tflap", "front_notch_sb_tjet", "front_peak_db", "front_peak_db4", "front_peak_sb", "front_peak_sb1", "front_peak_sb3", "front_peak_sb3_jet_tjet", "front_peak_sb3r2", "front_shawl_db", "front_shawl_db4", "front_shawl_sb", "front_shawl_sb1", "front_shawl_sb3_jet_tjet", "front_shawl_sb3r2"]), LAPEL_CM = 7;
+  function widthView(st, sc0) {
+    const B = st.B.slice(), S = st.S.slice(), Wp = st.Wp.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
+    const M = 6, BAND = 90;
+    const put = (y, x, sx) => {                     // pixel x of row y takes the map values at x = sx (linear for shading)
+      if (x < 0 || x >= W) return;
+      const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3]) return;
+      sx = Math.max(0, Math.min(W - 1.001, sx)); const x0 = sx | 0, f = sx - x0, j0 = y * W + x0, j1 = j0 + 1, jn = f < 0.5 ? j0 : j1;
+      if (!st.A[jn]) return;
+      const p = i * 4, p0 = j0 * 4, p1 = j1 * 4;
+      for (let c = 0; c < 4; c++) B[p + c] = st.B[jn * 4 + c];
+      S[p] = st.S[p0] * (1 - f) + st.S[p1] * f; S[p + 1] = S[p + 2] = S[p];
+      Wp[p] = st.Wp[p0] * (1 - f) + st.Wp[p1] * f; Wp[p + 1] = st.Wp[p0 + 1] * (1 - f) + st.Wp[p1 + 1] * f; Wp[p + 2] = st.Wp[jn * 4 + 2];
+      A[i] = st.A[jn]; uvAt(i, S, Wp, U, V, SH);
+    };
+    for (const pid of [2, 3]) {
+      let top = -1, bot = -1;                       // the lapel's rows: the change eases in at the top and out at the bottom
+      for (let y = 0; y < H; y++) { let c = 0; for (let x = 0; x < W; x += 2) if (st.Wp[(y * W + x) * 4 + 2] === pid) c++; if (c > 1) { if (top < 0) top = y; bot = y; } }
+      if (top < 0) continue;
+      const hgt = bot - top, ease = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+      for (let y = top; y <= bot; y++) {
+      const tt = Math.min(ease((y - top) / (hgt * 0.08)), ease((bot - y) / (hgt * 0.18))), sc = 1 + (sc0 - 1) * tt;
+      if (Math.abs(sc - 1) < 0.01) continue;
+      let best = null, run = null;                  // the longest run of this lapel in the row
+      for (let x = 0; x <= W; x++) {
+        const on = x < W && st.Wp[(y * W + x) * 4 + 2] === pid;
+        if (on && !run) run = [x, x]; else if (on) run[1] = x;
+        if (!on && run) { if (!best || run[1] - run[0] > best[1] - best[0]) best = run; run = null; }
+      }
+      if (!best || best[1] - best[0] < 4) continue;
+      const w = best[1] - best[0] + 1, wn = w * sc;
+      if (pid === 2) {                              // the wearer's left lapel: fold edge on the left, outer edge on the right
+        const xf = best[0], xo = best[1], xn = xf + wn - 1, end = Math.round(Math.max(xn, xo) + M + (sc < 1 ? BAND : 0));
+        for (let x = end; x >= xf; x--) {
+          let sx;
+          if (x <= xn) sx = xf + (x - xf) / sc;
+          else if (x <= xn + M) sx = xo + (x - xn);
+          else if (sc < 1) sx = xo + M + (x - xn - M) * BAND / (end - xn - M);
+          else continue;
+          put(y, x, sx);
+        }
+      } else {                                      // the wearer's right lapel: mirrored
+        const xf = best[1], xo = best[0], xn = xf - wn + 1, end = Math.round(Math.min(xn, xo) - M - (sc < 1 ? BAND : 0));
+        for (let x = end; x <= xf; x++) {
+          let sx;
+          if (x >= xn) sx = xf - (xf - x) / sc;
+          else if (x >= xn - M) sx = xo - (xn - x);
+          else if (sc < 1) sx = xo - M - (xn - M - x) * BAND / (xn - M - end);
+          else continue;
+          put(y, x, sx);
+        }
+      }
+      }
+    }
+    return { ...st, B, S, Wp, A, U, V, SH, ovCache: {}, lapelGeo: undefined };
   }
   // Pocket styles: the pocket area of a notch photo with that pocket (shading + fold offsets) is blended into
   // this photo, moved to where this photo's own pocket sits. Buttons and the photo's outline stay its own.
@@ -286,7 +446,7 @@
 
   function draw(st) {
     if (!st || !state.tile) return;
-    const T = state.tile.T, N = state.tile.n;
+    const T = state.tile.T, N = state.tile.n, SL = shadeLut(state.tile);
     const out = ctx.createImageData(W, H), O = out.data, B = st.B, n = W * H;
     for (let i = 0, p = 0; i < n; i++, p += 4) {
       const k = st.A[i];
@@ -294,11 +454,11 @@
       let u = st.U[i] % N, v = st.V[i] % N; if (u < 0) u += N; if (v < 0) v += N;
       const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0, x1 = (x0 + 1) % N, y1 = (y0 + 1) % N;
       // at the soft edge the photo's light includes the white backdrop: never brighten the cloth there (pink fringe)
-      const a = (y0 * N + x0) * 3, b = (y0 * N + x1) * 3, c = (y1 * N + x0) * 3, d = (y1 * N + x1) * 3, sh = k < 0.98 ? Math.min(st.SH[i], 0.9) : st.SH[i];
+      const a = (y0 * N + x0) * 3, b = (y0 * N + x1) * 3, c = (y1 * N + x0) * 3, d = (y1 * N + x1) * 3, s0 = SL[Math.min(1024, (st.SH[i] * 256) | 0)], sh = k < 0.98 ? Math.min(s0, 0.9) : s0;
       for (let ch = 0; ch < 3; ch++) {
         const top = T[a + ch] + (T[b + ch] - T[a + ch]) * fx, bot = T[c + ch] + (T[d + ch] - T[c + ch]) * fx;
-        let lin = (top + (bot - top) * fy) * sh; if (lin > 1) lin = 1;
-        O[p + ch] = B[p + ch] * (1 - k) + GAM[(lin * OUTN) | 0] * k;
+        let lin = (top + (bot - top) * fy) * sh; if (lin > 2) lin = 2;
+        O[p + ch] = B[p + ch] * (1 - k) + TONE[(lin * OUTN) | 0] * k;
       }
       O[p + 3] = 255;
     }
@@ -310,7 +470,7 @@
   // finer copy of the fabric, so the weave shows real detail instead of enlarged pixels.
   const ZOOM = 3;
   function drawZoom(st, tile, zx, zy, Z = ZOOM) {
-    const T = tile.T, N = tile.n, cx = W / 2, cy = H * 0.35;
+    const T = tile.T, N = tile.n, cx = W / 2, cy = H * 0.35, SL = shadeLut(state.tile || tile);
     const out = ctx.createImageData(W, H), O = out.data, B = st.B, S = st.S, Wp = st.Wp;
     for (let oy = 0, p = 0; oy < H; oy++) {
       const by = Math.min(zy + oy / Z, H - 1.001), y0 = by | 0, fy = by - y0, y1 = y0 + 1;
@@ -333,12 +493,12 @@
           if (u < 0) u += N; if (v < 0) v += N;
           const tx0 = u | 0, ty0 = v | 0, tfx = u - tx0, tfy = v - ty0, tx1 = (tx0 + 1) % N, ty1 = (ty0 + 1) % N;
           const a = (ty0 * N + tx0) * 3, b = (ty0 * N + tx1) * 3, c = (ty1 * N + tx0) * 3, d = (ty1 * N + tx1) * 3;
-          let sh = (S[i00] * w00 + S[i01] * w01 + S[i10] * w10 + S[i11] * w11) / 128;
+          let sh = SL[Math.min(1024, ((S[i00] * w00 + S[i01] * w01 + S[i10] * w10 + S[i11] * w11) * 2) | 0)];
           if (k < 0.98) sh = Math.min(sh, 0.9);
           const f = ch => {
             const top = T[a + ch] + (T[b + ch] - T[a + ch]) * tfx, bot = T[c + ch] + (T[d + ch] - T[c + ch]) * tfx;
-            let lin = (top + (bot - top) * tfy) * sh; if (lin > 1) lin = 1;
-            return GAM[(lin * OUTN) | 0] * k;
+            let lin = (top + (bot - top) * tfy) * sh; if (lin > 2) lin = 2;
+            return TONE[(lin * OUTN) | 0] * k;
           };
           r += f(0); g += f(1); bl += f(2);
         }
@@ -366,7 +526,7 @@
     // copies: the plain view reads A / SH / U / V, the zoomed view reads the photo's alpha (B) and shade (S)
     const A = st.A.slice(), OVP = new Uint8ClampedArray(st.OVP), B = new Uint8ClampedArray(st.B), S = new Uint8ClampedArray(st.S), SH = st.SH.slice(), U = st.U.slice(), V = st.V.slice();
     const segDist = (x, y) => { const t = Math.max(-r, Math.min(L + r, (x - bx) * dx + (y - by) * dy)); return Math.hypot(x - (bx + dx * t), y - (by + dy * t)); };
-    const x0 = Math.floor(Math.min(ax, bx) - r - 20), x1 = Math.ceil(Math.max(ax, bx) + r + 20), y0 = Math.floor(Math.min(ay, by) - r - 20), y1 = Math.ceil(Math.max(ay, by) + r + 20);
+    const x0 = Math.floor(Math.min(ax, bx) - 3.2 * r - 16), x1 = Math.ceil(Math.max(ax, bx) + 3.2 * r + 16), y0 = Math.floor(Math.min(ay, by) - 3.2 * r - 16), y1 = Math.ceil(Math.max(ay, by) + 3.2 * r + 16);
     // the photo's light on the cloth right around the buttons
     let ss = 0, sn = 0;
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -380,15 +540,42 @@
       const X = Math.round(bx) + x, Y = Math.round(by) + y, q = (Y * W + X) * 4;
       if (x * x + y * y <= R * R && st.OVP[q + 3]) spr.push([x, y, st.OVP[q], st.OVP[q + 1], st.OVP[q + 2], st.OVP[q + 3]]);
     }
-    // clear the photo's buttons: cloth there, in the light around them
+    // clear the photo's buttons: the light there is the smoothed light of the cloth around them (box mean over
+    // cloth outside the button row), plus the fine texture of a strip of the same sleeve beside them
+    const R2 = 3.2 * r + 6, ex0 = -dy, ey0 = dx, D = 2 * R2 + 6;   // R2: wide enough to take in the old buttonholes too
+    const okC = j => st.A[j] > 0.99 && !st.OVP[j * 4 + 3];
+    const bw = x1 - x0 + 1, bh = y1 - y0 + 1, KS = Math.ceil(R2) + 14;
+    const integ = f => {                           // summed-area table over the box
+      const t = new Float64Array((bw + 1) * (bh + 1));
+      for (let y = 0; y < bh; y++) { let row = 0; for (let x = 0; x < bw; x++) { row += f(x0 + x, y0 + y); t[(y + 1) * (bw + 1) + x + 1] = t[y * (bw + 1) + x + 1] + row; } }
+      return (x, y) => { const ax0 = Math.max(0, x - x0 - KS), ay0 = Math.max(0, y - y0 - KS), ax1 = Math.min(bw, x - x0 + KS + 1), ay1 = Math.min(bh, y - y0 + KS + 1);
+        return t[ay1 * (bw + 1) + ax1] - t[ay0 * (bw + 1) + ax1] - t[ay1 * (bw + 1) + ax0] + t[ay0 * (bw + 1) + ax0]; };
+    };
+    const outside = (x, y) => x >= 0 && x < W && y >= 0 && y < H && segDist(x, y) > R2 && okC(y * W + x);
+    const sumS = integ((x, y) => outside(x, y) ? st.S[(y * W + x) * 4] : 0), sumN = integ((x, y) => outside(x, y) ? 1 : 0);
+    let side = 0, best = -1;
+    for (const sg of [1, -1]) {                     // the side of the button row where the sleeve continues
+      let c = 0;
+      for (let y = y0; y <= y1; y += 3) for (let x = x0; x <= x1; x += 3) if (segDist(x, y) <= R2) {
+        const X = Math.round(x + ex0 * D * sg), Y = Math.round(y + ey0 * D * sg); if (X >= 0 && X < W && Y >= 0 && Y < H && okC(Y * W + X)) c++;
+      }
+      if (c > best) { best = c; side = sg; }
+    }
+    const sx0 = Math.round(ex0 * D * side), sy0 = Math.round(ey0 * D * side);
+    const texAt = (x, y) => {                       // the strip's fine texture: its value minus its 9x9 mean
+      let v = 0, c = 0, X = x + sx0, Y = y + sy0;
+      if (X < 4 || X >= W - 4 || Y < 4 || Y >= H - 4 || !okC(Y * W + X)) return 0;
+      for (let yy = -4; yy <= 4; yy += 2) for (let xx = -4; xx <= 4; xx += 2) { const j = (Y + yy) * W + X + xx; if (okC(j)) { v += st.S[j * 4]; c++; } }
+      return c ? st.S[(Y * W + X) * 4] - v / c : 0;
+    };
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const i = y * W + x, p = i * 4;
-      const dd = segDist(x, y);
-      if (dd <= r + 4 && (OVP[p + 3] || A[i] < 0.99) && (st.B[p] + st.B[p + 1] + st.B[p + 2]) / 3 < 150) {
-        OVP[p + 3] = 0; A[i] = 1; B[p + 3] = 0; S[p] = Math.min(255, sh * 128); uvAt(i, S, st.Wp, U, V, SH);
-      } else if (dd <= 2.3 * r + 6 && A[i] > 0.99 && !OVP[p + 3]) {   // the old buttons' shadows and holes fade into the cloth's light
-        const w = Math.min(1, (2.3 * r + 6 - dd) / 6);
-        S[p] = Math.min(255, S[p] * (1 - w) + sh * 128 * w); SH[i] = SH[i] * (1 - w) + sh * w;
+      const i = y * W + x, p = i * 4, dd = segDist(x, y); if (dd > R2) continue;
+      const n = sumN(x, y), v = Math.max(0, Math.min(255, (n ? sumS(x, y) / n : sh * 128) + texAt(x, y)));
+      const isBtn = OVP[p + 3] > 0 || (dd <= r + 4 && A[i] < 0.99 && (st.B[p] + st.B[p + 1] + st.B[p + 2]) / 3 < 150);   // any piece of the old buttons, even its highlights
+      if (isBtn) { OVP[p + 3] = 0; A[i] = 1; B[p + 3] = 0; S[p] = v; uvAt(i, S, st.Wp, U, V, SH); }
+      else if (A[i] > 0.99 && !OVP[p + 3]) {
+        const w = Math.min(1, (R2 - dd) / 10);
+        S[p] = Math.min(255, S[p] * (1 - w) + v * w); SH[i] = S[p] / 128;
       }
     }
     // the chosen buttons, from the cuff edge up
@@ -412,8 +599,10 @@
     ctx.save(); ctx.lineCap = 'round';
     for (const [cx, cy] of c.centres) {                // a buttonhole: stitched edge (thread colour) round a dark slit
       const x = (cx - zx) * Z, y = (cy - zy) * Z, l = c.r * 1.9 * Z, x2 = x + ex * l, y2 = y + ey * l;
-      ctx.strokeStyle = t ? `rgba(${t},0.95)` : 'rgba(0,0,0,0.28)'; ctx.lineWidth = Math.max(2.5, 2.6 * Z);
+      ctx.strokeStyle = t ? `rgba(${t},0.95)` : 'rgba(0,0,0,0.3)'; ctx.lineWidth = Math.max(2.5, 2.6 * Z);
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+      if (!t) { ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = Math.max(0.8, 0.9 * Z);   // matching thread: the stitched ridge catches the light
+        ctx.beginPath(); ctx.moveTo(x - 0.8 * Z, y - 1.1 * Z); ctx.lineTo(x2 - 0.8 * Z, y2 - 1.1 * Z); ctx.stroke(); }
       ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = Math.max(0.8, 0.8 * Z);
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2 - ex * Z, y2 - ey * Z); ctx.stroke();
     }
@@ -447,19 +636,22 @@
   }
   function drawLapelHoles(st, zx, zy, Z) {
     const holes = lapelHoles(st); if (!holes.length) return;
-    const style = state.opts.lapelHoleStyle || 'A', hand = /Handmade/i.test((choiceOf('lapelHoleStyle') || {}).label || '');
+    const style = (choiceOf('lapelHoleStyle') || {}).code || 'A'; if (style === 'A') return;     // 'None': no lapel buttonhole
+    const hand = /Handmade/i.test((choiceOf('lapelHoleStyle') || {}).label || '');
     const t = threadRGB('lapel'), len = 2.3 * PX_PER_CM;            // a 2.3 cm buttonhole
     ctx.save(); ctx.lineCap = 'round';
     for (const h of holes) {
       const a = (h.side === 'L' ? -1 : 1) * 0.3, dx = Math.cos(a) * (h.side === 'L' ? 1 : -1), dy = Math.sin(a) * (h.side === 'L' ? 1 : -1);
       const x = (h.x - zx) * Z, y = (h.y - zy) * Z, hx = dx * len / 2 * Z, hy = dy * len / 2 * Z;
-      ctx.strokeStyle = t ? `rgb(${t})` : 'rgba(0,0,0,0.5)'; ctx.lineWidth = (hand ? 3.6 : 2.8) * Z;
+      ctx.strokeStyle = t ? `rgb(${t})` : 'rgba(0,0,0,0.42)'; ctx.lineWidth = (hand ? 3.6 : 2.8) * Z;
       ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = Z; ctx.shadowOffsetY = 0.4 * Z;
       ctx.beginPath(); ctx.moveTo(x - hx, y - hy); ctx.lineTo(x + hx, y + hy); ctx.stroke();
-      if (style !== 'A' && !/Square/i.test((choiceOf('lapelHoleStyle') || {}).label || '')) {   // round (keyhole) end towards the edge
+      if (!/Square|Rome/i.test((choiceOf('lapelHoleStyle') || {}).label || '')) {   // round (keyhole) end towards the edge
         ctx.beginPath(); ctx.arc(x + hx, y + hy, (hand ? 2.2 : 1.8) * Z, 0, Math.PI * 2); ctx.fillStyle = ctx.strokeStyle; ctx.fill();
       }
-      ctx.shadowColor = 'transparent'; ctx.strokeStyle = t ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.18)'; ctx.lineWidth = 0.8 * Z;
+      if (!t) { ctx.shadowColor = 'transparent'; ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1 * Z;       // matching thread: its stitched ridge catches the light
+        ctx.beginPath(); ctx.moveTo(x - hx - Z, y - hy - 1.2 * Z); ctx.lineTo(x + hx - Z, y + hy - 1.2 * Z); ctx.stroke(); }
+      ctx.shadowColor = 'transparent'; ctx.strokeStyle = t ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.8 * Z;
       ctx.beginPath(); ctx.moveTo(x - hx * 0.85, y - hy * 0.85); ctx.lineTo(x + hx * 0.85, y + hy * 0.85); ctx.stroke();
     }
     ctx.restore();
@@ -527,7 +719,7 @@
       state.view = 'back'; state.zoom = null; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'back')); render(); return;
     }
     state.view = pos[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === pos[0]));
-    state.zoom = zoomBox(pos[1], pos[2], 3); render();
+    state.zoom = zoomBox(pos[1], pos[2], 2.2); render();
   }
 
   // Positions on the under collar: the melton is only seen with the collar turned up, so draw that part close up
@@ -698,11 +890,15 @@
     const my = ++ticket, m = mapName();
     busy.hidden = false; busy.textContent = 'Updating…';
     $('#angleNote').hidden = !m.note; $('#angleNote').textContent = m.note || '';
+    $$('.pic-note').forEach(e => e.remove());
+    const ls = m.note && state.lastStep && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
+    if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(m.note)}</p>`);
     try {
-      const st = cuffView(await loadView(m.name, m.pk, m.ck));
+      const st = cuffView(await loadView(m.name, m.pk, m.ck, m.lw));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
-        const g = lapelGeo(st), h = g && (g.L || g.R); state.zoomAt = null;
-        if (h) state.zoom = zoomBox(h.x - 20, h.y + 60, 3);
+        const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
+        if (g && g.L && g.R && (pos === 'D' || pos === 'E')) state.zoom = zoomBox((g.L.x + g.R.x) / 2, (g.L.y + g.R.y) / 2 + 80, 1.6);   // both lapels
+        else { const h = g && (pos === 'B' ? g.R || g.L : g.L || g.R); if (h) state.zoom = zoomBox(h.x - 20, h.y + 60, 2.2); }
       }
       if (!state.custom) {
         const f = state.fabric;
@@ -822,6 +1018,8 @@
     if (STAFF) rows.push(['Elbow patches', state.elbow ? `${state.elbow === 'A' ? 'Round elbow patch' : 'Round sleeve patch'}, ${contrastName(state.elbowFabric)}` : 'None',
       G && state.elbow ? `${G.elbow} ${state.elbow} · ${G.elbowFabric} ${trimCode('contrast', state.elbowFabric)}` : '']);
     if (MONO) monoRows(rows);
+    const ex = extrasList();
+    if (ex.length) { rows.push(['<b>Extras</b>', '', '', true]); ex.forEach(([k, v]) => rows.push([k, `+$${v}`, ''])); rows.push(['Extras total', `+$${ex.reduce((a, x) => a + x[1], 0)}`, '']); }
     rows.push(['<b>Remarks</b>', '', '', true]);
     rows.push(['Remark', state.remark || 'None', '']);
     const nb = BODY.filter(([k]) => state.body[k]).length;
@@ -922,11 +1120,20 @@
 
   // ---------- style (factory options) ----------
   const optOf = id => OPTS.find(o => o.id === id);
+  // extra charges (customer-facing): an option choice or a printed lining that costs more
+  function optExtra(id, code) { const x = EXTRAS.opts && EXTRAS.opts[id]; return x && !x.free.includes(code) ? x.price : 0; }
+  const linExtra = l => (l && l.kind === 'printed' && EXTRAS.lining && EXTRAS.lining.printed) || 0;
+  function extrasList() {
+    const out = [];
+    for (const o of OPTS) { const c = choiceOf(o.id), e = c ? optExtra(o.id, c.code) : 0; if (e) out.push([`${o.label}: ${c.label}`, e]); }
+    for (const [k, id] of [['Body lining', state.lining], ['Sleeve lining', state.sleeveLinSame ? null : state.sleeveLining]]) {
+      const l = LININGS.find(x => x.id === id), e = linExtra(l); if (e) out.push([`${k}: printed`, e]);
+    }
+    return out;
+  }
   function choiceOf(id) { const o = optOf(id); return o && o.choices.find(c => c.code === (state.opts[id] || o.default)); }
   const sleeveHoles = () => +((choiceOf('cuffButtons') || {}).code || 4) || 4;
-  const STYLE_HINT = { lowerPocket: 'Flap, slanted, patch and jetted pockets show in the picture. Every style goes on the order sheet.',
-    chestPocket: 'The picture shows the standard chest pocket. Your choice goes on the order sheet.',
-    vent: 'See it in the Back view.' };
+  const STYLE_HINT = { vent: 'See it in the Back view.' };
   // every section is a row (current choice + its sketch) that opens into a grid of sketches, like the factory screen
   const skImg = (img, alt) => img ? `<img src="${img.includes('/') ? img : 'sketch/' + img}?v=${VER}" alt="" loading="lazy" onerror="this.replaceWith(document.createTextNode(''))">` : `<span class="sk-none">${esc(alt || '')}</span>`;
   function stepRow(attr, label, cur, list, hint) {
@@ -940,7 +1147,7 @@
     let sec = '', html = '';
     for (const o of OPTS) {
       if (o.section !== sec) { sec = o.section; html += `<p class="sec-title">${esc(sec)}</p>`; }
-      const list = o.show.map(code => o.choices.find(c => c.code === code)).filter(Boolean).map(c => ({ v: c.code, label: c.label, img: c.img }));
+      const list = o.show.map(code => o.choices.find(c => c.code === code)).filter(Boolean).map(c => ({ v: c.code, label: c.label + (optExtra(o.id, c.code) ? ` (+$${optExtra(o.id, c.code)})` : ''), img: c.img }));
       html += stepRow(`data-step="${o.id}"`, o.label, state.opts[o.id] || o.default, list, STYLE_HINT[o.id]);
     }
     $('#styleSteps').innerHTML = html;
@@ -984,8 +1191,8 @@
   // Sleeve choices use the side view, where the cuff buttons lie flat to the camera.
   const SLEEVE = ['side', 530, 1255, 2];
   const SHOW = { front: ['front'], lapel: ['front', 512, 560, 1.5], lapelWidth: ['front', 512, 560, 1.5], lapelHoleStyle: ['front', 'lapelhole'],
-    lapelHole: ['front', 'lapelhole'], collarBack: ['back', 512, 330, 2], chestPocket: ['front', 690, 610, 2.8], lowerPocket: ['front', 300, 1000, 2.6],
-    ticket: ['front', 285, 960, 3.5], namecard: ['open'], vent: ['back', 512, 1250, 2], cuffButtons: SLEEVE, kissing: SLEEVE, sleeveHoleDir: SLEEVE,
+    lapelHole: ['front', 'lapelhole'], collarBack: ['back', 512, 330, 2], chestPocket: ['front', 690, 610, 2.2], lowerPocket: ['front', 300, 1000, 2],
+    ticket: ['front', 290, 960, 2.6], namecard: ['open', 512, 940, 1.7], vent: ['back', 512, 1220, 1.7], cuffButtons: SLEEVE, kissing: SLEEVE, sleeveHoleDir: SLEEVE,
     pick: ['front', 420, 560, 1.7], shoulder: ['front', 330, 520, 1.7], canvas: ['front'],
     facing: ['open'], liningStyle: ['open'], brandLabel: ['open'] };
   function showPart(id) {
@@ -995,7 +1202,7 @@
     state.zoom = s.length > 2 ? zoomBox(s[1], s[2], s[3]) : null;
     state.closeup = (id === 'lapelHoleStyle' || id === 'pick') ? id : null;
     if (state.closeup && closeName()) {               // the close-up photo, centred on the buttonhole / the stitched lapel edge
-      state.zoomAt = null; state.zoom = state.closeup === 'pick' ? zoomBox(760, 560, 1.7) : zoomBox(850, 420, 2.4);
+      state.zoomAt = null; state.zoom = state.closeup === 'pick' ? zoomBox(760, 560, 1.5) : zoomBox(852, 424, 2.2);
     }
   }
   // construction: how much of the front is canvas (sewn in, floating) and how much is fused (glued interlining)
@@ -1022,7 +1229,7 @@
     ctx.restore();
   }
   function setOpt(id, v) {
-    state.opts[id] = v; state.melton = false;
+    state.opts[id] = v; state.melton = false; state.lastStep = id;
     state.diagram = id === 'canvas' ? (choiceOf('canvas') || {}).label || '' : null;
     if (id === 'cuffButtons') paintThreads();
     showPart(id); render();
@@ -1127,7 +1334,7 @@
     ['Reach out for availability', l => !l.book, 'Not in our books. Please ask us before choosing one of these.']];
   function linTile(l, cur = state.lining) {
     const code = trimCode('linings', l.id);
-    return `<button type="button" class="fab${l.id === cur ? ' on' : ''}" data-l="${l.id}"><img src="linings/${l.id}.jpg?v=${VER}" alt="" loading="lazy" width="150" height="105"><b>${l.name ? esc(l.name) : liningName(l.id)}</b>${code ? `<small class="code">${esc(code)}</small>` : ''}</button>`;
+    return `<button type="button" class="fab${l.id === cur ? ' on' : ''}" data-l="${l.id}"><img src="linings/${l.id}.jpg?v=${VER}" alt="" loading="lazy" width="150" height="105"><b>${l.name ? esc(l.name) : liningName(l.id)}</b>${linExtra(l) ? `<small>+$${linExtra(l)}</small>` : ''}${code ? `<small class="code">${esc(code)}</small>` : ''}</button>`;
   }
   function paintLinings() {
     $('#linGrid').innerHTML = `<button type="button" class="fab${!state.lining ? ' on' : ''}" data-l=""><span class="ph">Tone on tone</span><b>Matching</b><small>We choose a tone to suit the cloth</small></button>` +
@@ -1421,6 +1628,7 @@
       try { PKC = await get('maps/_pk/chest.json'); } catch (e) { PKC = {}; }
       [FABRICS, OPTS, BUTTONS, SLEEVES, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'sleeve_buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
       try { SUGG = await get('suggestions.json'); } catch (e) { SUGG = null; }
+      try { EXTRAS = await get('extras.json'); } catch (e) { /* no extra charges listed */ }
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
