@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '41';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '42';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -49,9 +49,9 @@
     n = Math.max(8, Math.min(TILE, Math.round(n)));
     const t = new Float32Array(n * n * 3), r = TILE / n;
     for (let y = 0; y < n; y++) {
-      const y0 = y * r, y1 = y0 + r;
+      const y0 = y * r, y1 = Math.min(TILE, y0 + r);    // min: y0 + r can round past the tile's last row (NaN -> black lines)
       for (let x = 0; x < n; x++) {
-        const x0 = x * r, x1 = x0 + r; let R = 0, G = 0, Bc = 0, wsum = 0;
+        const x0 = x * r, x1 = Math.min(TILE, x0 + r); let R = 0, G = 0, Bc = 0, wsum = 0;
         for (let sy = Math.floor(y0); sy < Math.ceil(y1); sy++) {
           const wy = Math.min(y1, sy + 1) - Math.max(y0, sy);
           for (let sx = Math.floor(x0); sx < Math.ceil(x1); sx++) {
@@ -242,7 +242,8 @@
     if (lw) return views[name + lk] || (views[name + lk] = widthView(await loadView(name), lw));
     if (views[name]) return views[name];
     const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
-    const B = pixels(base), S = pixels(shade), Wp = pixels(warp), OVP = pixels(ov);
+    const B = pixels(base), S = pixels(shade), Wp = Float32Array.from(pixels(warp)), OVP = pixels(ov);   // Wp in floats: smoothed offsets keep their fractions
+    smoothWarp(Wp, B);
     let meta = { frontal: [] };
     try { meta = await (await fetch(`maps/${name}/buttons.json?v=${VER}`)).json(); } catch (e) { /* no frontal buttons */ }
     let lsum = 0, lcnt = 0;
@@ -322,6 +323,31 @@
         }
         if (c) { const p = i * 4; B[p] = R / c; B[p + 1] = G / c; B[p + 2] = Bb / c; break; }
       }
+    }
+  }
+  // The fold offsets (warp red/green) are stored in whole pixels, so they step from one value to the next; on fine
+  // weaves and stripes those 1 px steps show as little tears in the pattern. Smoothed over the cloth (box blur,
+  // 3 passes) and kept in fractions, the pattern still follows the folds but runs on unbroken.
+  function smoothWarp(Wp, B) {
+    const n = W * H, R = 6, src = [new Float32Array(n), new Float32Array(n)], m = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const p = i * 4; if (B[p + 3] < 255) { m[i] = 1; src[0][i] = Wp[p] - 128; src[1][i] = Wp[p + 1] - 128; } }
+    const blur = (a, horiz) => {                    // running-sum box blur along rows or columns
+      const out = new Float32Array(n), L = horiz ? W : H, M = horiz ? H : W, st = horiz ? 1 : W, ln = horiz ? W : 1;
+      for (let k = 0; k < M; k++) {
+        const o = k * ln; let s = 0;
+        for (let j = -R; j <= R; j++) if (j >= 0 && j < L) s += a[o + j * st];
+        for (let j = 0; j < L; j++) {
+          out[o + j * st] = s;
+          const add = j + R + 1, rem = j - R; if (add < L) s += a[o + add * st]; if (rem >= 0) s -= a[o + rem * st];
+        }
+      }
+      return out;
+    };
+    let mm = m;
+    for (let pass = 0; pass < 3; pass++) mm = blur(blur(mm, true), false);
+    for (const c of [0, 1]) {
+      let v = src[c]; for (let pass = 0; pass < 3; pass++) v = blur(blur(v, true), false);
+      for (let i = 0; i < n; i++) if (m[i] && mm[i] > 0) Wp[i * 4 + c] = 128 + v[i] / mm[i];
     }
   }
   // where pixel i of the cloth samples the fabric tile (warp offset, lapel grain rotation) and how lit it is
@@ -451,7 +477,7 @@
     for (let i = 0, p = 0; i < n; i++, p += 4) {
       const k = st.A[i];
       if (!k) { O[p] = B[p]; O[p + 1] = B[p + 1]; O[p + 2] = B[p + 2]; O[p + 3] = 255; continue; }
-      let u = st.U[i] % N, v = st.V[i] % N; if (u < 0) u += N; if (v < 0) v += N;
+      let u = st.U[i] % N, v = st.V[i] % N; if (u < 0) u += N; if (v < 0) v += N; if (u >= N) u -= N; if (v >= N) v -= N;   // -1e-9 % N + N can round to N
       const x0 = u | 0, y0 = v | 0, fx = u - x0, fy = v - y0, x1 = (x0 + 1) % N, y1 = (y0 + 1) % N;
       // at the soft edge the photo's light includes the white backdrop: never brighten the cloth there (pink fringe)
       const a = (y0 * N + x0) * 3, b = (y0 * N + x1) * 3, c = (y1 * N + x0) * 3, d = (y1 * N + x1) * 3, s0 = SL[Math.min(1024, (st.SH[i] * 256) | 0)], sh = k < 0.98 ? Math.min(s0, 0.9) : s0;
@@ -490,7 +516,7 @@
           const u0 = bx + (Wp[i00] * w00 + Wp[i01] * w01 + Wp[i10] * w10 + Wp[i11] * w11) - 128;
           const v0 = by + (Wp[i00 + 1] * w00 + Wp[i01 + 1] * w01 + Wp[i10 + 1] * w10 + Wp[i11 + 1] * w11) - 128;
           let u = (((u0 - cx) * cs - (v0 - cy) * sn + cx) * Z) % N, v = (((u0 - cx) * sn + (v0 - cy) * cs + cy) * Z) % N;
-          if (u < 0) u += N; if (v < 0) v += N;
+          if (u < 0) u += N; if (v < 0) v += N; if (u >= N) u -= N; if (v >= N) v -= N;   // -1e-9 % N + N can round to N
           const tx0 = u | 0, ty0 = v | 0, tfx = u - tx0, tfy = v - ty0, tx1 = (tx0 + 1) % N, ty1 = (ty0 + 1) % N;
           const a = (ty0 * N + tx0) * 3, b = (ty0 * N + tx1) * 3, c = (ty1 * N + tx0) * 3, d = (ty1 * N + tx1) * 3;
           let sh = SL[Math.min(1024, ((S[i00] * w00 + S[i01] * w01 + S[i10] * w10 + S[i11] * w11) * 2) | 0)];
@@ -1260,7 +1286,14 @@
   const mini = document.createElement('button'); mini.type = 'button'; mini.className = 'mini'; mini.hidden = true;
   mini.setAttribute('aria-label', 'Back to the jacket picture');
   const miniCv = document.createElement('canvas'); miniCv.width = 240; miniCv.height = 360; mini.appendChild(miniCv); document.body.appendChild(mini);
-  function paintMini() { miniCv.getContext('2d').drawImage(cv, 0, 0, 240, 360); }
+  // the small copy: shrunk in two steps with high-quality smoothing, so fine stripes and weaves keep the look of
+  // the big picture (one coarse step makes them shimmer and look shinier or more stripy than they are)
+  const miniTmp = document.createElement('canvas'); miniTmp.width = 480; miniTmp.height = 720;
+  function paintMini() {
+    const t = miniTmp.getContext('2d'), m = miniCv.getContext('2d');
+    t.imageSmoothingEnabled = m.imageSmoothingEnabled = true; t.imageSmoothingQuality = m.imageSmoothingQuality = 'high';
+    t.drawImage(cv, 0, 0, 480, 720); m.drawImage(miniTmp, 0, 0, 240, 360);
+  }
   mini.onclick = () => $('#stage').scrollIntoView({ behavior: 'smooth', block: 'start' });
   if ('IntersectionObserver' in window) new IntersectionObserver(es => {
     const off = !es[0].isIntersecting;
