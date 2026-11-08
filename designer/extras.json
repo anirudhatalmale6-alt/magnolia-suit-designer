@@ -1,5 +1,5 @@
 {
- "_note": "Extra charges shown to customers. Client 7-nov: other lapel buttonhole styles about $25 (Rome 2.3 machine and None free); printed linings about $15-17 (to confirm).",
+ "_note": "Extra charges shown to customers. Client 7-nov: other lapel buttonhole styles $25 (Rome 2.3 machine and None free). Linings: no surcharge (client 8-nov: only if the excel says so; none of the sheets does).",
  "opts": {
   "lapelHoleStyle": {
    "free": [
@@ -9,7 +9,5 @@
    "price": 25
   }
  },
- "lining": {
-  "printed": 15
- }
+ "lining": {}
 }

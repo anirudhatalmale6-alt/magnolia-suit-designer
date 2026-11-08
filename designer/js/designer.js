@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '42';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '43';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -71,17 +71,17 @@
   const DB_FRONTS = ['8', '9', '10', '11', '12', '13'];
   function styleOf() {
     const lap = OPTS.length ? (choiceOf('lapel') || {}).label || '' : 'Notch';
-    const lapel = /shawl/i.test(lap) ? 'shawl' : /peak/i.test(lap) ? 'peak' : 'notch';
+    const lapel = /removable/i.test(lap) ? (/peak/i.test(lap) ? 'peak' : 'notch') : /shawl/i.test(lap) ? 'shawl' : /peak/i.test(lap) ? 'peak' : 'notch';   // a removable shawl sits on a notch / peak lapel
     const front = state.opts.front || '2';
     return { lapel, db: DB_FRONTS.includes(front), front };
   }
   // factory pocket / vent codes grouped by the look we have a photo for
   const POCKET = { slant: 'G H I 9 10 23 25Y', hacking: 'O Q R 13 14 24', jet: 'D E F K L N P T U V Y', slantjet: 'J S',
-    patch: '15 233 235 238 BE HMD M S1', patchflap: '18 234 237 DJ', patchtab: '5 6 7', pleat: '19 20 236' };
+    patch: '15 233 235 238 BE HMD M S1', jettab: '2', patchflap: '18 234 237 DJ', patchtab: '5 6 7', pleat: '19 20 236' };
   const pocketLook = c => Object.keys(POCKET).find(k => POCKET[k].split(' ').includes(c)) || 'flap';
   const ticketLook = c => c === 'D' ? '' : 'F G H I J'.split(' ').includes(c) ? 'flap' : '25K 25Q EG YK'.split(' ').includes(c) ? 'card' : 'jet';
-  const POCKET_FALLBACK = { patchflap: 'patch', patchtab: 'patch', pleat: 'patch', slantjet: 'slant', hacking: 'slant' };   // views without that photo
-  const CHEST = { round: 'HXD G 233 BE C1', patchflap: '234', pleat: '235', barchetta: '237 238 I', none: 'H' };
+  const POCKET_FALLBACK = { jettab: 'jet',  patchflap: 'patch', patchtab: 'patch', pleat: 'patch', slantjet: 'slant', hacking: 'slant' };   // views without that photo
+  const CHEST = { round: 'HXD G 233 BE C1', patchflap: '234', pleat: '235', barchetta: '237 238 I', none: 'H', curved: 'D E F J', jetted: 'BC', trapezoid: 'R' };
   const chestLook = c => Object.keys(CHEST).find(k => CHEST[k].split(' ').includes(c)) || 'welt';
   // lapel width, shoulder and pick stitching: photos that show a specific one carry it as a 6th entry {w, sh, pick}
   function extrasWanted() {
@@ -92,8 +92,8 @@
   }
   // photos by angle: [lapel, front, lower pocket look, ticket look] -> map folder
   const LAPEL_PHOTOS = { BA: 'notch', BB: 'peak', BC: 'notch', BD: 'peak', 12: 'peak', 13: 'notch', 14: 'peak', 15: 'peak', 17: 'peak',
-    19: 'peak', 216: 'shawl', 22: 'peak', 23: 'peak', 24: 'shawl', 25: 'shawl', 27: 'shawl', 28: 'shawl', 30: 'peak', 31: 'notch',
-    AD: 'peak', AE: 'notch', BG: 'notch', BI: 'notch', BL: 'notch', BM: 'peak', BN: 'notch', BT: 'notch', 'HA279-118': 'notch' };
+    21: 'peak', 216: 'shawl', 22: 'peak', 23: 'peak', 24: 'shawl', 25: 'shawl', 27: 'shawl', 28: 'shawl', 29: 'shawl', 30: 'peak', 31: 'notch',
+    AD: 'peak', AE: 'notch', BG: 'notch', BI: 'notch', BJ: 'peak', BM: 'peak', BN: 'notch', DE: 'peak', 'HA279-118': 'notch', L: 'notch' };
   const PHOTOS = {
     front: [['notch', '2', 'slant', '', 'front_notch_sb_slant'], ['notch', '2', 'patch', '', 'front_notch_sb_patch'],
       ['notch', '2', 'jet', '', 'front_notch_sb_jet'], ['notch', '2', 'flap', 'jet', 'front_notch_sb_tjet'], ['notch', '2', 'flap', 'flap', 'front_notch_sb_tflap'],
@@ -145,7 +145,8 @@
   };
   // close-ups of the lapel (photo list 2, section G): shown while the lapel buttonhole or pick stitching is chosen
   const CLOSE_HOLE = { B: 'B', D: 'D', H: 'H', I: 'I', J: 'J', M: 'M', N: 'N', X: 'X', 15: '15', 16: '16', 17: '17', 32: '32', W: 'W', Y: 'Y', 34: '34',
-    CA: 'sq', C: 'sq', K: 'thin~', 18: 'rome', 4: 'rome', 5: 'rome', 7: 'rome', Z: 'rome', 33: 'x', 1: 'milanese', 2: 'milanese', 3: 'milanese', O: 'milanese' };
+    L: 'L', 13: '13', 14: '14', 40: '40', K: 'K', 33: '33', 4: '4',
+    CA: 'sq', C: 'sq', 18: 'rome', 5: 'rome', 7: 'rome', Z: 'rome', 1: 'milanese', 2: 'milanese', 3: 'milanese', O: 'milanese' };
   const CLOSE_PICK = { B: 'B', C: 'C', D: 'D', E: 'E', F: 'F', G: 'G', H: 'H~' };   // '~': closest photo, not the exact style
   function closeName() {
     const pick = (tab, c, pre, dflt) => { const v = tab[c] || ''; return { name: pre + (v.replace('~', '') || dflt), exact: !!v && !v.endsWith('~') }; };
@@ -153,20 +154,25 @@
     if (state.closeup === 'pick') { const c = state.opts.pick || 'A'; return c === 'A' ? null : pick(CLOSE_PICK, c, 'close_pick_', 'B'); }
     return null;
   }
-  const SIZE_ONLY = { lowerPocket: ['A', 'C', '11', '12', '22'], chestPocket: ['A', 'C'], ticket: ['G', 'H', 'I', 'J'], namecard: ['E', 'F'],
+  const SIZE_ONLY = { lowerPocket: ['A', 'C', '11', '12', '22', 'SA'], chestPocket: ['A', 'C', 'D', 'E', 'F', 'J'], ticket: ['G', 'H', 'I', 'J'], namecard: ['E', 'F'],
     lapelHoleStyle: ['5', '7', 'Z', '18'] };
   function mapName() {
     const s = styleOf(), miss = [], hid = t => (state.hid[t] || '');
     const sizes = [];                              // choices that differ only in size: same picture, exact size on the order
-    for (const [id, codes] of Object.entries(SIZE_ONLY)) { const c = state.opts[id]; if (c && codes.includes(c)) sizes.push(((choiceOf(id) || {}).label || '').toLowerCase()); }
-    const say = () => (miss.length ? `Closest photo shown. Photo for ${miss.join(' + ')} is coming. Your choice is saved for the order.` : '') +
-      (sizes.length ? `${miss.length ? ' ' : ''}The picture shows the style; the exact size (${sizes.join(', ')}) goes on the order.` : '');
+    for (const [id, codes] of Object.entries(SIZE_ONLY)) { const c = state.opts[id]; if (c && codes.includes(c)) sizes.push([((choiceOf(id) || {}).label || '').toLowerCase(), [id]]); }
+    // each note part names the steps it is about, so the note under a step only says what concerns that step
+    const sayFor = (step) => {
+      const m = miss.filter(x => !step || x[1].includes(step)).map(x => x[0]), z = sizes.filter(x => !step || x[1].includes(step)).map(x => x[0]);
+      return (m.length ? `Closest photo shown. Photo for ${m.join(' + ')} is coming. Your choice is saved for the order.` : '') +
+        (z.length ? `${m.length ? ' ' : ''}The picture shows the style; the exact size (${z.join(', ')}) goes on the order.` : '');
+    };
+    const say = () => ({ all: sayFor(null), by: sayFor });
     const cl = state.view === 'front' && closeName();
-    if (cl) { if (!cl.exact) miss.push(state.closeup === 'pick' ? 'this stitching' : 'this buttonhole style'); return { name: cl.name, note: say() }; }
+    if (cl) { if (!cl.exact) miss.push(state.closeup === 'pick' ? ['this stitching', ['pick']] : ['this buttonhole style', ['lapelHoleStyle']]); return { name: cl.name, note: say() }; }
     if (state.view === 'back') {
       const v = state.opts.vent || 'C', turned = (state.opts.collarBack || 'A') === 'B';
       const name = v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : v === 'D' ? 'back_inner_belt' : v === 'F' ? 'back_fixed_belt' : turned ? 'back_collar' : 'back';
-      if (turned && name !== 'back_collar') miss.push('the collar turned back with this vent');
+      if (turned && name !== 'back_collar') miss.push(['the collar turned back with this vent', ['collarBack', 'vent']]);
       return { name, note: say() };
     }
     if (state.view === 'open') {                    // inside photos: lining style first, then the inside details staff chose
@@ -176,20 +182,19 @@
       const card = { A: 'open_card_l', B: 'open_card_r', C: 'open_card_both' }[state.opts.namecard || 'D'];
       if (!name && s.db) name = 'open_db';
       if (!name && card) name = card;
-      if (!name) { name = s.lapel === 'shawl' ? 'open_shawl' : 'open_notch'; if (s.lapel === 'peak') miss.push('peak lapel'); }
-      if ((state.opts.facing || 'B') !== 'B') miss.push('this facing');
-      if ((state.opts.brandLabel || 'A') !== 'A') miss.push('the label position');
+      if (!name) { name = s.lapel === 'shawl' ? 'open_shawl' : 'open_notch'; if (s.lapel === 'peak') miss.push(['peak lapel', ['lapel']]); }
+      if (['F'].includes(state.opts.facing)) miss.push(['the slanted inner pockets of this facing', ['facing']]);
       return { name, note: say() };
     }
     if (state.view === 'side' && state.elbow) {    // elbow patches: one side photo (notch, 2 buttons)
-      if (s.lapel !== 'notch' || s.db || s.front !== '2') miss.push('this front with elbow patches');
+      if (s.lapel !== 'notch' || s.db || s.front !== '2') miss.push(['this front with elbow patches', ['front', 'lapel']]);
       return { name: 'side_elbow', note: say() };
     }
     const F = s.front, ex = extrasWanted(), exW = ex.w;
     if (state.view === 'front') ex.w = '';          // first look for the photo as if the width were standard
     const want = { lapel: s.lapel, front: s.db ? ({ 8: 'db21', 9: 'db4', 11: 'db4', 10: 'db61' }[F] || 'db') : F === '26' ? '27' : F,
       pocket: pocketLook(state.opts.lowerPocket || 'B'), ticket: ticketLook(state.opts.ticket || 'D') };
-    if (F === '6') want.front = '3';                // 4 roll 3: three buttons show, the top one sits in the lapel roll
+    if (F === '6') want.front = '4';                // 4 roll 3: four buttons, the top one on the lapel roll
     if (F === 'Z998') want.front = '2';             // the customer's own buttons: a 2-button front
     // the lapel and closure matter most, then lapel width / shoulder, then the pocket shape, then the ticket pocket
     const pickPhoto = () => {
@@ -221,23 +226,28 @@
       const Pw = P || (sx && V.patches.find(x => x[0] === wp && x[1] === wt));
       if (Pw) { pk = Pw[2] + (own ? '+' + own[2] : '') + (sx ? '@' + sx : ''); best.p = Pw[0]; best.t = Pw[1]; }
     }
+    if (want.pocket === 'jettab' && best.p === 'jet' && (state.view === 'front' || state.view === 'three4')) best.p = 'jettab';   // the tab is drawn on
+    let tk = null;
+    if (V && want.ticket && best.t !== want.ticket && best.p === want.pocket && !best.name.startsWith('three4_n_')) {
+      const T = V.patches.find(x => x[1] === want.ticket && x[0] === 'flap') || V.patches.find(x => x[1] === want.ticket);
+      if (T) { tk = T[2] + (sx ? '@' + sx : ''); best.t = want.ticket; }
+    }
     const chest = chestLook(state.opts.chestPocket || 'B');
     if (chest !== 'welt') {
-      if (best.e.chest === chest) { /* the photo shows this chest pocket */ } else if (PKC[state.view]) ck = `chest_${chest}+chest_welt`; else miss.push('this chest pocket');
+      if (best.e.chest === chest) { /* the photo shows this chest pocket */ } else if (PKC[state.view]) ck = `chest_${chest}+chest_welt`; else miss.push(['this chest pocket', ['chestPocket']]);
     }
-    if (best.l !== want.lapel) miss.push(`${want.lapel} lapel`);
-    else if (!['BK', '20', 'D'].includes(state.opts.lapel || 'BK') && best.e.lap !== state.opts.lapel) miss.push('this lapel shape');
-    if (best.f !== want.front) miss.push(((choiceOf('front') || {}).label || 'this front').toLowerCase());
-    else if (F === '6') miss.push('the 4th button in the lapel roll');
-    if (best.p !== want.pocket || best.t !== want.ticket || ['2', 'SA'].includes(state.opts.lowerPocket)) miss.push('these pockets');
-    if (['D', 'E', 'F', 'J', 'BC', 'R'].includes(state.opts.chestPocket)) miss.push('this chest pocket');
-    if (ex.w && best.e.w !== ex.w) miss.push(`${ex.w} lapel`);
-    if (ex.sh && best.e.sh !== ex.sh) miss.push('this shoulder');
-    return { name: best.name, pk, ck, lw, note: say() };
+    if (best.l !== want.lapel) miss.push([`${want.lapel} lapel`, ['lapel', 'front']]);
+    else if (!['BK', '20', 'D'].includes(state.opts.lapel || 'BK') && best.e.lap !== state.opts.lapel) miss.push(['this lapel shape', ['lapel']]);
+    if (best.f !== want.front) miss.push([((choiceOf('front') || {}).label || 'this front').toLowerCase(), ['front']]);
+    if (best.p !== want.pocket || best.t !== want.ticket || false) miss.push(['these pockets', ['lowerPocket', 'ticket']]);
+    if (ex.w && best.e.w !== ex.w) miss.push([`${ex.w} lapel`, ['lapelWidth']]);
+    if (ex.sh && best.e.sh !== ex.sh) miss.push(['this shoulder', ['shoulder']]);
+    return { name: best.name, pk, ck, lw, tk, note: say() };
   }
-  async function loadView(name, pk, ck, lw) {
+  async function loadView(name, pk, ck, lw, tk) {
     const lk = lw ? '~' + lw : '';
-    if (ck) return views[name + lk + '|' + pk + '|' + ck] || (views[name + lk + '|' + pk + '|' + ck] = await patchView(await loadView(name, pk, null, lw), ck, 'pkc'));
+    if (ck) return views[name + lk + '|' + pk + '|' + tk + '|' + ck] || (views[name + lk + '|' + pk + '|' + tk + '|' + ck] = await patchView(await loadView(name, pk, null, lw, tk), ck, 'pkc'));
+    if (tk) return views[name + lk + '|' + pk + '|tk' + tk] || (views[name + lk + '|' + pk + '|tk' + tk] = await patchView(await loadView(name, pk, null, lw), tk, 'tk'));
     if (pk) return views[name + lk + '|' + pk] || (views[name + lk + '|' + pk] = await patchView(await loadView(name, null, null, lw), pk));
     if (lw) return views[name + lk] || (views[name + lk] = widthView(await loadView(name), lw));
     if (views[name]) return views[name];
@@ -270,7 +280,9 @@
     cleanPhoto(B, A, S, Wp, U, V, SH, OVP);
     let LN = null;                                  // open-jacket views: lining mask (alpha) and its shading (red, 128 = x1.0)
     if (name.startsWith('open') && name !== 'open_unlined') LN = pixels(await loadImg(`maps/${name}/lining.webp?v=${VER}`));
-    return (views[name] = { B, S, Wp, U, V, A, SH, ov: ovImg, OVP, meta, LN, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
+    let HOLE = null;                                // buttonhole close-ups: the stitching, cut out of the photo
+    if (meta.hole) try { HOLE = pixels(await loadImg(`maps/${name}/hole.webp?v=${VER}`)); } catch (e) { /* none */ }
+    return (views[name] = { name, HOLE, holeCache: {}, B, S, Wp, U, V, A, SH, ov: ovImg, OVP, meta, LN, Lo: lcnt ? lsum / lcnt : 40, ovCache: {} });
   }
   // The photo around the cloth: its off-white backdrop (with faint marks left by the photo) becomes one clean colour,
   // and at the soft cloth edge the photo's own dark navy is replaced by what lies behind it (backdrop, mannequin),
@@ -422,6 +434,7 @@
   async function pkImg(f) { return pkImgs[f] || (pkImgs[f] = pixels(await loadImg(`maps/_pk/${f}.webp?v=${VER}`))); }
   // kind 'pk': lower pockets (left and right pocket move separately), 'pkc': the chest pocket
   async function patchView(st, pk, kind = 'pk') {
+    const tkOnly = kind === 'tk'; if (tkOnly) kind = 'pk';      // only the ticket pocket: the rows above the lower pocket, on its side
     const v = (kind === 'pkc' ? PKC : PK)[state.view], [pkf, sxs] = pk.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
     const off = st.meta[kind] || [0, 0, 0], tdy = off[1], tdx = px => px < split ? off[0] : (off[2] ?? off[0]);
     const sx = +sxs || 0, split = kind === 'pkc' ? 1e9 : state.view === 'front' ? pw / 2 : 209;   // left / right pocket (three-quarter: far / near)
@@ -434,6 +447,7 @@
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
       const x = v.at[0] + tdx(px) + px, y = v.at[1] + tdy + py, k = py * pw + px;
       if (x < 0 || x >= W || y < 0 || y >= H) continue;
+      if (tkOnly && (px >= split || py >= 110)) continue;
       const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3]) continue;   // only on cloth, never over a button
       let e = 1;                                        // fade out near the jacket outline (outlines differ per photo)
       for (let d = 4; d <= 28 && e > 0; d += 4) if (!st.A[i - d] || !st.A[i + d]) e = Math.min(e, (d - 4) / 24);
@@ -488,8 +502,8 @@
       }
       O[p + 3] = 255;
     }
-    if (st.LN) liningPass(st, O, 0, 0, 1);
-    ctx.putImageData(out, 0, 0); drawCuffHoles(st, 0, 0, 1); drawLapelHoles(st, 0, 0, 1); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
+    if (st.LN) liningPass(st, O, 0, 0, 1, state.tile);
+    ctx.putImageData(out, 0, 0); drawHole(st, 0, 0, 1); drawLabel(st.name, 0, 0, 1); drawTabs(st, 0, 0, 1); drawCuffHoles(st, 0, 0, 1); drawLapelHoles(st, 0, 0, 1); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
   }
 
   // Zoomed view: redraw only the tapped area at ZOOM x the resolution, sampling the maps between pixels and a
@@ -531,9 +545,87 @@
         O[p] = r; O[p + 1] = g; O[p + 2] = bl; O[p + 3] = 255;
       }
     }
-    if (st.LN) liningPass(st, O, zx, zy, Z);
-    ctx.putImageData(out, 0, 0); drawCuffHoles(st, zx, zy, Z); drawLapelHoles(st, zx, zy, Z);
+    if (st.LN) liningPass(st, O, zx, zy, Z, tile);
+    ctx.putImageData(out, 0, 0); drawHole(st, zx, zy, Z); drawLabel(st.name, zx, zy, Z); drawTabs(st, zx, zy, Z); drawCuffHoles(st, zx, zy, Z); drawLapelHoles(st, zx, zy, Z);
     ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z); drawMonos(zx, zy, Z);
+  }
+
+  // ---------- the lapel buttonhole on its close-up photo, in the chosen thread (matching thread: a shade lighter than the cloth) ----------
+  const HBOX = [690, 330, 1010, 520];
+  function drawHole(st, zx, zy, Z) {
+    if (!st.HOLE) return;
+    const t = threadRGB('lapel'), rgb = t || clothRGB().map(v => Math.min(255, v * 1.7 + 30)), key = rgb.join(',');
+    let c = st.holeCache[key];
+    if (!c) {
+      const [x0, y0, x1, y1] = HBOX, w = x1 - x0, h = y1 - y0;
+      c = document.createElement('canvas'); c.width = w; c.height = h;
+      const x = c.getContext('2d'), im = x.createImageData(w, h), O = im.data, Hp = st.HOLE;
+      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
+        const p = ((y0 + yy) * W + x0 + xx) * 4, o = (yy * w + xx) * 4, a = Hp[p + 3]; if (!a) continue;
+        const k = Math.min(1.6, Hp[p] / 128);                     // the stitch's own light and shadow
+        O[o] = Math.min(255, rgb[0] * k); O[o + 1] = Math.min(255, rgb[1] * k); O[o + 2] = Math.min(255, rgb[2] * k); O[o + 3] = a;
+      }
+      x.putImageData(im, 0, 0); st.holeCache[key] = c;
+    }
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(c, (HBOX[0] - zx) * Z, (HBOX[1] - zy) * Z, (HBOX[2] - HBOX[0]) * Z, (HBOX[3] - HBOX[1]) * Z); ctx.restore();
+  }
+
+  // ---------- brand label on the inside view ----------
+  // Inner breast pocket welts on the open photos: [wearer's right (image left), wearer's left (image right)].
+  const INNER_PK = { open_notch: [[312, 763], [712, 803]], open_shawl: [[320, 767], [712, 803]], _: [[300, 895], [725, 895]] };
+  const LABEL_AT = { B: [0, -2.9], E: [1, -2.9], F: [1, 8], K: [0, 8], L1: [1, -1.6], R: [1, 1.7], S: [1, 1.7] };   // [pocket, cm below]
+  function drawLabel(name, zx, zy, Z) {
+    const pos = LABEL_AT[state.opts.brandLabel || 'A']; if (!pos || state.view !== 'open') return;
+    const pk = (INNER_PK[name] || INNER_PK._)[pos[0]], k = PX_PER_CM * Z, cx = (pk[0] - zx) * Z, cy = (pk[1] + pos[1] * PX_PER_CM - zy) * Z;
+    const w = 5 * k, h = 1.6 * k;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(pos[0] ? 0.03 : -0.02);
+    ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 1.5 * Z; ctx.shadowOffsetY = 0.6 * Z;
+    ctx.fillStyle = '#1f2533'; ctx.fillRect(-w / 2, -h / 2, w, h);                                     // woven label
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 0.5 * Z;
+    for (let y = -h / 2 + Z; y < h / 2; y += 1.2 * Z) { ctx.beginPath(); ctx.moveTo(-w / 2, y); ctx.lineTo(w / 2, y); ctx.stroke(); }
+    ctx.fillStyle = '#c9a85a'; ctx.font = `600 ${Math.max(6, 0.62 * k)}px Georgia, serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('MAGNOLIA BESPOKE', 0, 0.5 * Z, w * 0.9);
+    ctx.setLineDash(state.opts.brandLabel === 'S' ? [1.2 * Z, 1.6 * Z] : [2.2 * Z, 1 * Z]);           // stitched on (hand-made: spaced stitches)
+    ctx.strokeStyle = 'rgba(200,190,170,0.55)'; ctx.lineWidth = 0.6 * Z; ctx.strokeRect(-w / 2 + 1.2 * Z, -h / 2 + 1.2 * Z, w - 2.4 * Z, h - 2.4 * Z);
+    ctx.restore();
+  }
+
+  // ---------- jetted pockets with a button tab (lower pocket code 2): a pointed tab of the cloth hangs from the jet ----------
+  // Jet centres on the pocket photos (front: left, right; three-quarter: far, near), moved like the pockets themselves.
+  const JET_AT = { front: [[287, 997], [725, 991]], three4: [[268, 992], [577, 987]] };
+  function drawTabs(st, zx, zy, Z) {
+    if ((state.opts.lowerPocket || 'B') !== '2' || !JET_AT[state.view]) return;
+    const off = st.meta.pk || [0, 0, 0], split = state.view === 'front' ? 521 : 454, sx = styleOf().db ? 14 : 0;
+    const bi = state.button && btnImgs[state.button + '|' + (state.thread.button || '')];
+    for (const [jx, jy] of JET_AT[state.view]) {
+      const left = jx < split, x0 = jx + (left ? off[0] : (off[2] ?? off[0])) + (state.view === 'front' && sx ? (left ? -sx : sx) : 0), y0 = jy + off[1];
+      const s = state.view === 'three4' && left ? 0.55 : 1;                // the far pocket is seen edge-on
+      const w = 2.6 * PX_PER_CM * s, l = 3.3 * PX_PER_CM, X = (x0 - zx) * Z, Y = (y0 - zy) * Z, hw = w / 2 * Z, L = l * Z;
+      const path = () => { ctx.beginPath(); ctx.moveTo(X - hw, Y); ctx.lineTo(X + hw, Y); ctx.lineTo(X + hw, Y + L * 0.72); ctx.lineTo(X, Y + L); ctx.lineTo(X - hw, Y + L * 0.72); ctx.closePath(); };
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 2.5 * Z; ctx.shadowOffsetY = 1.2 * Z; path(); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fill();
+      ctx.shadowColor = 'transparent'; path(); ctx.clip();
+      ctx.drawImage(cv, X - hw, Y + L * 1.3, 2 * hw, L * 1.05, X - hw, Y, 2 * hw, L * 1.05);    // the same cloth, from just below
+      const g = ctx.createLinearGradient(X - hw, Y, X + hw, Y + L); g.addColorStop(0, 'rgba(255,255,255,0.08)'); g.addColorStop(1, 'rgba(0,0,0,0.12)');
+      ctx.fillStyle = g; ctx.fillRect(X - hw, Y, 2 * hw, L);
+      ctx.restore();
+      ctx.save(); path(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.1 * Z; ctx.stroke();
+      ctx.setLineDash([1.6 * Z, 1.4 * Z]); ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.7 * Z;   // edge stitching
+      ctx.beginPath(); ctx.moveTo(X - hw + 2.5 * Z, Y + 2 * Z); ctx.lineTo(X - hw + 2.5 * Z, Y + L * 0.7); ctx.lineTo(X, Y + L - 3 * Z); ctx.lineTo(X + hw - 2.5 * Z, Y + L * 0.7); ctx.lineTo(X + hw - 2.5 * Z, Y + 2 * Z); ctx.stroke();
+      ctx.restore();
+      const R = 0.75 * PX_PER_CM * Z * Math.max(s, 0.7), bx = X, by = Y + L * 0.62;                     // the button
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 2 * Z; ctx.shadowOffsetY = 0.8 * Z;
+      if (bi) { ctx.beginPath(); ctx.arc(bx, by, R, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(bi, bx - R, by - R, 2 * R, 2 * R); }
+      else {
+        const gr = ctx.createRadialGradient(bx - R * 0.3, by - R * 0.3, R * 0.1, bx, by, R); gr.addColorStop(0, '#5a5856'); gr.addColorStop(1, '#1d1c1b');
+        ctx.beginPath(); ctx.arc(bx, by, R, 0, Math.PI * 2); ctx.fillStyle = gr; ctx.fill();
+        ctx.shadowColor = 'transparent'; ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.beginPath(); ctx.arc(bx + a * R * 0.28, by + b * R * 0.28, R * 0.12, 0, Math.PI * 2); ctx.fill(); }
+      }
+      ctx.restore();
+    }
   }
 
   // ---------- sleeve buttons (side and three-quarter views) ----------
@@ -692,15 +784,61 @@
     P19: ['front', 572, 560, -77], P20: ['front', 452, 560, 77] };
   // the closest web font to each factory font (the embroidery itself uses the factory's own font)
   const MONO_FONT = { 'Bank Gothic': 'Michroma', 'Bank Gothic Light BT': 'Michroma', 'Arial Black': 'Archivo Black', Arial: 'Arimo',
-    Bradley: 'Caveat', Constantia: 'Crimson Text', 'Monotype Corsiva': 'Italianno', 'Viner Hand ITC': 'Kalam', 'Harlow Solid Italic': 'Lobster',
-    'Lucida Handwriting': 'Dancing Script', Mistral: 'Marck Script', 'Kunstler Script': 'Great Vibes', 'Comic Book': 'Bangers',
-    Gradl: 'Poiret One', 'Lucida Calligraphy': 'Parisienne', 'Old English Text': 'UnifrakturMaguntia', 'Script MT Bold': 'Yesteryear', 'Times New Roman': 'Tinos' };
+    Bradley: 'Caveat', Constantia: 'Crimson Text', 'Monotype Corsiva': 'Cormorant Garamond', 'Viner Hand ITC': 'Kalam', 'Harlow Solid Italic': 'Lobster',
+    'Lucida Handwriting': 'Merienda', Mistral: 'Marck Script', 'Kunstler Script': 'Great Vibes', 'Comic Book': 'Bangers',
+    Gradl: 'Poiret One', 'Lucida Calligraphy': 'Fondamento', 'Old English Text': 'UnifrakturMaguntia', 'Script MT Bold': 'Yesteryear', 'Times New Roman': 'Tinos' };
+  // italic faces: Corsiva is a chancery italic, Lucida Calligraphy a slanted broad-pen hand (the free face is upright: slanted here)
+  const MONO_STYLE = { 'Monotype Corsiva': { style: 'italic', weight: 600 }, 'Lucida Calligraphy': { skew: -0.2 }, 'Lucida Handwriting': { weight: 500 } };
   const monoFamily = m => MONO_FONT[((MONO.fonts.find(f => f.id === m.font) || {}).name)] || 'Tinos';
+  const monoStyle = m => MONO_STYLE[((MONO.fonts.find(f => f.id === m.font) || {}).name)] || {};
+  const monoFont = (m, px) => { const st = monoStyle(m); return `${st.style || ''} ${st.weight || ''} ${Math.round(px)}px "${monoFamily(m)}", serif`.trim(); };
+  // Embroidery: the shape (letters or symbol) filled with the thread, in satin stitches (fine parallel thread lines across
+  // the strokes), its edges raised (light on the upper-left edge, shade on the lower-right) and a soft shadow on the
+  // cloth. Drawn at 3x and shrunk, so the stitches stay fine.
+  function stitched(paintMask, w, h, rgb) {
+    const S = 3, CW = Math.ceil(w * S) + 16, CH = Math.ceil(h * S) + 16;
+    const mk = () => { const c = document.createElement('canvas'); c.width = CW; c.height = CH; return [c, c.getContext('2d')]; };
+    const [M, mx] = mk(); mx.translate(CW / 2, CH / 2); mx.scale(S, S); mx.fillStyle = '#fff'; mx.strokeStyle = '#fff'; paintMask(mx);
+    const [T, tx] = mk();
+    tx.fillStyle = `rgb(${rgb})`; tx.fillRect(0, 0, CW, CH);
+    tx.save(); tx.translate(CW / 2, CH / 2); tx.rotate(0.5);
+    const R = CW + CH, P = Math.max(3, CH / 22);    // thread lines: fine, but visible at the size shown
+    for (let x = -R; x < R; x += P) {
+      tx.fillStyle = 'rgba(255,255,255,0.2)'; tx.fillRect(x, -R, P * 0.4, 2 * R);
+      tx.fillStyle = 'rgba(0,0,0,0.24)'; tx.fillRect(x + P * 0.55, -R, P * 0.3, 2 * R);
+    }
+    tx.restore();
+    tx.globalCompositeOperation = 'destination-in'; tx.drawImage(M, 0, 0);
+    const [I, ix] = mk(); ix.fillStyle = '#fff'; ix.fillRect(0, 0, CW, CH); ix.globalCompositeOperation = 'destination-out'; ix.drawImage(M, 0, 0);
+    const tint = col => { const [c, x] = mk(); x.drawImage(I, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = col; x.fillRect(0, 0, CW, CH); return c; };
+    const Dk = tint('rgba(0,0,0,0.22)'), Lt = tint('rgba(255,255,255,0.2)');
+    tx.globalCompositeOperation = 'source-atop';
+    for (const k of [1, 2, 3, 4]) tx.drawImage(Dk, -k, -k);     // the outside, moved up-left, shades the letters' lower-right edges
+    for (const k of [1, 2, 3]) tx.drawImage(Lt, k, k);          // and moved down-right, lights their upper-left edges
+    return { c: T, w: CW / S, h: CH / S };
+  }
+  function drawStitched(m, rgb, cap, Z, maxW) {      // at the current origin (ctx already moved and turned)
+    let st;
+    if (m.type === 'word' && m.text) {
+      const x = document.createElement('canvas').getContext('2d'); let px = cap / 0.7; x.font = monoFont(m, px);
+      let tw = x.measureText(m.text).width; if (maxW && tw > maxW) { px *= maxW / tw; x.font = monoFont(m, px); tw = x.measureText(m.text).width; }
+      const sk = monoStyle(m).skew || 0;
+      st = stitched(c => { c.font = monoFont(m, px); c.textAlign = 'center'; c.textBaseline = 'middle'; if (sk) c.transform(1, 0, sk, 1, 0, 0); c.fillText(m.text, 0, 0); },
+        tw + px * (0.4 + Math.abs(sk)), px * 1.5, rgb);
+    } else if (m.type === 'gallery' && monoImgs[m.gal]) {
+      const im = monoImgs[m.gal], h = cap, w = h * im.width / im.height, mask = monoTint(im, [255, 255, 255]);
+      st = stitched(c => c.drawImage(mask, -w / 2, -h / 2, w, h), w + 4, h + 4, rgb);
+    }
+    if (!st) return;
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 1.6 * Z; ctx.shadowOffsetX = 0.3 * Z; ctx.shadowOffsetY = 0.7 * Z;
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(st.c, -st.w / 2, -st.h / 2, st.w, st.h); ctx.restore();
+  }
   const monoImgs = {};
   async function monoReady() {                     // fonts and symbol pictures used by the monograms on the current view
     for (const m of state.monos) {
       const pos = MONO_POS[m.pos]; if (!pos || (pos[0] !== state.view && !(state.melton && pos[0] === 'melton'))) continue;
-      if (m.type === 'word' && m.text) try { await document.fonts.load(`40px "${monoFamily(m)}"`, m.text); } catch (e) { /* fallback font */ }
+      if (m.type === 'word' && m.text) try { await document.fonts.load(monoFont(m, 40), m.text); } catch (e) { /* fallback font */ }
       if (m.type === 'gallery' && m.gal && !monoImgs[m.gal]) {
         const g = MONO.gallery.find(x => x.id === m.gal);
         if (g) try { monoImgs[m.gal] = await loadImg(`mono/${g.img}?v=${VER}`); } catch (e) { /* no picture */ }
@@ -726,15 +864,7 @@
       const mm = parseFloat(((m.type === 'gallery' ? MONO.gHeights : MONO.heights).find(h => h.id === (m.type === 'gallery' ? m.gheight : m.height)) || {}).name) || (m.type === 'gallery' ? 20 : 10);
       const capPx = mm / 10 * PX_PER_CM * Z, x = (pos[1] - zx) * Z, y = (pos[2] - zy) * Z;
       ctx.save(); ctx.translate(x, y); ctx.rotate(pos[3] * Math.PI / 180);
-      if (m.type === 'word' && m.text) {
-        ctx.font = `${Math.round(capPx / 0.7)}px "${monoFamily(m)}", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = Z; ctx.shadowOffsetY = Z * 0.6;     // raised stitches
-        ctx.fillStyle = `rgb(${rgb})`; ctx.fillText(m.text, 0, 0);
-      } else if (m.type === 'gallery' && monoImgs[m.gal]) {
-        const im = monoImgs[m.gal], h = capPx, w = h * im.width / im.height;
-        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = Z; ctx.shadowOffsetY = Z * 0.5;
-        ctx.drawImage(monoTint(im, rgb), -w / 2, -h / 2, w, h);
-      }
+      drawStitched(m, rgb, capPx, Z);
       ctx.restore();
     }
   }
@@ -786,15 +916,7 @@
       const t = m.colour && THREADS.find(x => x.id === m.colour), rgb = t ? t.rgb : [200, 170, 90];
       const mm = parseFloat(((m.type === 'gallery' ? MONO.gHeights : MONO.heights).find(h => h.id === (m.type === 'gallery' ? m.gheight : m.height)) || {}).name) || (m.type === 'gallery' ? 20 : 10);
       const cap = mm / 10 * k, x = W / 2, y = seamY(x) - 1.5 * k;
-      ctx.save(); ctx.translate(x, y); ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;
-      if (m.type === 'word' && m.text) {
-        ctx.font = `${Math.round(cap / 0.7)}px "${monoFamily(m)}", serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        while (ctx.measureText(m.text).width > W * 0.9 && cap > 8) { ctx.font = ctx.font.replace(/^\d+/, d => Math.round(d * 0.9)); }
-        ctx.fillStyle = `rgb(${rgb})`; ctx.fillText(m.text, 0, 0);
-      } else if (m.type === 'gallery' && monoImgs[m.gal]) {
-        const im = monoImgs[m.gal], w = cap * im.width / im.height; ctx.drawImage(monoTint(im, rgb), -w / 2, -cap / 2, w, cap);
-      }
-      ctx.restore();
+      ctx.save(); ctx.translate(x, y); drawStitched(m, rgb, cap, 2.5, W * 0.9); ctx.restore();
     }
     ctx.shadowColor = 'transparent'; ctx.font = '600 38px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#333';
     ctx.fillText('Melton collar (collar turned up)', W / 2, 300);
@@ -826,15 +948,56 @@
     const m = [0, 0, 0]; for (let i = 0; i < T.length; i += 3) { m[0] += T[i]; m[1] += T[i + 1]; m[2] += T[i + 2]; }
     return m.map(v => Math.min(1, v / (T.length / 3) * 1.6));    // tone on tone: a lighter shade of the cloth
   }
-  function liningPass(st, O, zx, zy, Z) {
+  // Facing (the cloth band inside the front edge): the photos show facing 4 (straight). Other facings take more of
+  // the inside in cloth, following the factory's sketches; width added to the photo's facing, in cm, by height
+  // (p = the inner breast pocket's height, top = the lining's top, hem = its bottom).
+  const FACING = {
+    A: (y, p, top, hem) => y < p ? 7 : y < p + 200 ? 7 * (1 - (y - p) / 200) ** 2 : 0,                     // facing 5: curves out to the armhole
+    C: (y, p) => Math.max(0, 3.6 * (1 - Math.abs(y - p) / 95)),                                            // sword: a point round the pocket
+    DGG: (y, p, top, hem) => y < p + 40 ? 13 : y < p + 260 ? 13 * (1 - (y - p - 40) / 220) : 0,           // facing 9: the upper front in cloth
+    E: () => 1.5,                                                                                          // facing 2: a wider straight facing
+    US66: (y, p) => Math.abs(y - p) < 28 ? 1 : 4.5                                                         // facing 7: wide, the lining round the pocket
+  };
+  function facingMask(st) {
+    const code = state.opts.facing || 'B', f = FACING[code]; if (!f || !st.LN) return null;
+    st.facing = st.facing || {}; if (st.facing[code]) return st.facing[code];
+    const L = st.LN, M = new Uint8Array(W * H), pk = INNER_PK[st.name] || INNER_PK._;
+    for (const side of [0, 1]) {
+      let top = -1, hem = -1;
+      for (let y = 0; y < H; y++) for (let x = side ? 512 : 0; x < (side ? W : 512); x += 3) if (L[(y * W + x) * 4 + 3] > 128) { if (top < 0) top = y; hem = y; break; }
+      if (top < 0) continue;
+      for (let y = top; y <= hem; y++) {
+        const add = f(y, pk[side][1], top, hem) * PX_PER_CM; if (add < 0.5) continue;
+        let xe = -1;                                 // the lining's outer edge in this row (towards the front edge)
+        if (!side) { for (let x = 0; x < 512; x++) if (L[(y * W + x) * 4 + 3] > 128) { xe = x; break; } }
+        else { for (let x = W - 1; x >= 512; x--) if (L[(y * W + x) * 4 + 3] > 128) { xe = x; break; } }
+        if (xe < 0) continue;
+        for (let k = 0; k < add + 3; k++) {
+          const x = side ? xe - k : xe + k; if (x < 0 || x >= W) break;
+          const i = y * W + x; if (L[i * 4 + 3] < 30) continue;
+          M[i] = k < add ? 1 : 2;                    // 1 = cloth now, 2 = the seam where the lining starts
+        }
+      }
+    }
+    return (st.facing[code] = M);
+  }
+  function liningPass(st, O, zx, zy, Z, tile) {
     const L = st.LN, flat = liningColour(), tex = flat ? null : linTex[state.lining + '@' + Z];
     if (!flat && !tex) return;                     // printed swatch still loading: render() loads it first
+    const FM = facingMask(st), T = tile && tile.T, N = tile && tile.n;
     for (let oy = 0, p = 0; oy < H; oy++) {
       const my = Math.min(H - 1, (zy + oy / Z) | 0);
       for (let ox = 0; ox < W; ox++, p += 4) {
         const mx = Math.min(W - 1, (zx + ox / Z) | 0), q = (my * W + mx) * 4, a = L[q + 3] / 255;
         if (!a) continue;
-        const sh = L[q] / 128;
+        let sh = L[q] / 128;
+        const fm = FM ? FM[my * W + mx] : 0;
+        if (fm === 1 && T) {                        // facing: the cloth, in the lining's folds
+          const u = Math.floor(zx * Z + ox) % N, v = Math.floor(zy * Z + oy) % N, k = (v * N + u) * 3;
+          for (let ch = 0; ch < 3; ch++) { let lin = T[k + ch] * sh * 0.92; if (lin > 2) lin = 2; O[p + ch] = O[p + ch] * (1 - a) + TONE[(lin * OUTN) | 0] * a; }
+          continue;
+        }
+        if (fm === 2) sh *= 0.55;                   // the facing seam
         let c = flat;
         if (!c) {                                   // straight repeat: the tile is seamless
           const u = Math.floor(zx * Z + ox) % tex.w, v = Math.floor(zy * Z + oy) % tex.h;
@@ -915,12 +1078,14 @@
   async function render() {
     const my = ++ticket, m = mapName();
     busy.hidden = false; busy.textContent = 'Updating…';
-    $('#angleNote').hidden = !m.note; $('#angleNote').textContent = m.note || '';
+    const allNote = m.note ? m.note.all : '';
+    $('#angleNote').hidden = !allNote; $('#angleNote').textContent = allNote;
     $$('.pic-note').forEach(e => e.remove());
-    const ls = m.note && state.lastStep && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
-    if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(m.note)}</p>`);
+    const stepNote = m.note && state.lastStep ? m.note.by(state.lastStep) : '';
+    const ls = stepNote && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
+    if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(stepNote)}</p>`);
     try {
-      const st = cuffView(await loadView(m.name, m.pk, m.ck, m.lw));
+      const st = cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
         if (g && g.L && g.R && (pos === 'D' || pos === 'E')) state.zoom = zoomBox((g.L.x + g.R.x) / 2, (g.L.y + g.R.y) / 2 + 80, 1.6);   // both lapels
@@ -941,12 +1106,10 @@
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
-        // phones: the small floating copy always shows the whole jacket, even while the big one is zoomed on a detail
-        if (state.zoom && innerWidth <= 900) { draw(st); paintMini(); }
         if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy, state.zoom.z); else draw(st);
         if (state.diagram && state.view === 'front' && !state.zoom) drawConstruction(st, state.diagram);
-        if (!(state.zoom && innerWidth <= 900)) paintMini();
-        if (state.melton && state.view === 'back' && !state.zoom) drawMelton();
+        paintMini();                                  // the small copy shows exactly what the big picture shows, zoom included
+        if (state.melton && state.view === 'back' && !state.zoom) { drawMelton(); paintMini(); }
         $('#stage').classList.toggle('zoom', !!state.zoom);
         $('#zoomHint').textContent = state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
         if (my === ticket) busy.hidden = true;
@@ -1220,7 +1383,7 @@
     lapelHole: ['front', 'lapelhole'], collarBack: ['back', 512, 330, 2], chestPocket: ['front', 690, 610, 2.2], lowerPocket: ['front', 300, 1000, 2],
     ticket: ['front', 290, 960, 2.6], namecard: ['open', 512, 940, 1.7], vent: ['back', 512, 1220, 1.7], cuffButtons: SLEEVE, kissing: SLEEVE, sleeveHoleDir: SLEEVE,
     pick: ['front', 420, 560, 1.7], shoulder: ['front', 330, 520, 1.7], canvas: ['front'],
-    facing: ['open'], liningStyle: ['open'], brandLabel: ['open'] };
+    facing: ['open'], liningStyle: ['open'], brandLabel: ['open', 512, 880, 1.7] };
   function showPart(id) {
     const s = SHOW[id]; if (!s) return;
     state.view = s[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === s[0]));
