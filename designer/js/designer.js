@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '47';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '48';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -182,7 +182,7 @@
       const card = { A: 'open_card_l', B: 'open_card_r', C: 'open_card_both' }[state.opts.namecard || 'D'];
       if (!name && s.db) name = 'open_db';
       if (!name && card) name = card;
-      if (!name) { name = s.lapel === 'shawl' ? 'open_shawl' : 'open_notch'; if (s.lapel === 'peak') miss.push(['peak lapel', ['lapel']]); }
+      if (!name) name = s.lapel === 'shawl' ? 'open_shawl' : s.lapel === 'peak' ? 'open_peak' : 'open_notch';
       if (['F'].includes(state.opts.facing)) miss.push(['the slanted inner pockets of this facing', ['facing']]);
       return { name, note: say() };
     }
@@ -779,9 +779,10 @@
   // Where each factory position sits on our photos: [view, x, y, angle in degrees]. Left/right = the wearer's.
   const MONO_POS = { P01: ['front', 695, 572, 0], P02: ['front', 695, 610, 0], P03: ['front', 695, 606, 0], P04: ['open', 708, 968, 0],
     P05: ['front', 610, 440, -20], P06: ['open', 740, 772, 0], P07: ['open', 285, 748, 0], P08: ['front', 695, 652, 0],
-    P09: ['open', 708, 862, 0], P10: ['open', 315, 840, 0], P11: ['open', 315, 840, 0], P12: ['open', 315, 840, 0], P13: ['open', 315, 840, 0],
+    P09: ['open', 712, 890, 0], P10: ['open', 312, 852, 0], P11: ['open', 312, 852, 0], P12: ['open', 312, 852, 0], P13: ['open', 312, 852, 0],
     P14: ['melton', 512, 0, 0], P15: ['open', 710, 772, 0], P16: ['open', 315, 748, 0], P17: ['open', 690, 1150, 0], P18: ['open', 335, 1150, 0],
     P19: ['front', 572, 560, -77], P20: ['front', 452, 560, 77] };
+  const MONO_SWATCH = { P09: 'cloth', P10: 'cloth', P11: [92, 64, 46], P12: [28, 28, 30], P13: [38, 58, 118] };
   // the closest web font to each factory font (the embroidery itself uses the factory's own font)
   const MONO_FONT = { 'Bank Gothic': 'Michroma', 'Bank Gothic Light BT': 'Michroma', 'Arial Black': 'Archivo Black', Arial: 'Arimo',
     Bradley: 'Caveat', Constantia: 'Crimson Text', 'Monotype Corsiva': 'Cormorant Garamond', 'Viner Hand ITC': 'Kalam', 'Harlow Solid Italic': 'Lobster',
@@ -862,11 +863,28 @@
       const t = m.colour && THREADS.find(x => x.id === m.colour);
       const rgb = t ? t.rgb : matchThread();          // "Match the cloth": tone on tone
       const mm = parseFloat(((m.type === 'gallery' ? MONO.gHeights : MONO.heights).find(h => h.id === (m.type === 'gallery' ? m.gheight : m.height)) || {}).name) || (m.type === 'gallery' ? 20 : 10);
-      const capPx = mm / 10 * PX_PER_CM * Z, x = (pos[1] - zx) * Z, y = (pos[2] - zy) * Z;
+      const [px, py] = monoXY(pos, state.mapName);
+      const capPx = mm / 10 * PX_PER_CM * Z, x = (px - zx) * Z, y = (py - zy) * Z;
       ctx.save(); ctx.translate(x, y); ctx.rotate(pos[3] * Math.PI / 180);
+      const sw = MONO_SWATCH[m.pos];
+      if (sw) {                                       // the monogram sits on a sewn-in swatch: the cloth, or brown / black / blue
+        const c = sw === 'cloth' ? clothRGB() : sw, h = 8 * PX_PER_CM * Z * 0.62;   // 8 cm, seen at the inside's angle
+        ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 2 * Z; ctx.shadowOffsetY = Z;
+        ctx.fillStyle = `rgb(${c})`; ctx.fillRect(-h / 2, -h / 2, h, h); ctx.restore();
+        ctx.save(); ctx.setLineDash([2 * Z, 1.5 * Z]); ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 0.7 * Z;
+        ctx.strokeRect(-h / 2 + 2.5 * Z, -h / 2 + 2.5 * Z, h - 5 * Z, h - 5 * Z); ctx.restore();
+      }
       drawStitched(m, rgb, capPx, Z);
       ctx.restore();
     }
+  }
+  function monoXY(pos, name) {                    // inside positions follow the inner pockets of the photo shown (set on the notch photo)
+    let x = pos[1], y = pos[2];
+    if (pos[0] === 'open' && name && name !== 'open_notch') {
+      const side = x > 512 ? 1 : 0, a = INNER_PK.open_notch[side], b = (INNER_PK[name] || INNER_PK._)[side];
+      x += b[0] - a[0]; y += b[1] - a[1];
+    }
+    return [x, y];
   }
   function showMono() {                            // after a monogram choice: go to its position, close up
     const m = cm(), pos = m && MONO_POS[m.pos]; state.melton = !!pos && pos[0] === 'melton';
@@ -875,7 +893,8 @@
       state.view = 'back'; state.zoom = null; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'back')); render(); return;
     }
     state.view = pos[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === pos[0]));
-    state.zoom = zoomBox(pos[1], pos[2], 2.2); render();
+    const [x, y] = monoXY(pos, mapName().name);
+    state.zoom = zoomBox(x, y, 2.2); render();
   }
 
   // Positions on the under collar: the melton is only seen with the collar turned up, so draw that part close up
@@ -1078,7 +1097,7 @@
 
   let ticket = 0;
   async function render() {
-    const my = ++ticket, m = mapName();
+    const my = ++ticket, m = mapName(); state.mapName = m.name;
     busy.hidden = false; busy.textContent = 'Updating…';
     const allNote = m.note ? m.note.all : '';
     $('#angleNote').hidden = !allNote; $('#angleNote').textContent = allNote;
@@ -1128,8 +1147,8 @@
     if (!c) return 'unknown';
     if (/^100% wool$/.test(c)) return 'wool';
     if (c.includes('cashmere')) return 'cashmere';
-    if (c.includes('silk') && c.includes('wool')) return 'silk';
-    const w = c.match(/([\d.]+)% wool/);
+    const w = c.match(/([\d.]+)% wool/), pes = c.match(/([\d.]+)% polyester/);
+    if (c.includes('silk') && w && parseFloat(w[1]) >= 50 && !(pes && parseFloat(pes[1]) >= 10)) return 'silk';
     return w && parseFloat(w[1]) >= 50 ? 'blend' : 'other';
   }
   function weightOf(f) { return !f.weight ? 'unknown' : f.weight < 270 ? 'light' : f.weight <= 320 ? 'mid' : 'heavy'; }
@@ -1165,7 +1184,7 @@
     if (state.custom) { el.innerHTML = '<div><b>Your uploaded swatch</b><small>Only on this screen, not saved.</small></div>'; return; }
     const f = state.fabric; if (!f) return;
     const s = STAFF && STAFF[f.id];
-    el.innerHTML = `<button type="button" class="sw-open" title="See the swatch photo"><img src="thumbs/${f.id}.jpg?v=${VER}" alt="Swatch"></button><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? '<span class="tag">Italian cloth</span>' : ''}</b>
+    el.innerHTML = `<button type="button" class="sw-open" title="See the swatch photo"><img src="thumbs/${f.id}.jpg?v=${VER}" alt="Swatch"></button><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? ' <span class="tag">Italian cloth</span>' : ''}</b>
       <small>${f.composition ? esc(f.composition) : 'Composition to follow'}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : 'Suit cloth'} · ${SEASONS[f.season] || ''}</small>
       <button type="button" class="sw-link">See the real swatch photo</button>
       ${s ? `<small class="staffline">Factory code ${esc(s.code)} · ${s.band ? `Band ${esc(s.band)}` : (s.usd ? `Cost $${esc(s.usd)}/m (band not set yet)` : 'Band not set yet')}${s.origin ? ` · ${esc(s.origin)}` : ''} · ${esc(s.book || '')}</small>` : ''}</div>`;
@@ -1188,6 +1207,13 @@
     }
     const bt = btnByCode(state.button), sbt = btnByCode(sleeveBtn()), ln = state.lining;
     const bc = trimCode('buttons', bt && bt.id), sc = trimCode('buttons', sbt && sbt.id);
+    { // where the picture is approximate, the summary says so (the front and the inside views decide it)
+      const v0 = state.view, notes = new Set();
+      for (const v of ['front', 'open']) { state.view = v; const n = mapName().note; if (n && n.all) n.all.split(/(?<=\.)\s+(?=[A-Z])/).forEach(x => notes.add(x)); }
+      state.view = v0;
+      const keep = [...notes].filter(x => /Closest photo|Photo for/.test(x));
+      if (keep.length) rows.push(['About the picture', keep.join(' '), '']);
+    }
     rows.push(['<b>Trims</b>', '', '', true]);
     rows.push(['Front buttons', bt ? `${MAT[bt.mat] || 'Button'}, No. ${parseInt(bt.id.slice(1), 10)}` : 'As pictured (to be chosen)', bc ? bc.code : '']);
     rows.push(['Sleeve buttons', state.sleeveSame ? 'Same as the front' : (sbt ? `${MAT[sbt.mat] || 'Button'}, No. ${parseInt(sbt.id.slice(1), 10)}` : 'As pictured'),
@@ -1326,10 +1352,10 @@
   const sleeveHoles = () => +((choiceOf('cuffButtons') || {}).code || 4) || 4;
   const STYLE_HINT = { vent: 'See it in the Back view.' };
   // every section is a row (current choice + its sketch) that opens into a grid of sketches, like the factory screen
-  const skImg = (img, alt) => img ? `<img src="${img.includes('/') ? img : 'sketch/' + img}?v=${VER}" alt="" loading="lazy" onerror="this.replaceWith(document.createTextNode(''))">` : `<span class="sk-none">${esc(alt || '')}</span>`;
+  const skImg = (img, alt, eager) => img ? `<img src="${img.includes('/') ? img : 'sketch/' + img}?v=${VER}" alt=""${eager ? '' : ' loading="lazy"'} onerror="this.replaceWith(document.createTextNode(''))">` : `<span class="sk-none">${esc(alt || '')}</span>`;
   function stepRow(attr, label, cur, list, hint) {
     const c = list.find(x => x.v === cur) || list[0];
-    return `<div class="step" ${attr}><button type="button" class="step-head"><span class="step-thumb">${c && c.img ? skImg(c.img) : ''}</span>` +
+    return `<div class="step" ${attr}><button type="button" class="step-head"><span class="step-thumb">${c && c.img ? skImg(c.img, '', true) : ''}</span>` +
       `<span class="step-txt"><b>${esc(label)}</b><small>${esc(c ? c.label : '')}</small></span><i class="step-arrow"></i></button>` +
       `<div class="sk-grid" hidden>${list.map(x => `<button type="button" class="sk${x.v === cur ? ' on' : ''}${x.img ? '' : ' txt'}" data-v="${esc(x.v)}">${x.img ? skImg(x.img) : ''}<span>${esc(x.label)}</span></button>`).join('')}</div>` +
       (hint ? `<p class="hint">${hint}</p>` : '') + '</div>';
@@ -1615,7 +1641,7 @@
     }
     if (m.type === 'drawing') {
       html += `<label class="upload">${m.drawing ? `Drawing added: ${esc(m.drawing)} (tap to change)` : 'Upload your drawing or logo'}<input type="file" accept="image/*" id="monoDraw"></label>`;
-      html += `<p class="hint">We will contact you to confirm size and colours before ordering.</p>`;
+      html += `<p class="hint">Your own drawing is not shown on the picture. We will contact you to confirm size, colours and placement before ordering.</p>`;
     }
     if (m.type !== 'drawing') html += `<div class="thread-row"><b>Thread colour</b>${palette(m.colour, 'mono')}</div>`;
     html += row('pos', 'Position', m.pos || '', [{ v: '', label: 'Choose a position' }].concat(M.positions.map(p => ({ v: p.id, label: p.name, img: p.img && 'mono/' + p.img }))));
@@ -1624,7 +1650,7 @@
     html += row(hk, 'Height', m[hk] || '', [{ v: '', label: 'Standard' }].concat(H.map(h => ({ v: h.id, label: h.name, img: h.img && 'mono/' + h.img }))));
     $('#monoBox').innerHTML = html;
   }
-  $('#monoType').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; cm().type = b.dataset.v; paintMono(); paintSummary(); };
+  $('#monoType').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; cm().type = b.dataset.v; paintMono(); paintSummary(); render(); };
   let monoT = 0;
   $('#monoBox').oninput = e => { if (e.target.id !== 'monoText') return; cm().text = e.target.value; $('#monoCount').textContent = `${cm().text.length}/${MONO.maxText}`; paintSummary();
     clearTimeout(monoT); monoT = setTimeout(() => { if (MONO_POS[cm().pos]) render(); }, 350); };
@@ -1655,7 +1681,7 @@
     if (m.type === 'drawing') rows.push(['Own drawing', m.drawing || 'Not uploaded yet', S ? 'Customers Drawings' : '']);
     if (m.type !== 'drawing') {
       const yz = m.colour && STAFF && STAFF._trims ? STAFF._trims.threads[m.colour] : '';
-      rows.push(['Thread colour', m.colour ? threadName(m.colour) : 'To be chosen', S && m.colour ? `${yz} · ${S.groups['Embroidery Color']} ${S.colour[m.colour] || ''}` : '']);
+      rows.push(['Thread colour', m.colour ? threadName(m.colour) : 'Matching the cloth', S && m.colour ? `${yz} · ${S.groups['Embroidery Color']} ${S.colour[m.colour] || ''}` : '']);
     }
     rows.push(['Position', pick(M.positions, m.pos) || 'To be chosen', S && m.pos ? `${S.groups['Embroidery Position']} ${S.position[m.pos]}` : '']);
     const hid = m.type === 'gallery' ? m.gheight : m.height, H = m.type === 'gallery' ? M.gHeights : M.heights;
