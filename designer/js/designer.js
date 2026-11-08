@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '46';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '47';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -860,7 +860,7 @@
     for (const m of state.monos) {
       const pos = MONO_POS[m.pos]; if (!pos || pos[0] !== state.view) continue;
       const t = m.colour && THREADS.find(x => x.id === m.colour);
-      const rgb = t ? t.rgb : [200, 170, 90];        // no colour chosen yet: a gold thread so the position is visible
+      const rgb = t ? t.rgb : matchThread();          // "Match the cloth": tone on tone
       const mm = parseFloat(((m.type === 'gallery' ? MONO.gHeights : MONO.heights).find(h => h.id === (m.type === 'gallery' ? m.gheight : m.height)) || {}).name) || (m.type === 'gallery' ? 20 : 10);
       const capPx = mm / 10 * PX_PER_CM * Z, x = (pos[1] - zx) * Z, y = (pos[2] - zy) * Z;
       ctx.save(); ctx.translate(x, y); ctx.rotate(pos[3] * Math.PI / 180);
@@ -880,6 +880,8 @@
 
   // Positions on the under collar: the melton is only seen with the collar turned up, so draw that part close up
   // (the middle ~24 cm of the collar, about 42 px per cm): the felt piece, its roll line, and the monogram in the stand.
+  // thread matched to the cloth: the cloth's colour a shade lighter, so tone-on-tone embroidery still reads
+  const matchThread = () => clothRGB().map(v => Math.min(255, Math.round(v * 1.18 + 22)));
   function clothRGB() {
     const px = state.fabric && tilePx[state.fabric.id]; if (!px) return [60, 62, 72];
     let r = 0, g = 0, b = 0, n = 0;
@@ -913,7 +915,7 @@
     ctx.beginPath(); for (let x = 0, u = 0; x <= W; x += 9, u ^= 1) { const y = seamY(x) - 10 - u * 9; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
     for (const m of state.monos) {                                                                 // the letters, centred in the stand
       const pos = MONO_POS[m.pos]; if (!pos || pos[0] !== 'melton') continue;
-      const t = m.colour && THREADS.find(x => x.id === m.colour), rgb = t ? t.rgb : [200, 170, 90];
+      const t = m.colour && THREADS.find(x => x.id === m.colour), rgb = t ? t.rgb : matchThread();
       const mm = parseFloat(((m.type === 'gallery' ? MONO.gHeights : MONO.heights).find(h => h.id === (m.type === 'gallery' ? m.gheight : m.height)) || {}).name) || (m.type === 'gallery' ? 20 : 10);
       const cap = mm / 10 * k, x = W / 2, y = seamY(x) - 1.5 * k;
       ctx.save(); ctx.translate(x, y); drawStitched(m, rgb, cap, 2.5, W * 0.9); ctx.restore();
@@ -1108,7 +1110,7 @@
       requestAnimationFrame(() => setTimeout(() => {
         if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy, state.zoom.z); else draw(st);
         if (state.diagram && state.view === 'front' && !state.zoom) drawConstruction(st, state.diagram);
-        paintMini();                                  // the small copy shows exactly what the big picture shows, zoom included
+        paintMini(); popMini();                       // the small copy shows exactly what the big picture shows, zoom included
         if (state.melton && state.view === 'back' && !state.zoom) { drawMelton(); paintMini(); }
         $('#stage').classList.toggle('zoom', !!state.zoom);
         $('#zoomHint').textContent = state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
@@ -1445,7 +1447,17 @@
   // phones: a small copy of the jacket follows the customer down the page while the big picture is out of view
   const onSummary = () => !!document.querySelector('.tabs button.on[data-tab=summary]');
   let stageOff = false;                           // the summary has the big picture on top: no floating copy there
-  const updMini = () => { mini.hidden = !(stageOff && innerWidth <= 900 && !$('#designer').hidden && !onSummary()); };
+  const updMini = () => { mini.hidden = !(stageOff && innerWidth <= 900 && !$('#designer').hidden && !onSummary()); if (mini.hidden) mini.classList.remove('big'); };
+  // the copy shows big for a moment after a change, then shrinks to a small round button in the corner, so it never
+  // sits on the options being chosen; scrolling shrinks it at once
+  let miniT = 0, popAt = 0;
+  function popMini() {
+    if (mini.hidden) return;
+    popAt = Date.now(); mini.classList.add('big'); clearTimeout(miniT); miniT = setTimeout(() => mini.classList.remove('big'), 2600);
+  }
+  addEventListener('scroll', () => {                // the customer scrolling (not the page's own move to the next step)
+    if (mini.classList.contains('big') && Date.now() - popAt > 1500) { clearTimeout(miniT); miniT = setTimeout(() => mini.classList.remove('big'), 300); }
+  }, { passive: true });
   const mini = document.createElement('button'); mini.type = 'button'; mini.className = 'mini'; mini.hidden = true;
   mini.setAttribute('aria-label', 'Back to the jacket picture');
   const miniCv = document.createElement('canvas'); miniCv.width = 240; miniCv.height = 360; mini.appendChild(miniCv); document.body.appendChild(mini);
