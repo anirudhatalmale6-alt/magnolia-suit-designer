@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '45';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '46';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -77,10 +77,10 @@
   }
   // factory pocket / vent codes grouped by the look we have a photo for
   const POCKET = { slant: 'G H I 9 10 23 25Y', hacking: 'O Q R 13 14 24', jet: 'D E F K L N P T U V Y', slantjet: 'J S',
-    patch: '15 233 235 238 BE HMD M S1', jettab: '2', patchflap: '18 234 237 DJ', patchtab: '5 6 7', pleat: '19 20 236' };
+    patch: 'BE S1', roundpatch: '233 235 238 HMD M', slantpatch: '15', jettab: '2', patchflap: '18 234 237 DJ', patchtab: '5 6 7', pleat: '19 20 236' };
   const pocketLook = c => Object.keys(POCKET).find(k => POCKET[k].split(' ').includes(c)) || 'flap';
   const ticketLook = c => c === 'D' ? '' : 'F G H I J'.split(' ').includes(c) ? 'flap' : '25K 25Q EG YK'.split(' ').includes(c) ? 'card' : 'jet';
-  const POCKET_FALLBACK = { jettab: 'jet',  patchflap: 'patch', patchtab: 'patch', pleat: 'patch', slantjet: 'slant', hacking: 'slant' };   // views without that photo
+  const POCKET_FALLBACK = { jettab: 'jet', slantpatch: 'patch', roundpatch: 'patch',  patchflap: 'patch', patchtab: 'patch', pleat: 'patch', slantjet: 'slant', hacking: 'slant' };   // views without that photo
   const CHEST = { round: 'HXD G 233 BE C1', patchflap: '234', pleat: '235', barchetta: '237 238 I', none: 'H', curved: 'D E F J', jetted: 'BC', trapezoid: 'R' };
   const chestLook = c => Object.keys(CHEST).find(k => CHEST[k].split(' ').includes(c)) || 'welt';
   // lapel width, shoulder and pick stitching: photos that show a specific one carry it as a 6th entry {w, sh, pick}
@@ -239,7 +239,7 @@
     if (best.l !== want.lapel) miss.push([`${want.lapel} lapel`, ['lapel', 'front']]);
     else if (!['BK', '20', 'D'].includes(state.opts.lapel || 'BK') && best.e.lap !== state.opts.lapel) miss.push(['this lapel shape', ['lapel']]);
     if (best.f !== want.front) miss.push([((choiceOf('front') || {}).label || 'this front').toLowerCase(), ['front']]);
-    if (best.p !== want.pocket || best.t !== want.ticket || false) miss.push(['these pockets', ['lowerPocket', 'ticket']]);
+    if (best.p !== want.pocket || best.t !== want.ticket || ['BE', 'S1'].includes(state.opts.lowerPocket)) miss.push([['BE', 'S1'].includes(state.opts.lowerPocket) ? 'the pleats on these patch pockets' : 'these pockets', ['lowerPocket', 'ticket']]);
     if (ex.w && best.e.w !== ex.w) miss.push([`${ex.w} lapel`, ['lapelWidth']]);
     if (ex.sh && best.e.sh !== ex.sh) miss.push(['this shoulder', ['shoulder']]);
     return { name: best.name, pk, ck, lw, tk, note: say() };
