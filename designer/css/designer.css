@@ -273,3 +273,20 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
 .tip { margin: 0 0 10px; padding: 9px 12px; border-left: 3px solid var(--teal); background: var(--mist); border-radius: 0 10px 10px 0; font-size: 13px; line-height: 1.45; color: var(--ink); }
 .tip b { font-weight: 600; }
 .pic-note { margin: 6px 4px 2px; padding: 7px 10px; border-radius: 8px; background: #fbf4e6; color: #6b5420; font-size: 12.5px; line-height: 1.4; }
+
+/* floating WhatsApp: full pill on the welcome pages, round icon in the designer (bottom-left, clear of the floating jacket) */
+.wa { position: fixed; right: 16px; bottom: 18px; z-index: 16; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.wa-btn { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 24px 0 18px; border: 0; border-radius: 28px; background: #5fcf6e; color: #fff; font: 500 18px/1 Inter, system-ui, sans-serif; box-shadow: 0 6px 18px rgba(0,0,0,.22); cursor: pointer; }
+.wa-btn svg { width: 30px; height: 30px; fill: #fff; flex: none; }
+.wa-btn:hover { background: #4fc25f; }
+.wa-menu { width: 250px; background: #fff; border-radius: 14px; box-shadow: 0 8px 26px rgba(0,0,0,.22); padding: 12px; }
+.wa-menu[hidden] { display: none; }
+.wa-menu p { margin: 2px 4px 8px; font: 600 14px/1.3 Inter, system-ui, sans-serif; color: #333; }
+.wa-menu a { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; color: #1f2a2a; text-decoration: none; border: 1px solid #e3e8e8; margin-top: 8px; }
+.wa-menu a:hover { background: #f1faf2; border-color: #5fcf6e; }
+.wa-menu b { font: 600 15px/1.2 Inter, system-ui, sans-serif; }
+.wa-menu small { font: 400 13px/1.2 Inter, system-ui, sans-serif; color: #6b7676; }
+body:has(#designer:not([hidden])) .wa { right: auto; left: 12px; bottom: 14px; align-items: flex-start; }
+body:has(#designer:not([hidden])) .wa-btn { width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; }
+body:has(#designer:not([hidden])) .wa-btn span { display: none; }
+@media (max-width: 480px) { .wa-btn { height: 52px; font-size: 16px; padding: 0 20px 0 16px; } .wa-btn svg { width: 26px; height: 26px; } }

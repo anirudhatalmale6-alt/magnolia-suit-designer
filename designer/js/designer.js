@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '49';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '50';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -1872,5 +1872,15 @@
     if (flow && flow.build) { Object.assign(state, flow); startDesigner(); } else showWelcome('home');
     const pw = store.get('mb_staff');
     if (pw) { try { staffOn(await unlock(pw), pw); } catch (e) { store.set('mb_staff', ''); } }
+  })();
+
+  // floating WhatsApp: opens a small card with both numbers; closes on a click outside or Escape
+  (() => {
+    const btn = $('#waBtn'), menu = $('#waMenu');
+    if (!btn) return;
+    const set = open => { menu.hidden = !open; btn.setAttribute('aria-expanded', open); };
+    btn.onclick = e => { e.stopPropagation(); set(menu.hidden); };
+    document.addEventListener('click', e => { if (!menu.hidden && !menu.contains(e.target)) set(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') set(false); });
   })();
 })();
