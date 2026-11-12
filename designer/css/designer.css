@@ -289,4 +289,10 @@ h3 { font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color:
 body:has(#designer:not([hidden])) .wa { right: auto; left: 12px; bottom: 14px; align-items: flex-start; }
 body:has(#designer:not([hidden])) .wa-btn { width: 52px; height: 52px; padding: 0; justify-content: center; border-radius: 50%; }
 body:has(#designer:not([hidden])) .wa-btn span { display: none; }
-@media (max-width: 480px) { .wa-btn { height: 52px; font-size: 16px; padding: 0 20px 0 16px; } .wa-btn svg { width: 26px; height: 26px; } }
+@media (max-width: 600px) {
+  .wa { right: 12px; bottom: 14px; }
+  .wa-btn { height: 42px; gap: 8px; font-size: 14px; padding: 0 16px 0 12px; border-radius: 21px; }
+  .wa-btn svg { width: 22px; height: 22px; }
+  .wa-menu { width: 220px; }
+  body:has(#designer:not([hidden])) .wa-btn { width: 44px; height: 44px; }
+}
