@@ -296,3 +296,8 @@ body:has(#designer:not([hidden])) .wa-btn span { display: none; }
   .wa-menu { width: 220px; }
   body:has(#designer:not([hidden])) .wa-btn { width: 44px; height: 44px; }
 }
+
+/* bekeshe: covered buttons (no button / thread / monogram pickers yet), one cloth book, no suit suggestions */
+.bk-only { display: none; }
+body.bk .bk-only { display: block; }
+body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: none !important; }

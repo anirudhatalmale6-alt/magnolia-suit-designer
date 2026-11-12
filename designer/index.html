@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '51';
+    var V = '52';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -20,7 +20,7 @@
   })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Archivo+Black&family=Arimo&family=Caveat&family=Crimson+Text&family=Cormorant+Garamond:ital,wght@1,600&family=Kalam&family=Merienda:wght@500&family=Fondamento&family=Marck+Script&family=Great+Vibes&family=Bangers&family=Poiret+One&family=UnifrakturMaguntia&family=Yesteryear&family=Tinos&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=51">
+<link rel="stylesheet" href="css/designer.css?v=52">
 </head>
 <body>
 <header class="topbar">
@@ -57,7 +57,7 @@
     <h2>From cloth to finished suit</h2>
     <ol class="w-steps">
       <li><b>Choose how you design</b><span>In person in Jerusalem or Lakewood (by appointment only), or online from home.</span></li>
-      <li><b>Choose what you're building</b><span>A full suit or a jacket. Trousers, bekeshe, coat and shirt are coming.</span></li>
+      <li><b>Choose what you're building</b><span>A full suit, a jacket or a bekeshe. Trousers, coat and shirt are coming.</span></li>
       <li><b>Pick your fabric</b><span>Hundreds of cloths, including Italian. The fabric sets the price.</span></li>
       <li><b>Design every detail</b><span>Front, lapels, pockets, vents, sleeves, stitching, buttons, thread colours, lining and up to two monograms. Every choice has a picture.</span></li>
       <li><b>Measurements</b><span>Taken in person at the shop, or sent from home.</span></li>
@@ -102,7 +102,7 @@
       <button type="button" class="w-card" data-build="suit"><b>Full suit</b><span>Jacket and trousers</span><em class="w-from" data-price="suit"></em></button>
       <button type="button" class="w-card" data-build="jacket"><b>Jacket only</b><span>No trousers</span></button>
       <button type="button" class="w-card soon" data-build="pants" disabled><b>Trousers only</b><span>Not available yet &middot; In progress</span></button>
-      <button type="button" class="w-card soon" data-build="bekeshe" disabled><b>Bekeshe</b><span>Not available yet &middot; In progress</span></button>
+      <button type="button" class="w-card" data-build="bekeshe"><b>Bekeshe</b><span>Front view now, more angles coming</span><em class="w-from">From $450</em></button>
       <button type="button" class="w-card soon" data-build="coat" disabled><b>Coat</b><span>Not available yet &middot; In progress</span></button>
       <button type="button" class="w-card soon" data-build="shirt" disabled><b>Shirt</b><span>Not available yet &middot; In progress</span></button>
     </div>
@@ -151,10 +151,10 @@
           <label>Pattern<select id="fPattern"><option value="">All</option></select></label>
           <label>Cloth<select id="fCloth"><option value="">All</option></select></label>
           <label>Weight<select id="fWeight"><option value="">All</option><option value="light">Light (under 270 g)</option><option value="mid">Medium (270 to 320 g)</option><option value="heavy">Heavy (over 320 g)</option><option value="unknown">Weight to follow</option></select></label>
-          <label>For<select id="fUse"><option value="">Suits and blazers</option><option value="Suit">Suits</option><option value="Blazer">Blazers only</option></select></label>
-          <label>Season<select id="fSeason"><option value="">All seasons</option><option value="26FW">Autumn / Winter</option><option value="26SS">Spring / Summer</option></select></label>
+          <label class="jk-only">For<select id="fUse"><option value="">Suits and blazers</option><option value="Suit">Suits</option><option value="Blazer">Blazers only</option></select></label>
+          <label class="jk-only">Season<select id="fSeason"><option value="">All seasons</option><option value="26FW">Autumn / Winter</option><option value="26SS">Spring / Summer</option></select></label>
         </div>
-        <label class="check"><input type="checkbox" id="fItaly"> Italian cloth only</label>
+        <label class="check jk-only"><input type="checkbox" id="fItaly"> Italian cloth only</label>
       </div>
       <div class="count"><span id="count"></span> <button type="button" class="link" id="clear">Clear filters</button></div>
       <div class="grid" id="grid"></div>
@@ -177,6 +177,8 @@
     </section>
 
     <section class="tab" data-pane="trims" hidden>
+      <p class="tip bk-only">The buttons of a bekeshe are covered in its own cloth, so they always match. Choose the lining below.</p>
+      <div class="jk-only">
       <h3>Front buttons</h3>
       <p class="tip" id="btnTip" hidden></p>
       <div class="chips" id="btnMat"></div>
@@ -187,6 +189,7 @@
 
       <h3 id="hThreads">Thread colours</h3>
       <div id="threadRows"></div>
+      </div>
 
       <h3 id="hLining">Lining</h3>
       <p class="tip" id="linTip" hidden></p>
@@ -194,10 +197,12 @@
       <label class="check"><input type="checkbox" id="sleeveLinSame" checked> Sleeve lining the same as the body</label>
       <div id="sleeveLinBox" hidden><p class="hint">Choose the sleeve lining:</p><div class="grid lin-grid" id="sleeveLinGrid"></div></div>
 
+      <div class="jk-only">
       <h3 id="hMono">Monogram</h3>
       <div class="mono-tabs" id="monoTabs"></div>
       <div class="seg" id="monoType"><button type="button" data-v="" class="on">No monogram</button><button type="button" data-v="word">Letters</button><button type="button" data-v="gallery">Symbol</button><button type="button" data-v="drawing">Own drawing</button></div>
       <div id="monoBox"></div>
+      </div>
 
       <div class="staff-only adv" hidden>
         <h3>Staff only: contrast fabric</h3>
@@ -259,6 +264,6 @@
   </div>
   <button class="wa-btn" id="waBtn" type="button" aria-expanded="false" aria-controls="waMenu" aria-label="WhatsApp: how can I help you?"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg><span>How can I help you?</span></button>
 </div>
-<script src="js/designer.js?v=51"></script>
+<script src="js/designer.js?v=52"></script>
 </body>
 </html>

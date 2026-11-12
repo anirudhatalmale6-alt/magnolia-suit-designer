@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '51';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '52';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -18,7 +18,7 @@
   }
   const COLOURS = { navy: '#1f2a44', black: '#111', charcoal: '#3b3d42', grey: '#7d7f84', 'light grey': '#c4c5c8', blue: '#3c5a8a',
     brown: '#5a3f2c', tan: '#b49a7e', burgundy: '#5c1f2a', red: '#c4545e', green: '#4f5e52', cream: '#ece6da' };
-  const SEASONS = { '26FW': 'Autumn / Winter', '26SS': 'Spring / Summer' };
+  const SEASONS = { '26FW': 'Autumn / Winter', '26SS': 'Spring / Summer', Yikabol: 'Yikabol' };
   const PATTERNS = { solid: 'Plain', textured: 'Textured', herringbone: 'Herringbone', stripe: 'Stripe', check: 'Check', corduroy: 'Corduroy' };
   const CLOTH = { wool: '100% wool', cashmere: 'Wool and cashmere', silk: 'Wool and silk', blend: 'Wool blend', other: 'Other blends', unknown: 'Composition to follow' };
 
@@ -30,7 +30,7 @@
     monos: [], monoSel: 0, fabricPicked: false, reached: 0, mode: '', location: '', build: '',
     remark: '', photos: [null, null, null], body: { front: null, side: null, back: null }, prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
-  let FABRICS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null, SUGG = null, EXTRAS = { opts: {}, lining: {} };
+  let FABRICS = [], JF = [], BKF = [], JOPTS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null, SUGG = null, EXTRAS = { opts: {}, lining: {} };
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
                   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
@@ -64,6 +64,26 @@
     }
     let L = 0; for (let o = 0; o < t.length; o += 3) L += 0.2126 * t[o] + 0.7152 * t[o + 1] + 0.0722 * t[o + 2];
     return { T: t, n, L: L / (n * n) };
+  }
+
+  // ---------- bekeshe: its own cloths (Yikabol book) and choices; one front photo for now ----------
+  const BK_OPTS = [
+    { id: 'bkLapel', label: 'Lapel', section: 'Bekeshe', default: 'peak', show: ['peak', 'shawl'],
+      choices: [{ code: 'peak', label: 'Peak', img: '27.jpg' }, { code: 'shawl', label: 'Shawl', img: '18.jpg' }] },
+    { id: 'bkBelt', label: 'Belt', section: 'Bekeshe', default: 'none', show: ['none', 'belt'],
+      choices: [{ code: 'none', label: 'Without belt' }, { code: 'belt', label: 'With belt (included)' }] }];
+  const BK_SLEEVE = ['cuffButtons', 'kissing', 'sleeveHoleDir'];
+  const isBk = () => state.build === 'bekeshe';
+  function applyBuild() {                          // the garment decides the cloth list, the style choices and the views
+    const bk = isBk();
+    FABRICS = bk ? BKF : JF;
+    OPTS = bk ? BK_OPTS.concat(JOPTS.filter(o => BK_SLEEVE.includes(o.id))) : JOPTS;
+    if (!FABRICS.includes(state.fabric)) state.fabric = bk ? FABRICS[0] : (FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0]);
+    if (bk) { for (const k of Object.keys(state.opts)) if (!OPTS.some(o => o.id === k)) delete state.opts[k]; state.monos = []; state.view = 'front'; state.zoom = null; }
+    $$('#views button').forEach(b => { b.hidden = bk && b.dataset.view !== 'front'; b.classList.toggle('on', b.dataset.view === state.view); });
+    document.body.classList.toggle('bk', bk);
+    if (bk) { Object.assign(filt, { q: '', pattern: '', cloth: '', weight: '', use: '', season: '', italy: false }); filt.colours.clear(); }
+    setupFilters(); paintGrid(); paintStyle(); paintSugg();
   }
 
   // ---------- which photo to show ----------
@@ -158,6 +178,15 @@
   const SIZE_ONLY = { lowerPocket: ['A', 'C', '11', '12', '22', 'SA'], chestPocket: ['A', 'C', 'D', 'E', 'F', 'J'], ticket: ['G', 'H', 'I', 'J'], namecard: ['E', 'F'],
     lapelHoleStyle: ['5', '7', 'Z', '18'] };
   function mapName() {
+    if (isBk()) {                                   // one photo: peak lapel, no belt; the shawl, belt and sleeve photos follow
+      const m = [];
+      if (state.opts.bkLapel === 'shawl') m.push(['the shawl collar', 'bkLapel']);
+      if (state.opts.bkBelt === 'belt') m.push(['the belt', 'bkBelt']);
+      const t = step => { const x = m.filter(y => !step || y[1] === step).map(y => y[0]);
+        return (x.length ? `Closest photo shown. Photo for ${x.join(' + ')} is coming. Your choice is saved for the order.` : '') +
+          (BK_SLEEVE.includes(step) ? 'The sleeve photo is coming; your sleeve choice is saved for the order.' : ''); };
+      return { name: 'bk_front', note: { all: t(null), by: t } };
+    }
     const s = styleOf(), miss = [], hid = t => (state.hid[t] || '');
     const sizes = [];                              // choices that differ only in size: same picture, exact size on the order
     for (const [id, codes] of Object.entries(SIZE_ONLY)) { const c = state.opts[id]; if (c && codes.includes(c)) sizes.push([((choiceOf(id) || {}).label || '').toLowerCase(), [id]]); }
@@ -1153,7 +1182,7 @@
     return w && parseFloat(w[1]) >= 50 ? 'blend' : 'other';
   }
   function weightOf(f) { return !f.weight ? 'unknown' : f.weight < 270 ? 'light' : f.weight <= 320 ? 'mid' : 'heavy'; }
-  const num = f => f.id.replace('MB-', '');
+  const num = f => f.code || f.id.replace('MB-', '');
 
   const filt = { q: '', colours: new Set(), pattern: '', cloth: '', weight: '', use: '', season: '', italy: false };
   function matches(f) {
@@ -1186,7 +1215,7 @@
     const f = state.fabric; if (!f) return;
     const s = STAFF && STAFF[f.id];
     el.innerHTML = `<button type="button" class="sw-open" title="See the swatch photo"><img src="thumbs/${f.id}.jpg?v=${VER}" alt="Swatch"></button><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? ' <span class="tag">Italian cloth</span>' : ''}</b>
-      <small>${f.composition ? esc(f.composition) : 'Composition to follow'}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : 'Suit cloth'} · ${SEASONS[f.season] || ''}</small>
+      <small>${f.composition ? esc(f.composition) : 'Composition to follow'}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : f.use === 'Bekeshe' ? 'Bekeshe cloth' : 'Suit cloth'} · ${SEASONS[f.season] || ''}</small>
       <button type="button" class="sw-link">See the real swatch photo</button>
       ${s ? `<small class="staffline">Factory code ${esc(s.code)} · ${s.band ? `Band ${esc(s.band)}` : (s.usd ? `Cost $${esc(s.usd)}/m (band not set yet)` : 'Band not set yet')}${s.origin ? ` · ${esc(s.origin)}` : ''} · ${esc(s.book || '')}</small>` : ''}</div>`;
   }
@@ -1194,7 +1223,7 @@
     const f = state.fabric, s = f && STAFF && STAFF[f.id];
     const rows = [
       ['Design', state.mode === 'online' ? 'Online' : state.mode === 'inperson' ? `In person${state.location ? ', ' + LOCS[state.location] : ''}` : 'Not chosen', ''],
-      ['Building', { suit: 'Full suit (jacket now, trousers coming soon)', jacket: 'Jacket only', pants: 'Trousers only' }[state.build] || 'Jacket', ''],
+      ['Building', { suit: 'Full suit (jacket now, trousers coming soon)', jacket: 'Jacket only', pants: 'Trousers only', bekeshe: 'Bekeshe, $450 (belt included)' }[state.build] || 'Jacket', ''],
       ['Fabric', state.custom ? 'Uploaded swatch' : `No. ${num(f)}, ${f.name}`, s && !state.custom ? `${s.code} · band ${s.band || 'not set yet'}` : ''],
       ['Cloth', state.custom ? '' : `${f.composition || 'Composition to follow'}${f.weight ? `, ${f.weight} g` : ''}`, '']
     ];
@@ -1210,18 +1239,18 @@
     const bc = trimCode('buttons', bt && bt.id), sc = trimCode('buttons', sbt && sbt.id);
     { // where the picture is approximate, the summary says so (the front and the inside views decide it)
       const v0 = state.view, notes = new Set();
-      for (const v of ['front', 'open']) { state.view = v; const n = mapName().note; if (n && n.all) n.all.split(/(?<=\.)\s+(?=[A-Z])/).forEach(x => notes.add(x)); }
+      for (const v of isBk() ? ['front'] : ['front', 'open']) { state.view = v; const n = mapName().note; if (n && n.all) n.all.split(/(?<=\.)\s+(?=[A-Z])/).forEach(x => notes.add(x)); }
       state.view = v0;
       const keep = [...notes].filter(x => /Closest photo|Photo for/.test(x));
       if (keep.length) rows.push(['About the picture', keep.join(' '), '']);
     }
     rows.push(['<b>Trims</b>', '', '', true]);
-    rows.push(['Front buttons', bt ? `${MAT[bt.mat] || 'Button'}, No. ${parseInt(bt.id.slice(1), 10)}` : 'As pictured (to be chosen)', bc ? bc.code : '']);
-    rows.push(['Sleeve buttons', state.sleeveSame ? 'Same as the front' : (sbt ? `${MAT[sbt.mat] || 'Button'}, No. ${parseInt(sbt.id.slice(1), 10)}` : 'As pictured'),
+    if (isBk()) rows.push(['Buttons', 'Covered in the bekeshe cloth', '']);
+    if (!isBk()) rows.push(['Front buttons', bt ? `${MAT[bt.mat] || 'Button'}, No. ${parseInt(bt.id.slice(1), 10)}` : 'As pictured (to be chosen)', bc ? bc.code : '']);
+    if (!isBk()) rows.push(['Sleeve buttons', state.sleeveSame ? 'Same as the front' : (sbt ? `${MAT[sbt.mat] || 'Button'}, No. ${parseInt(sbt.id.slice(1), 10)}` : 'As pictured'),
       sc ? (sc.sleeve || sc.code) : '']);
     const tn = k => state.thread[k] ? threadName(state.thread[k]) : 'Matching the cloth', tc = k => { const yz = trimCode('threads', state.thread[k]); return yz ? `${yz}${STAFF._mono && STAFF._mono.yz[yz] ? ' · ' + STAFF._mono.yz[yz] : ''}` : ''; };
-    rows.push(['Button thread', tn('button'), tc('button')]);
-    rows.push(['Lapel buttonhole', tn('lapel'), tc('lapel')]);
+    if (!isBk()) { rows.push(['Button thread', tn('button'), tc('button')]); rows.push(['Lapel buttonhole', tn('lapel'), tc('lapel')]); }
     const n = sleeveHoles(), sl = state.thread.sleeve.slice(0, n);
     if (STAFF) rows.push(['Front buttonholes', tn('front'), tc('front')]);
     if (STAFF) rows.push(['Sleeve buttonholes', sl.some(Boolean) ? Array.from({ length: n }, (_, i) => `${i + 1}: ${sl[i] ? threadName(sl[i]) + (trimCode('threads', sl[i]) ? ` (${trimCode('threads', sl[i])})` : '') : 'match'}`).join(', ') : 'Matching the cloth', '']);
@@ -1235,7 +1264,7 @@
       G ? `${G.undercollar} ${state.undercollar ? trimCode('contrast', state.undercollar) : G.undercollarMatch}` : '']);
     if (STAFF) rows.push(['Elbow patches', state.elbow ? `${state.elbow === 'A' ? 'Round elbow patch' : 'Round sleeve patch'}, ${contrastName(state.elbowFabric)}` : 'None',
       G && state.elbow ? `${G.elbow} ${state.elbow} · ${G.elbowFabric} ${trimCode('contrast', state.elbowFabric)}` : '']);
-    if (MONO) monoRows(rows);
+    if (MONO && !isBk()) monoRows(rows);
     const ex = extrasList();
     if (ex.length) { rows.push(['<b>Extras</b>', '', '', true]); ex.forEach(([k, v]) => rows.push([k, `+$${v}`, ''])); rows.push(['Extras total', `+$${ex.reduce((a, x) => a + x[1], 0)}`, '']); }
     rows.push(['<b>Remarks</b>', '', '', true]);
@@ -1259,6 +1288,7 @@
     const used = [...new Set(FABRICS.map(f => f.colour))].sort((a, b) => Object.keys(COLOURS).indexOf(a) - Object.keys(COLOURS).indexOf(b));
     $('#colours').innerHTML = used.map(c => `<button type="button" class="chip" data-c="${c}"><i style="background:${COLOURS[c] || '#999'}"></i>${c[0].toUpperCase() + c.slice(1)}</button>`).join('');
     const pats = [...new Set(FABRICS.map(f => f.pattern))];
+    $('#fPattern').innerHTML = '<option value="">All</option>'; $('#fCloth').innerHTML = '<option value="">All</option>';   // rebuilt when the garment changes
     $('#fPattern').insertAdjacentHTML('beforeend', Object.keys(PATTERNS).filter(p => pats.includes(p)).map(p => `<option value="${p}">${PATTERNS[p]}</option>`).join(''));
     const cloths = [...new Set(FABRICS.map(f => f._cloth))];
     $('#fCloth').insertAdjacentHTML('beforeend', Object.keys(CLOTH).filter(c => cloths.includes(c)).map(c => `<option value="${c}">${CLOTH[c]}</option>`).join(''));
@@ -1351,7 +1381,7 @@
   }
   function choiceOf(id) { const o = optOf(id); return o && o.choices.find(c => c.code === (state.opts[id] || o.default)); }
   const sleeveHoles = () => +((choiceOf('cuffButtons') || {}).code || 4) || 4;
-  const STYLE_HINT = { vent: 'See it in the Back view.' };
+  const STYLE_HINT = { vent: 'See it in the Back view.', bkBelt: 'The length is made to your measurements.' };
   // every section is a row (current choice + its sketch) that opens into a grid of sketches, like the factory screen
   const skImg = (img, alt, eager) => img ? `<img src="${img.includes('/') ? img : 'sketch/' + img}?v=${VER}" alt=""${eager ? '' : ' loading="lazy"'} onerror="this.replaceWith(document.createTextNode(''))">` : `<span class="sk-none">${esc(alt || '')}</span>`;
   function stepRow(attr, label, cur, list, hint) {
@@ -1414,6 +1444,10 @@
     pick: ['front', 420, 560, 1.7], shoulder: ['front', 330, 520, 1.7], canvas: ['front'],
     facing: ['open'], liningStyle: ['open'], brandLabel: ['open', 512, 880, 1.7] };
   function showPart(id) {
+    if (isBk()) {                                   // only the front photo: the lapels, or the sleeve end with its covered buttons
+      state.view = 'front'; state.closeup = null; state.zoomAt = null;
+      state.zoom = BK_SLEEVE.includes(id) ? zoomBox(215, 860, 2.2) : id === 'bkLapel' ? zoomBox(512, 420, 1.6) : null; return;
+    }
     const s = SHOW[id]; if (!s) return;
     state.view = s[0]; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === s[0]));
     state.zoomAt = s[1] === 'lapelhole' ? 'lapelhole' : null;
@@ -1730,7 +1764,7 @@
   function startDesigner() {
     $('#welcome').hidden = true; $('#designer').hidden = false; $('#restartBtn').hidden = false;
     store.set('mb_flow', JSON.stringify({ mode: state.mode, location: state.location, build: state.build }));
-    paintProgress(); paintSummary(); render();
+    applyBuild(); paintProgress(); paintSummary(); render();
   }
   $('#welcome').onclick = e => {
     const go = e.target.closest('[data-go]'); if (go) return showWelcome(go.dataset.go);
@@ -1861,11 +1895,13 @@
       const get = async n => (await fetch(`${n}?v=${VER}`)).json();
       try { PK = await get('maps/_pk/index.json'); } catch (e) { PK = {}; }
       try { PKC = await get('maps/_pk/chest.json'); } catch (e) { PKC = {}; }
+      try { BKF = await get('bk_fabrics.json'); } catch (e) { BKF = []; }
       [FABRICS, OPTS, BUTTONS, SLEEVES, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'sleeve_buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
       try { SUGG = await get('suggestions.json'); } catch (e) { SUGG = null; }
       try { EXTRAS = await get('extras.json'); } catch (e) { /* no extra charges listed */ }
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
-    FABRICS.forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
+    JF = FABRICS; JOPTS = OPTS;
+    FABRICS.concat(BKF).forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
     setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); paintSteps(); paintSugg(); paintTips();
     let flow = null; try { flow = JSON.parse(store.get('mb_flow') || 'null'); } catch (e) { flow = null; }
