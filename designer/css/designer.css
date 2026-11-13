@@ -301,3 +301,4 @@ body:has(#designer:not([hidden])) .wa-btn span { display: none; }
 .bk-only { display: none; }
 body.bk .bk-only { display: block; }
 body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: none !important; }
+.prev-note { display: block; margin: 4px 0 2px; color: #6b5420; font-style: italic; }

@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '53';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '54';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -1129,7 +1129,8 @@
   async function render() {
     const my = ++ticket, m = mapName(); state.mapName = m.name;
     busy.hidden = false; busy.textContent = 'Updating…';
-    const allNote = m.note ? m.note.all : '';
+    // a cloth shown from a photo of its swatch with an estimated scale says so on the picture (and on its card)
+    const allNote = [m.note ? m.note.all : '', !state.custom && state.fabric && state.fabric.preview || ''].filter(Boolean).join(' ');
     $('#angleNote').hidden = !allNote; $('#angleNote').textContent = allNote;
     $$('.pic-note').forEach(e => e.remove());
     const stepNote = m.note && state.lastStep ? m.note.by(state.lastStep) : '';
@@ -1216,6 +1217,7 @@
     const s = STAFF && STAFF[f.id];
     el.innerHTML = `<button type="button" class="sw-open" title="See the swatch photo"><img src="thumbs/${f.id}.jpg?v=${VER}" alt="Swatch"></button><div><b>No. ${num(f)} · ${esc(f.name)}${f.italian ? ' <span class="tag">Italian cloth</span>' : ''}</b>
       <small>${f.composition ? esc(f.composition) : 'Composition to follow'}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : f.use === 'Bekeshe' ? 'Bekeshe cloth' : 'Suit cloth'} · ${SEASONS[f.season] || ''}</small>
+      ${f.preview ? `<small class="prev-note">${esc(f.preview)}</small>` : ''}
       <button type="button" class="sw-link">See the real swatch photo</button>
       ${s ? `<small class="staffline">Factory code ${esc(s.code)} · ${s.band ? `Band ${esc(s.band)}` : (s.usd ? `Cost $${esc(s.usd)}/m (band not set yet)` : 'Band not set yet')}${s.origin ? ` · ${esc(s.origin)}` : ''} · ${esc(s.book || '')}</small>` : ''}</div>`;
   }
@@ -1242,6 +1244,7 @@
       for (const v of isBk() ? ['front'] : ['front', 'open']) { state.view = v; const n = mapName().note; if (n && n.all) n.all.split(/(?<=\.)\s+(?=[A-Z])/).forEach(x => notes.add(x)); }
       state.view = v0;
       const keep = [...notes].filter(x => /Closest photo|Photo for/.test(x));
+      if (!state.custom && f && f.preview) keep.push(f.preview);
       if (keep.length) rows.push(['About the picture', keep.join(' '), '']);
     }
     rows.push(['<b>Trims</b>', '', '', true]);

@@ -52,6 +52,20 @@
 "season": "Yikabol"
 },
 {
+"id": "BK-NLF001-9",
+"code": "NLF001-9",
+"name": "Black, tone-on-tone raindrop",
+"colour": "black",
+"pattern": "textured",
+"composition": "57% polyester, 43% wool",
+"weight": 280,
+"use": "Bekeshe",
+"italian": false,
+"tcm": 7.737,
+"season": "Yikabol",
+"preview": "Illustrative preview from a photo of the swatch; pattern scale estimated."
+},
+{
 "id": "BK-NLF002-11",
 "code": "NLF002-11",
 "name": "Black, fine texture",
