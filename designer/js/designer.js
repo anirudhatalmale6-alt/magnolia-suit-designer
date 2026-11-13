@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '54';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '55';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -1594,7 +1594,12 @@
       else state.thread.sleeve = Array.from({ length: 6 }, () => v);
     } else state.thread[key] = v;
     paintThreads();
-    if (key === 'button') { zoomTo(...FRONT_BTN); render(); } else paintSummary();
+    // show where the thread goes, in the new colour: the front buttons, the lapel buttonhole (zoomed once the photo
+    // is loaded), the sleeve holes; then redraw (the lapel and staff-only holes used to update the summary only)
+    if (key === 'button' || key === 'front') zoomTo(...FRONT_BTN);
+    else if (key === 'lapel') showPart('lapelHole');
+    else if (key === 'sleeve') showPart('cuffButtons');
+    render();
     if (key === 'sleeve' && state.holeSel) return;            // picking hole by hole: stay here
     const rows = [...document.querySelectorAll('#threadRows .pal')].map(p => p.closest('.thread-row'));
     const i = rows.findIndex(r => r.querySelector(`[data-t="${key}"]`));
