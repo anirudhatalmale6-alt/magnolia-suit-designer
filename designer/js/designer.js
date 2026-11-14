@@ -1221,6 +1221,7 @@
       <button type="button" class="sw-link">See the real swatch photo</button>
       ${s ? `<small class="staffline">Factory code ${esc(s.code)} · ${s.band ? `Band ${esc(s.band)}` : (s.usd ? `Cost $${esc(s.usd)}/m (band not set yet)` : 'Band not set yet')}${s.origin ? ` · ${esc(s.origin)}` : ''} · ${esc(s.book || '')}</small>` : ''}</div>`;
   }
+  let sumRows = [];                                  // the last summary, for the request form hand-over (no codes)
   function paintSummary() {
     const f = state.fabric, s = f && STAFF && STAFF[f.id];
     const rows = [
@@ -1283,6 +1284,7 @@
         rows.push([h.title, v ? (state.hid[h.title] ? v : `${v} (default)`) : 'Not set', h.group && oc ? `${h.group} ${oc}` : '']);
       }
     }
+    sumRows = rows;
     $('#summary').innerHTML = rows.map(([k, v, code, head]) => head ? `<dt class="sum-h">${k}</dt><dd></dd>` :
       `<dt>${k}</dt><dd>${esc(v || '')}${STAFF && code ? ` <span class="code">${esc(code)}</span>` : ''}</dd>`).join('');
   }
@@ -1730,6 +1732,26 @@
     const hid = m.type === 'gallery' ? m.gheight : m.height, H = m.type === 'gallery' ? M.gHeights : M.heights;
     rows.push(['Height', pick(H, hid) || 'Standard', S && hid ? `${S.groups['Embroidery Height']} ${hid}` : '']);
   }
+
+  // ---------- hand-over to the request form: the design stays in this tab (sessionStorage) and the form opens with
+  // ?request=design (window.MAGNOLIA_REQUEST_URL, default ../request-preview/). Public option choices and the customer's
+  // summary text only (built with staff mode off): no factory codes. The form adds it to the chosen tailor's request.
+  $('#sendToRequest').onclick = () => {
+    try {
+      const keep = STAFF; let rows = [];             // the customer's summary: staff rows and their codes never travel
+      STAFF = null; try { paintSummary(); rows = sumRows; } finally { STAFF = keep; paintSummary(); }
+      const plain = x => String(x || '').replace(/<[^>]*>/g, '').trim();
+      const lines = rows.map(([k, v, , head]) => head ? `\n${plain(k).toUpperCase()}` : `${plain(k)}: ${plain(v)}`);
+      const opts = {}; for (const o of OPTS) if (state.opts[o.id] != null && state.opts[o.id] !== '') opts[o.id] = String(state.opts[o.id]);
+      const photos = [...Object.values(state.body), ...state.photos].filter(Boolean).map(x => x.name);
+      const design = { garment: { jacket: 'Jacket', bekeshe: 'Bekeshe' }[state.build] || 'Suit', fabric: state.fabric && !state.custom ? { id: state.fabric.id, name: state.fabric.name } : null,
+        options: opts, button: state.button, sleeveButton: state.sleeveSame ? state.button : state.sleeveButton, thread: state.thread, lining: state.lining,
+        sleeveLining: state.sleeveLinSame ? state.lining : state.sleeveLining, monograms: state.monos.filter(m => m.type), notes: state.remark, photos,
+        summary: lines.join('\n').trim(), location: state.mode === 'inperson' ? state.location : '', mode: state.mode };
+      sessionStorage.setItem('magnolia_customer_design', JSON.stringify(design));
+      location.href = (window.MAGNOLIA_REQUEST_URL || '../request-preview/') + '?request=design';
+    } catch (e) { $('#transferError').textContent = 'Could not keep your design in this browser. Keep this page open and copy your choices before going to the request form.'; }
+  };
 
   // ---------- remarks, photos, pre-fitting / urgent (factory "Remark" and "Pre-fitting / Urgent") ----------
   const PREFIT = ['No', 'Pre-fitting', 'Unfinished Semi-Made Fitting', 'Canvas Shell Sample (No Return)', 'Blank display sample (no return afterwards)'];
