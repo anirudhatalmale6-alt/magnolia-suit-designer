@@ -1203,7 +1203,7 @@
   }
   function paintGrid() {
     const list = FABRICS.filter(matches);
-    $('#count').textContent = `Showing ${list.length} of ${FABRICS.length} sample fabrics`;
+    $('#count').textContent = `${list.length} of the ${FABRICS.length} sample fabrics shown (not the full catalogue)`;
     $('#grid').innerHTML = list.length ? list.map(f => {
       const s = STAFF && STAFF[f.id];
       return `<button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
@@ -1501,8 +1501,15 @@
     st.querySelector('.step-thumb').innerHTML = c && c.img ? skImg(c.img) : '';
     closeStep(b);
     setOpt(id, b.dataset.v);
-    goNext(nextAfter(document.querySelector(`[data-step="${id}"]`), '#styleSteps .step') || $('[data-next=style]'));
+    openNext(document.querySelector(`[data-step="${id}"]`), '#styleSteps .step', $('[data-next=style]'));
   };
+  // after a choice the next section opens by itself, its options in view (below the picture on phones)
+  function openNext(st, sel, last) {
+    const all = [...document.querySelectorAll(sel)].filter(x => x.offsetParent !== null), nx = all[all.indexOf(st) + 1];
+    if (!nx) return goNext(last);
+    nx.classList.add('open'); nx.querySelector('.sk-grid').hidden = false;
+    setTimeout(() => nx.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+  }
 
   // show a part of the jacket close up (front view), e.g. the buttons right after choosing them
   function zoomTo(x, y) {

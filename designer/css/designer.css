@@ -304,3 +304,10 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
 .prev-note { display: block; margin: 4px 0 2px; color: #6b5420; font-style: italic; }
 /* sample fabrics label (fabric step) */
 .sample-note { margin: 0 0 12px; padding: 9px 12px; border-radius: 8px; background: #fff4dc; border-left: 4px solid #c69642; font-size: 13px; line-height: 1.45; color: #4d3b16; }
+/* phones and small tablets: the jacket stays in view at the top while the options scroll underneath */
+@media (max-width: 900px) {
+  .stage { position: sticky; top: 0; z-index: 6; height: 42vh; border-bottom: 1px solid var(--line); }
+  .stage { align-items: flex-start; padding-top: 4px; }
+  .stage canvas { max-height: calc(42vh - 92px); }
+  .panel .step, .panel .next-bar, .panel .thread-row { scroll-margin-top: calc(42vh + 10px); }
+}
