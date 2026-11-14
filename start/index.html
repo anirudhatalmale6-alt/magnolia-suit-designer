@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Magnolia Bespoke · connected demo</title>
+<style>
+:root{--ink:#173b3d;--teal:#176b6e;--ivory:#f6f3ec;--paper:#fff;--line:#d8ddd8;--muted:#526768;--radius:12px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ivory)}
+body{color:var(--ink);font:400 16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+main{max-width:1100px;margin:auto;padding:clamp(16px,2.4vw,32px)}
+h1,h2,h3{font-family:Georgia,'Times New Roman',serif;font-weight:400;letter-spacing:-.02em;line-height:1.1}
+header{display:flex;align-items:center;gap:20px;padding:8px 0 16px;border-bottom:1px solid var(--line)}
+header img{width:88px;height:88px;flex:none}
+header h1{font-size:clamp(34px,5vw,60px);margin:0 0 6px}header p{margin:0;color:var(--muted);font-size:17px}
+.demo-note{background:#fff4dc;border-left:4px solid #c69642;border-radius:6px;padding:10px 14px;font-size:14px;margin:18px 0}
+h2{font-size:clamp(26px,3.2vw,38px);margin:28px 0 14px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.card h3{font-size:28px;margin:0 0 6px}.card p{margin:0 0 14px;color:var(--muted)}
+.locs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px}
+.locs button{font:inherit;text-align:left;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink);padding:12px 14px;cursor:pointer;min-height:44px}
+.locs button[aria-pressed=true]{border-color:var(--teal);box-shadow:inset 0 0 0 1px var(--teal);background:#eef6f4}
+.locs b{display:block;font:400 20px/1.2 Georgia,serif}.locs small{color:var(--muted);font-size:13px}
+.go{display:block;text-decoration:none;text-align:center;font-weight:600;border-radius:999px;padding:12px 18px;margin:8px 0 0;min-height:44px}
+.go.primary{background:var(--teal);color:#fff}.go.secondary{background:var(--paper);color:var(--teal);border:1px solid var(--teal)}
+.go[aria-disabled=true]{opacity:.45;pointer-events:none}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+ol{margin:0;padding-left:20px}ol li{margin:0 0 10px}
+.t{display:inline-block;font:700 11px/1.7 system-ui,sans-serif;letter-spacing:.04em;border-radius:99px;padding:0 8px;margin-right:6px;vertical-align:1px}
+.t-e{background:#d9efe9;color:#173b3d}.t-n{background:#ffe1a8;color:#4d3b16}.t-x{background:#efe6e6;color:#5b2730}
+.key{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:14px;margin:0 0 6px}
+ul.not{margin:0;padding-left:20px}ul.not li{margin:0 0 8px}
+footer{margin:28px 0 8px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
+@media(max-width:700px){.choices,.steps{grid-template-columns:1fr}header{gap:14px}header img{width:64px;height:64px}header p{font-size:16px}}
+@media(max-width:380px){.locs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<header><img src="../request-preview/magnolia-logo-round.png" alt="" width="88" height="88"><div><h1>Magnolia Bespoke</h1><p>Made to measure. Made personal.</p></div></header>
+
+<p class="demo-note"><b>Connected test demo.</b> Start here and go through the website as a customer would. Nothing is sent or ordered, and the live website is unchanged. A dark bar at the top of each page tells you where you are and what is built.</p>
+
+<h2>How would you like to work with us?</h2>
+<div class="choices">
+  <section class="card" aria-labelledby="ip">
+    <h3 id="ip">In person</h3>
+    <p>By appointment only, in Jerusalem or Lakewood. Your tailor takes your measurements and helps you choose.</p>
+    <div class="locs" role="group" aria-label="Choose your tailor">
+      <button type="button" data-loc="jerusalem" aria-pressed="false"><b>Jerusalem</b><small>Shloimy Braun · Ramat Eshkol / Sanhedria area</small></button>
+      <button type="button" data-loc="lakewood" aria-pressed="false"><b>Lakewood, NJ</b><small>Ezriel Daum · tri-state area</small></button>
+    </div>
+    <a class="go primary" id="goAppt" href="#" aria-disabled="true">Request an appointment &rsaquo;</a>
+    <a class="go secondary" id="goDesignIP" href="#" aria-disabled="true">Design in the configurator first (optional) &rsaquo;</a>
+    <p class="hint" id="ipHint">Choose a tailor first.</p>
+  </section>
+  <section class="card" aria-labelledby="ol">
+    <h3 id="ol">Online</h3>
+    <p>Design from home in the configurator, then send your design with your fit and contact details.</p>
+    <a class="go primary" href="../designer/?journey=online" data-journey="online">Start in the configurator &rsaquo;</a>
+    <p class="hint">Your tailor is chosen on the request page.</p>
+  </section>
+</div>
+
+<h2>What each journey goes through</h2>
+<p class="key"><span><span class="t t-e">ESTABLISHED</span>built and reviewed in earlier rounds</span><span><span class="t t-n">NEW</span>added this week (reviewed, or in review now)</span><span><span class="t t-x">NOT CONNECTED</span>not part of this demo yet</span></p>
+<div class="steps">
+  <section class="card"><h3>Online</h3><ol>
+    <li>This start page <span class="t t-n">NEW</span></li>
+    <li>Configurator: choose what you are building, then Fabric, Style, Trims and Summary <span class="t t-e">ESTABLISHED</span> The fabrics are labelled as samples <span class="t t-n">NEW</span></li>
+    <li>"Continue to fit &amp; request" carries your design to the request page; "Add my design" puts it on your tailor's request <span class="t t-n">NEW</span></li>
+    <li>Fit &amp; contact: "Help me with measurements" shows the measurement guide with pictures; "I have measurements to discuss" takes your readings <span class="t t-n">NEW</span> Contact details and the order form itself <span class="t t-e">ESTABLISHED</span></li>
+    <li>Review, then Send <span class="t t-x">NOT CONNECTED</span> in this demo</li>
+  </ol></section>
+  <section class="card"><h3>In person</h3><ol>
+    <li>This start page: choose your tailor <span class="t t-n">NEW</span></li>
+    <li>Request page: the tailor's details, then the appointment request with its calendar and evening times <span class="t t-e">ESTABLISHED</span> Page styling and round logo <span class="t t-n">NEW</span></li>
+    <li>Optional: design in the configurator first, then continue to an order request for the same tailor <span class="t t-e">ESTABLISHED</span> / <span class="t t-n">NEW</span> hand-over</li>
+    <li>Review, then Send <span class="t t-x">NOT CONNECTED</span> in this demo</li>
+  </ol></section>
+</div>
+
+<h2>Not connected in this demo yet</h2>
+<ul class="not">
+  <li><b>Sending.</b> Send is switched off here. Saving the request, the owners' Requests screen, the order emails and the PDFs run on the server version (milestone B, in review).</li>
+  <li><b>Prices by fabric.</b> Price bands come with milestone C (waiting for the price matrix). The "from" prices shown are your published starting prices.</li>
+  <li><b>Trousers, coat and shirt pictures.</b> Marked "in progress" in the configurator. The bekeshe shows the front view.</li>
+  <li><b>The full fabric catalogue.</b> The configurator and the request form show sample fabrics from the fabric books received. Your tailor confirms availability.</li>
+  <li><b>Your own domain and the joint site handover</b> (milestone E). This demo runs on a test address; the live website is unchanged.</li>
+  <li><b>Photos</b> chosen in the configurator stay on the customer's device and are attached manually when sending (by design).</li>
+</ul>
+
+<footer>Magnolia Bespoke · connected test demo. Prices, availability, fit and timing are always confirmed personally.</footer>
+</main>
+<script>
+(function () {
+  var loc = '';
+  function reset(journey) {                       // a clean start for each journey (this tab only)
+    try { var s = window.sessionStorage, k = [];
+      for (var i = 0; i < s.length; i++) { var n = s.key(i); if (/^magnolia_draft:|^magnolia_customer_design$|^mb_flow$|^magnolia_demo$/.test(n)) k.push(n); }
+      k.forEach(function (n) { s.removeItem(n); });
+      s.setItem('magnolia_demo', JSON.stringify({ journey: journey, loc: loc }));
+    } catch (e) {}
+  }
+  document.querySelectorAll('[data-loc]').forEach(function (b) {
+    b.onclick = function () {
+      loc = b.dataset.loc;
+      document.querySelectorAll('[data-loc]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      var a = document.getElementById('goAppt'), d = document.getElementById('goDesignIP');
+      a.href = '../request-preview/?journey=inperson&loc=' + loc; d.href = '../designer/?journey=inperson&loc=' + loc;
+      a.removeAttribute('aria-disabled'); d.removeAttribute('aria-disabled');
+      document.getElementById('ipHint').textContent = (loc === 'lakewood' ? 'Lakewood, NJ' : 'Jerusalem') + ' chosen.';
+    };
+  });
+  document.getElementById('goAppt').addEventListener('click', function () { reset('inperson'); });
+  document.getElementById('goDesignIP').addEventListener('click', function () { reset('inperson'); });
+  document.querySelector('[data-journey=online]').addEventListener('click', function () { loc = ''; reset('online'); });
+})();
+</script>
+</body>
+</html>

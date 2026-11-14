@@ -1203,7 +1203,7 @@
   }
   function paintGrid() {
     const list = FABRICS.filter(matches);
-    $('#count').textContent = `Showing ${list.length} of ${FABRICS.length} fabrics`;
+    $('#count').textContent = `Showing ${list.length} of ${FABRICS.length} sample fabrics`;
     $('#grid').innerHTML = list.length ? list.map(f => {
       const s = STAFF && STAFF[f.id];
       return `<button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
@@ -1935,7 +1935,12 @@
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];
     setupFilters(); paintGrid(); paintStyle(); paintButtons(); paintThreads(); paintLinings(); paintContrast(); paintMono(); paintExtras(); paintSteps(); paintSugg(); paintTips();
     let flow = null; try { flow = JSON.parse(store.get('mb_flow') || 'null'); } catch (e) { flow = null; }
-    if (flow && flow.build) { Object.assign(state, flow); startDesigner(); } else showWelcome('home');
+    // the connected demo's start page opens the designer at "What are we building?" with the journey already chosen
+    const qs = new URLSearchParams(location.search), jr = qs.get('journey'), jl = qs.get('loc');
+    if (jr === 'online' || (jr === 'inperson' && LOCS[jl])) {
+      store.set('mb_flow', ''); state.mode = jr; state.location = jr === 'inperson' ? jl : '';
+      history.replaceState(null, '', location.pathname); showWelcome('build');
+    } else if (flow && flow.build) { Object.assign(state, flow); startDesigner(); } else showWelcome('home');
     const pw = store.get('mb_staff');
     if (pw) { try { staffOn(await unlock(pw), pw); } catch (e) { store.set('mb_staff', ''); } }
   })();
