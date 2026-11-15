@@ -30,6 +30,7 @@
     monos: [], monoSel: 0, fabricPicked: false, reached: 0, mode: '', location: '', build: '',
     remark: '', photos: [null, null, null], body: { front: null, side: null, back: null }, prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
+  let PREV = {};                                   // fabric code -> its preview files (previews.json)
   let FABRICS = [], JF = [], BKF = [], JOPTS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null, SUGG = null, EXTRAS = { opts: {}, lining: {} };
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
@@ -1206,8 +1207,9 @@
     $('#count').textContent = `${list.length} of the ${FABRICS.length} sample fabrics shown (not the full catalogue)`;
     $('#grid').innerHTML = list.length ? list.map(f => {
       const s = STAFF && STAFF[f.id];
-      return `<button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
-        <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)}${s.band ? ` · ${esc(s.band)}` : ''}</small>` : ''}</button>`;
+      return `<div class="fab-cell"><button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
+        <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)}${s.band ? ` · ${esc(s.band)}` : ''}</small>` : ''}</button>` +
+        `<button type="button" class="pv-open${PREV[f.id] ? '' : ' soon'}" data-pv-open="${f.id}" aria-label="Preview No. ${num(f)}: draped and close-up">${PREV[f.id] ? '&#9654; Drape' : 'Close-up'}</button></div>`;
     }).join('') : '<p class="empty">No fabric matches these filters.</p>';
   }
   function paintChosen() {
@@ -1311,6 +1313,7 @@
       $$('#colours .chip').forEach(b => b.classList.remove('on')); paintGrid();
     };
     $('#grid').onclick = e => {
+      const pv = e.target.closest('[data-pv-open]'); if (pv) return openPreview(pv.dataset.pvOpen);
       const b = e.target.closest('[data-id]'); if (!b) return;
       state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; paintSteps(); paintProgress(); goNext($('[data-next=fabric]'));
       store.set('mb_look', ''); paintSugg(); paintTips();
@@ -1865,7 +1868,89 @@
     $('#swCap').textContent = `No. ${num(f)} · ${f.name}. Actual swatch photo, about 5 × 5 cm of cloth.`;
     $('#swModal').hidden = false;
   }
-  $('#chosen').onclick = e => { if (e.target.closest('.sw-open, .sw-link')) openSwatch(); };
+  $('#chosen').onclick = e => { if (e.target.closest('.sw-open, .sw-link') && state.fabric && !state.custom) openPreview(state.fabric.id); };
+
+  // ---------- fabric preview: Draped (the owner's video, labelled when simulated) / Close-up (actual swatch photo,
+  // zoom and drag); previous / next through the fabrics in the current filter; "Choose this fabric" selects it.
+  // Fabrics without preview files show the swatch close-up and "Draped preview coming". previews.json comes from
+  // build/import_previews.py; the videos load only when that fabric's Draped view is opened.
+  let pvList = [], pvAt = 0, pvTab = 'drape', zs = 1, zx = 0, zy = 0;
+  const pvFab = () => FABRICS.concat(BKF).find(f => f.id === pvList[pvAt]);
+  function openPreview(id) {
+    pvList = FABRICS.filter(matches).map(f => f.id); if (!pvList.includes(id)) pvList = [id];
+    pvAt = pvList.indexOf(id); pvTab = PREV[id] ? 'drape' : 'close'; $('#pvModal').hidden = false; paintPreview();
+    setTimeout(() => $('#pvClose').focus(), 0);
+  }
+  function closePreview() { const v = $('#pvVideo'); v.pause(); v.removeAttribute('src'); v.load(); $('#pvModal').hidden = true; }
+  function zoomSet(s, cx, cy) {
+    const box = $('#pvZoom').getBoundingClientRect(), ns = Math.min(4, Math.max(1, s));
+    if (cx === undefined) { cx = box.width / 2; cy = box.height / 2; }
+    zx = cx - (cx - zx) * ns / zs; zy = cy - (cy - zy) * ns / zs; zs = ns;
+    zx = Math.min(0, Math.max(box.width - box.width * zs, zx)); zy = Math.min(0, Math.max(box.height - box.height * zs, zy));
+    $('#pvImg').style.transform = `translate(${zx}px, ${zy}px) scale(${zs})`;
+  }
+  function paintPreview() {
+    const f = pvFab(), p = PREV[f.id], v = $('#pvVideo');
+    $('#pvTitle').textContent = `No. ${num(f)} · ${f.name}`;
+    $('#pvSub').textContent = [f.composition || 'Composition to follow', SEASONS[f.season] || ''].filter(Boolean).join(' · ');
+    $$('.pv-tabs button').forEach(b => b.classList.toggle('on', b.dataset.pv === pvTab));
+    const drape = pvTab === 'drape';
+    v.hidden = !(drape && p); $('#pvZoom').hidden = drape; $('#pvZbtns').hidden = drape;
+    $('#pvMissing').hidden = !(drape && !p); $('#pvMissing').textContent = 'Draped preview coming for this fabric. The close-up shows the actual swatch.';
+    if (drape && p) {
+      v.poster = `previews/${p.poster}?v=${VER}`;
+      if (v.getAttribute('src') !== `previews/${p.drape}?v=${VER}`) { v.src = `previews/${p.drape}?v=${VER}`; }
+      v.play().catch(() => { /* autoplay refused: the poster stays, the customer can tap play */ });
+    } else { v.pause(); }
+    if (!drape) {
+      $('#pvImg').src = p ? `previews/${p.source || p.closeup}?v=${VER}` : `swatch/${f.id}.jpg?v=${VER}`;
+      zs = 1; zx = 0; zy = 0; $('#pvImg').style.transform = '';
+    }
+    $('#pvNote').textContent = drape
+      ? (p ? (p.simulated ? 'Simulated drape: the folds and light are simulated, not measured cloth behaviour. ' : '') + (p.colourChecked ? '' : 'Colours are approximate; your tailor shows you the real cloth.') : '')
+      : 'Actual swatch photo' + (p && p.source ? ', unchanged' : '') + '. Zoom with + / −, a pinch or the mouse wheel; drag to move around. Screen colours vary.';
+    $('#pvPos').textContent = `${pvAt + 1} of ${pvList.length}`;
+    $('#pvPrev').disabled = pvAt === 0; $('#pvNext').disabled = pvAt === pvList.length - 1;
+    const chosen = state.fabric && state.fabric.id === f.id && !state.custom;
+    $('#pvChoose').textContent = chosen ? 'Chosen ✓' : 'Choose this fabric'; $('#pvChoose').disabled = chosen;
+  }
+  $('#pvClose').onclick = closePreview;
+  $('#pvModal').onclick = e => { if (e.target.id === 'pvModal') closePreview(); };
+  document.addEventListener('keydown', e => {
+    if ($('#pvModal').hidden) return;
+    if (e.key === 'Escape') closePreview();
+    if (e.key === 'ArrowRight' && pvAt < pvList.length - 1) { pvAt++; paintPreview(); }
+    if (e.key === 'ArrowLeft' && pvAt > 0) { pvAt--; paintPreview(); }
+  });
+  $('.pv-tabs').onclick = e => { const b = e.target.closest('[data-pv]'); if (b) { pvTab = b.dataset.pv; paintPreview(); } };
+  $('#pvPrev').onclick = () => { if (pvAt > 0) { pvAt--; paintPreview(); } };
+  $('#pvNext').onclick = () => { if (pvAt < pvList.length - 1) { pvAt++; paintPreview(); } };
+  $('#pvChoose').onclick = () => {
+    const f = pvFab(); state.fabric = f; state.custom = false; state.fabricPicked = true;
+    paintSteps(); paintProgress(); store.set('mb_look', ''); paintSugg(); paintTips(); paintGrid(); render(); paintPreview();
+  };
+  $('#pvZbtns').onclick = e => { const b = e.target.closest('[data-z]'); if (b) zoomSet(zs * (+b.dataset.z > 0 ? 1.6 : 1 / 1.6)); };
+  (() => {                                   // close-up: wheel and pinch zoom, drag to move, double tap to zoom in / out
+    const z = $('#pvZoom'), pts = new Map(); let last = null, pinch = 0, tapT = 0;
+    const rel = e => { const r = z.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    z.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = rel(e); zoomSet(zs * (e.deltaY < 0 ? 1.15 : 1 / 1.15), x, y); }, { passive: false });
+    z.addEventListener('pointerdown', e => {
+      z.setPointerCapture(e.pointerId); pts.set(e.pointerId, rel(e)); last = rel(e);
+      if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); }
+      if (pts.size === 1) { const now = Date.now(); if (now - tapT < 300) zoomSet(zs > 1.05 ? 1 : 2.5, ...rel(e)); tapT = now; }
+    });
+    z.addEventListener('pointermove', e => {
+      if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, rel(e));
+      if (pts.size === 2) {
+        const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (pinch) zoomSet(zs * d / pinch, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); pinch = d;
+      } else if (last && zs > 1) {
+        const [x, y] = rel(e); zx += x - last[0]; zy += y - last[1]; last = [x, y]; zoomSet(zs);
+      }
+    });
+    const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = 0; last = pts.size ? [...pts.values()][0] : null; };
+    z.addEventListener('pointerup', up); z.addEventListener('pointercancel', up);
+  })();
   $('#swClose').onclick = () => { $('#swModal').hidden = true; };
   $('#swModal').onclick = e => { if (e.target.id === 'swModal') $('#swModal').hidden = true; };
   $('#stage').onclick = e => {
@@ -1935,6 +2020,7 @@
       try { BKF = await get('bk_fabrics.json'); } catch (e) { BKF = []; }
       [FABRICS, OPTS, BUTTONS, SLEEVES, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'sleeve_buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
       try { SUGG = await get('suggestions.json'); } catch (e) { SUGG = null; }
+      try { PREV = await get('previews.json'); } catch (e) { PREV = {}; }
       try { EXTRAS = await get('extras.json'); } catch (e) { /* no extra charges listed */ }
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
     JF = FABRICS; JOPTS = OPTS;

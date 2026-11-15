@@ -311,3 +311,24 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
   .stage canvas { max-height: calc(42vh - 92px); }
   .panel .step, .panel .next-bar, .panel .thread-row { scroll-margin-top: calc(42vh + 10px); }
 }
+/* fabric preview: Draped (owner's video) / Close-up (actual swatch, zoom and drag) */
+.fab-cell { position: relative; display: flex; flex-direction: column; }
+.fab-cell .fab { flex: 1; width: 100%; }
+.pv-open { position: absolute; top: 8px; right: 8px; border: 0; border-radius: 999px; background: rgba(255,255,255,.92); color: var(--teal-dd); font-size: 11px; font-weight: 600; padding: 3px 8px; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+.pv-open.soon { color: var(--muted); }
+.pv-card { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 16px; }
+.pv-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.pv-head b { display: block; font-size: 16px; } .pv-head small { display: block; color: var(--muted); font-size: 12.5px; }
+.pv-x { border: 0; background: none; font-size: 28px; line-height: 1; cursor: pointer; color: var(--ink); padding: 0 4px; min-width: 44px; min-height: 44px; }
+.pv-tabs { margin: 10px 0; }
+.pv-stage { position: relative; aspect-ratio: 3 / 4; max-height: 62vh; margin: 0 auto; background: #f1efe9; border-radius: 10px; overflow: hidden; display: grid; place-items: center; touch-action: none; }
+.pv-stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.pv-zoom { position: absolute; inset: 0; overflow: hidden; cursor: grab; display: grid; place-items: center; }
+.pv-zoom img { width: 100%; height: 100%; object-fit: contain; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; }
+.pv-missing { margin: 0; padding: 20px; text-align: center; color: var(--muted); font-size: 14px; }
+.pv-zbtns { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+.pv-zbtns button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.95); font-size: 20px; cursor: pointer; }
+.pv-note { margin: 8px 0 0; }
+.pv-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.pv-modal[hidden], .pv-zoom[hidden], .pv-missing[hidden], .pv-zbtns[hidden] { display: none !important; }
+.pv-modal { z-index: 100; }   /* above every bar on the page, including the demo guide bar */

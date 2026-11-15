@@ -16,7 +16,7 @@
     ? { step: online ? 'Step 2 · Configurator' : 'Optional step · Configurator', name: 'Design your garment',
         next: 'Choose what you are building, then Fabric, Style, Trims and Summary. On Summary, press "Continue to fit & request".',
         est: 'Configurator: fabrics, style options, buttons, thread colours, linings, monograms, summary (phases 1-2).',
-        neu: 'Sample-fabric label; the "Continue to fit & request" button that carries your design to the request page.',
+        neu: 'Fabric preview on each swatch: Draped (your simulated drape videos, first batches) and Close-up (the actual swatch, zoom and drag), previous / next; sample-fabric label; the "Continue to fit & request" button.',
         not: 'Prices by fabric (milestone C). Trousers, coat and shirt pictures (in progress).' }
     : online || fromDesign
     ? { step: online ? 'Steps 3-5 · Request page' : 'Steps 3-4 · Request page', name: 'Add your design, fit & contact, review',
