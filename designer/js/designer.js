@@ -31,6 +31,7 @@
     remark: '', photos: [null, null, null], body: { front: null, side: null, back: null }, prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
   let PREV = {};                                   // fabric code -> its preview files (previews.json)
+  const PVB = window.MAGNOLIA_PREVIEW_BASE || 'previews/';   // where the preview files are served (set in index.html)
   let FABRICS = [], JF = [], BKF = [], JOPTS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null, SUGG = null, EXTRAS = { opts: {}, lining: {} };
 
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
@@ -1898,12 +1899,12 @@
     v.hidden = !(drape && p); $('#pvZoom').hidden = drape; $('#pvZbtns').hidden = drape;
     $('#pvMissing').hidden = !(drape && !p); $('#pvMissing').textContent = 'Draped preview coming for this fabric. The close-up shows the actual swatch.';
     if (drape && p) {
-      v.poster = `previews/${p.poster}?v=${VER}`;
-      if (v.getAttribute('src') !== `previews/${p.drape}?v=${VER}`) { v.src = `previews/${p.drape}?v=${VER}`; }
+      v.poster = `${PVB}${p.poster}?v=${VER}`;
+      if (v.getAttribute('src') !== `${PVB}${p.drape}?v=${VER}`) { v.src = `${PVB}${p.drape}?v=${VER}`; }
       v.play().catch(() => { /* autoplay refused: the poster stays, the customer can tap play */ });
     } else { v.pause(); }
     if (!drape) {
-      $('#pvImg').src = p ? `previews/${p.source || p.closeup}?v=${VER}` : `swatch/${f.id}.jpg?v=${VER}`;
+      $('#pvImg').src = p ? `${PVB}${p.source || p.closeup}?v=${VER}` : `swatch/${f.id}.jpg?v=${VER}`;
       zs = 1; zx = 0; zy = 0; $('#pvImg').style.transform = '';
     }
     $('#pvNote').textContent = drape
