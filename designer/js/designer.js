@@ -1908,7 +1908,7 @@
     }
     $('#pvNote').textContent = drape
       ? (p ? (p.simulated ? 'Simulated drape: the folds and light are simulated, not measured cloth behaviour. ' : '') + (p.colourChecked ? '' : 'Colours are approximate; your tailor shows you the real cloth.') : '')
-      : 'Actual swatch photo' + (p && p.source ? ', unchanged' : '') + '. Zoom with + / −, a pinch or the mouse wheel; drag to move around. Screen colours vary.';
+      : `${f.id} · ${f.name} · ${f.composition || 'Composition to follow'}. Actual swatch photo` + (p && p.source ? ', unchanged' : '') + '. Colours approximate: screens vary, and your tailor shows you the real cloth. Zoom with + / −, a pinch or the mouse wheel; drag to move around.';
     $('#pvPos').textContent = `${pvAt + 1} of ${pvList.length}`;
     $('#pvPrev').disabled = pvAt === 0; $('#pvNext').disabled = pvAt === pvList.length - 1;
     const chosen = state.fabric && state.fabric.id === f.id && !state.custom;
