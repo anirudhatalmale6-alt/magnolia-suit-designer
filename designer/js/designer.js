@@ -1900,12 +1900,19 @@
     $('#pvMissing').hidden = !(drape && !p); $('#pvMissing').textContent = 'Draped preview coming for this fabric. The close-up shows the actual swatch.';
     if (drape && p) {
       v.poster = `${PVB}${p.poster}?v=${VER}`;
+      v.onerror = () => { $('#pvNote').textContent = 'The draped video could not be played on this device; showing its still picture. ' + $('#pvNote').textContent; };
       if (v.getAttribute('src') !== `${PVB}${p.drape}?v=${VER}`) { v.src = `${PVB}${p.drape}?v=${VER}`; }
       v.play().catch(() => { /* autoplay refused: the poster stays, the customer can tap play */ });
     } else { v.pause(); }
-    if (!drape) {
-      $('#pvImg').src = p ? `${PVB}${p.source || p.closeup}?v=${VER}` : `swatch/${f.id}.jpg?v=${VER}`;
-      zs = 1; zx = 0; zy = 0; $('#pvImg').style.transform = '';
+    if (!drape) {                    // the untouched photo, else the labelled close-up, else the designer's swatch photo
+      const img = $('#pvImg'), tries = (p ? [p.source, p.closeup].filter(Boolean).map(x => `${PVB}${x}?v=${VER}`) : []).concat(`swatch/${f.id}.jpg?v=${VER}`);
+      let k = 0;
+      img.onerror = () => {
+        if (++k < tries.length) { img.src = tries[k]; return; }
+        $('#pvZoom').hidden = true; $('#pvMissing').hidden = false; $('#pvMissing').textContent = 'The close-up could not be loaded right now. Please try again in a moment.';
+      };
+      img.dataset.tries = String(tries.length); img.src = tries[0];
+      zs = 1; zx = 0; zy = 0; img.style.transform = '';
     }
     $('#pvNote').textContent = drape
       ? (p ? (p.simulated ? 'Simulated drape: the folds and light are simulated, not measured cloth behaviour. ' : '') + (p.colourChecked ? '' : 'Colours are approximate; your tailor shows you the real cloth.') : '')
