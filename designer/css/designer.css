@@ -342,4 +342,4 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
 @media (max-width: 900px) { .inline-thread { scroll-margin-top: calc(42vh + 10px); } }
 /* an angle with no photo of the chosen front: shown, but not offered */
 .views button.na { color: var(--muted, #8a8f8f); text-decoration: line-through; text-decoration-thickness: 1px; opacity: .6; cursor: not-allowed; }
-.toast { border-radius: 14px; max-width: min(420px, calc(100vw - 32px)); text-align: left; line-height: 1.4; }
+.toast { border-radius: 14px; width: max-content; max-width: min(420px, calc(100vw - 32px)); text-align: left; line-height: 1.4; }
