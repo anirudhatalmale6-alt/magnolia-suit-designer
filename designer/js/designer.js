@@ -182,6 +182,18 @@
     if (state.closeup === 'pick') { const c = state.opts.pick || 'A'; return c === 'A' ? null : pick(CLOSE_PICK, c, 'close_pick_', 'B'); }
     return null;
   }
+  const FRONTISH = ['front', 'three4', 'side'];
+  const APPROX = [
+    ['chestPocket', FRONTISH, { 233: 'the tulip-shaped chest pocket', 234: 'two chest pockets with flaps', BE: 'the angled box-pleat chest pocket',
+      C1: 'the multi-pleated chest pocket' }],
+    ['lowerPocket', FRONTISH, { 233: 'the tulip-shaped pockets', 235: 'the water-drop pockets', HMD: 'the water-drop pockets',
+      236: 'the button on the pocket flaps', 237: 'the button on the pocket flaps', 19: 'the angled flaps with a button', DJ: 'the diagonal patch pockets',
+      Y: 'this jetted pocket' }],
+    ['lapel', FRONTISH, { 'HA279-118': 'the removable shawl lapel' }],
+    ['shoulder', FRONTISH, { E: 'the shirt-head shoulder' }],
+    ['collarBack', ['back', 'front', 'three4', 'side'], { B: 'the collar turned back at the end' }],
+    ['facing', ['open'], { A: 'this facing shape', C: 'the sword-shaped facing', DGG: 'this facing shape', E: 'this facing shape',
+      G: 'the half-lining facing', G03: 'the unlined facing', US66: 'this facing shape' }]];
   const SIZE_ONLY = { lowerPocket: ['A', 'C', '11', '12', '22', 'SA'], chestPocket: ['A', 'C', 'D', 'E', 'F', 'J'], ticket: ['G', 'H', 'I', 'J'], namecard: ['E', 'F'],
     lapelHoleStyle: ['5', '7', 'Z', '18'] };
   function mapName() {
@@ -195,6 +207,10 @@
       return { name: 'bk_front', note: { all: t(null), by: t } };
     }
     const s = styleOf(), miss = [], hid = t => (state.hid[t] || '');
+    // choices whose picture is the closest photo, not the exact style (checked choice by choice, 17 Nov): say so
+    for (const [id, views, codes] of APPROX) {
+      const c = state.opts[id]; if (c && codes[c] && views.includes(state.view)) miss.push([codes[c], [id]]);
+    }
     const sizes = [];                              // choices that differ only in size: same picture, exact size on the order
     for (const [id, codes] of Object.entries(SIZE_ONLY)) { const c = state.opts[id]; if (c && codes.includes(c)) sizes.push([((choiceOf(id) || {}).label || '').toLowerCase(), [id]]); }
     // each note part names the steps it is about, so the note under a step only says what concerns that step
@@ -209,7 +225,6 @@
     if (state.view === 'back') {
       const v = state.opts.vent || 'C', turned = (state.opts.collarBack || 'A') === 'B';
       const name = v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : v === 'D' ? 'back_inner_belt' : v === 'F' ? 'back_fixed_belt' : turned ? 'back_collar' : 'back';
-      if (turned && name !== 'back_collar') miss.push(['the collar turned back with this vent', ['collarBack', 'vent']]);
       return { name, note: say() };
     }
     if (state.view === 'open') {                    // inside photos: lining style first, then the inside details staff chose
@@ -635,7 +650,7 @@
   function drawTabs(st, zx, zy, Z) {
     if ((state.opts.lowerPocket || 'B') !== '2' || !JET_AT[state.view]) return;
     const off = st.meta.pk || [0, 0, 0], split = state.view === 'front' ? 521 : 454, sx = styleOf().db ? 14 : 0;
-    const bi = state.button && btnImgs[state.button + '|' + (state.thread.button || '')];
+    const bi = curBtn() && btnImgs[curBtn() + '|' + (state.thread.button || '')];
     for (const [jx, jy] of JET_AT[state.view]) {
       const left = jx < split, x0 = jx + (left ? off[0] : (off[2] ?? off[0])) + (state.view === 'front' && sx ? (left ? -sx : sx) : 0), y0 = jy + off[1];
       const s = state.view === 'three4' && left ? 0.55 : 1;                // the far pocket is seen edge-on
@@ -1102,6 +1117,9 @@
     x.putImageData(img, 0, 0);
     return (st.ovCache[key] = c);
   }
+  // a button thread colour needs a button to sew: until the customer picks one, the closest catalogue button to the
+  // photo's own (dark horn) is drawn, so the thread colour shows; the order still says no button was chosen
+  const curBtn = () => state.button || (state.thread.button && BUTTONS.some(b => b.id === 'B001') ? 'B001' : null);
   async function loadBtn(code) {
     const key = code + '|' + (state.thread.button || '');
     if (btnImgs[key]) return btnImgs[key];
@@ -1117,8 +1135,25 @@
     x.putImageData(d, 0, 0);
     return (btnImgs[key] = c);
   }
+  // 5 hidden buttons (front 26, a fly front): the buttons are covered by the cloth, so each one on the photo is covered
+  // with the cloth beside it (same panel, towards the side seam), feathered at the edge
+  const hiddenFront = () => !isBk() && (state.opts.front || '2') === '26';
+  function hideDiscs(st, zx, zy, Z) {
+    const list = st.meta.body || st.meta.frontal;     // every front button on the photo (frontal = the ones redrawn)
+    if (!hiddenFront() || !list.length) return;
+    for (const [bx, by, r] of list) {
+      const cx = (bx - zx) * Z, cy = (by - zy) * Z, R = r * Z * 2.1, off = -3.6 * r * Z;     // wide enough for its shadow
+      if (cx < -R || cy < -R || cx > W + R || cy > H + R) continue;
+      const t = document.createElement('canvas'); t.width = t.height = Math.ceil(2 * R); const tx = t.getContext('2d');
+      tx.drawImage(ctx.canvas, cx + off - R, cy - R, 2 * R, 2 * R, 0, 0, 2 * R, 2 * R);
+      const g = tx.createRadialGradient(R, R, R * 0.7, R, R, R); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      tx.globalCompositeOperation = 'destination-in'; tx.fillStyle = g; tx.fillRect(0, 0, 2 * R, 2 * R);
+      ctx.drawImage(t, cx - R, cy - R);
+    }
+  }
   function drawDiscs(st, zx, zy, Z) {
-    const img = state.button && btnImgs[state.button + '|' + (state.thread.button || '')];
+    if (hiddenFront()) return hideDiscs(st, zx, zy, Z);
+    const img = curBtn() && btnImgs[curBtn() + '|' + (state.thread.button || '')];
     if (!img || !st.meta.frontal.length) return;
     for (const [bx, by, r] of st.meta.frontal) {
       const cx = (bx - zx) * Z, cy = (by - zy) * Z, R = r * Z * 0.97;
@@ -1157,7 +1192,7 @@
         if (sc !== 1) state.tile = await loadTile(f, sc);
         if (state.zoom) state.ztile = await loadTile(f, state.zoom.z * sc);
       }
-      if (state.button) await loadBtn(state.button);
+      if (curBtn()) await loadBtn(curBtn());
       const lo = st.LN && state.lining && LININGS.find(x => x.id === state.lining);
       if (lo) await loadLinTex(lo, state.zoom ? state.zoom.z : 1);
       await monoReady();
@@ -1459,6 +1494,8 @@
     ticket: ['front', 290, 960, 2.6], namecard: ['open', 512, 940, 1.7], vent: ['back', 512, 1220, 1.7], cuffButtons: SLEEVE, kissing: SLEEVE, sleeveHoleDir: SLEEVE,
     pick: ['front', 420, 560, 1.7], shoulder: ['front', 330, 520, 1.7], canvas: ['front'],
     facing: ['open'], liningStyle: ['open'], brandLabel: ['open', 512, 880, 1.7] };
+  // the lapel buttonhole in its thread colour: the close-up of the chosen buttonhole style, or the lapel when none is chosen
+  const showLapelThread = () => showPart(((choiceOf('lapelHoleStyle') || {}).code || 'A') !== 'A' ? 'lapelHoleStyle' : 'lapelHole');
   function showPart(id) {
     if (isBk()) {                                   // only the front photo: the lapels, or the sleeve end with its covered buttons
       state.view = 'front'; state.closeup = null; state.zoomAt = null;
@@ -1505,7 +1542,7 @@
   $('#styleSteps').onclick = e => {
     const tc = e.target.closest('#lapelThreadInline [data-c]');
     if (tc) {
-      state.thread.lapel = tc.dataset.c || null; paintThreads(); showPart('lapelHole'); render();
+      state.thread.lapel = tc.dataset.c || null; paintThreads(); showLapelThread(); render();
       openNext(document.querySelector('[data-step="lapelHoleStyle"]'), '#styleSteps .step', $('[data-next=style]'));
       return;
     }
@@ -1617,7 +1654,7 @@
     const cur = sel ? state.thread.sleeve[sel - 1] : (state.thread.sleeve.slice(0, n).every(c => c === state.thread.sleeve[0]) ? state.thread.sleeve[0] : undefined);
     paintInlineThread();
     $('#threadRows').innerHTML =
-      `<div class="thread-row"><b>Button thread</b>${palette(state.thread.button, 'button')}</div>` +
+      `<div class="thread-row"><b>Button thread</b>${!state.button && state.thread.button ? '<p class="hint">Shown on a dark horn button until you choose your buttons above.</p>' : ''}${palette(state.thread.button, 'button')}</div>` +
       `<div class="thread-row"><b>Lapel buttonhole</b>${palette(state.thread.lapel, 'lapel')}</div>` +
       (STAFF ? `<div class="thread-row adv"><b>Staff only: front buttonholes</b>${palette(state.thread.front, 'front')}</div>` +
       `<div class="thread-row adv"><b>Staff only: sleeve buttonholes</b><p class="hint">Pick a colour for all holes, or choose a hole first to give it its own colour.</p>${holes}${palette(cur, 'sleeve')}</div>` : '');
@@ -1635,7 +1672,7 @@
     // show where the thread goes, in the new colour: the front buttons, the lapel buttonhole (zoomed once the photo
     // is loaded), the sleeve holes; then redraw (the lapel and staff-only holes used to update the summary only)
     if (key === 'button' || key === 'front') zoomTo(...FRONT_BTN);
-    else if (key === 'lapel') showPart('lapelHole');
+    else if (key === 'lapel') showLapelThread();
     else if (key === 'sleeve') showPart('cuffButtons');
     render();
     if (key === 'sleeve' && state.holeSel) return;            // picking hole by hole: stay here
