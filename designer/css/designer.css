@@ -340,3 +340,5 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
 .nav-row .next-btn, .nav-row #sendToRequest { flex: 1 1 auto; }
 .inline-thread { margin: 8px 0 4px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 @media (max-width: 900px) { .inline-thread { scroll-margin-top: calc(42vh + 10px); } }
+/* an angle with no photo of the chosen front: shown, but not offered */
+.views button.na { color: var(--muted, #8a8f8f); text-decoration: line-through; text-decoration-thickness: 1px; opacity: .6; cursor: not-allowed; }

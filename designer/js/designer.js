@@ -182,6 +182,19 @@
     if (state.closeup === 'pick') { const c = state.opts.pick || 'A'; return c === 'A' ? null : pick(CLOSE_PICK, c, 'close_pick_', 'B'); }
     return null;
   }
+  // the front closure each choice needs a photo of, per angle (26 = 5 hidden buttons: the 5-button photo, buttons hidden)
+  const FRONT_KEY = { 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '4r3', 26: '27', 27: '27', Z998: '2', 8: 'db21', 9: 'db41', 10: 'db61',
+    11: 'db4', 12: 'db', 13: 'db63' };
+  // angles that have no photo of the chosen front are not offered: a different jacket is never shown
+  function viewOk(v) {
+    if (isBk() || !['three4', 'side'].includes(v) || !PHOTOS[v]) return true;
+    const k = FRONT_KEY[state.opts.front || '2'] || '2';
+    return PHOTOS[v].some(e => e[1] === k);
+  }
+  function paintViews() {
+    $$('#views button').forEach(b => { const ok = viewOk(b.dataset.view); b.classList.toggle('na', !ok);
+      b.title = ok ? '' : 'No photo of this front from this angle yet'; });
+  }
   const FRONTISH = ['front', 'three4', 'side'];
   const APPROX = [
     ['chestPocket', FRONTISH, { 233: 'the tulip-shaped chest pocket', 234: 'two chest pockets with flaps', BE: 'the angled box-pleat chest pocket',
@@ -191,6 +204,7 @@
       Y: 'this jetted pocket' }],
     ['lapel', FRONTISH, { 'HA279-118': 'the removable shawl lapel' }],
     ['shoulder', FRONTISH, { E: 'the shirt-head shoulder' }],
+    ['front', ['front'], { 6: 'the 4 roll 3 front', 9: 'the 4-button double-breasted (1 to close)', 13: 'the 6-button double-breasted (3 to close)' }],
     ['collarBack', ['back', 'front', 'three4', 'side'], { B: 'the collar turned back at the end' }],
     ['facing', ['open'], { A: 'this facing shape', C: 'the sword-shaped facing', DGG: 'this facing shape', E: 'this facing shape',
       G: 'the half-lining facing', G03: 'the unlined facing', US66: 'this facing shape' }]];
@@ -761,6 +775,62 @@
     if (ex > 0) { ex = -ex; ey = -ey; }                      // as in the photos: towards the vent, on the left of the buttons
     return (st.cuffs[key] = { ...st, A, B, S, OVP, SH, U, V, ov, ovCache: {}, cuffAt: { centres, r, ex, ey, dx, dy } });
   }
+  // ---------- sleeve buttons in the front, inside and back photos ----------
+  // build/cuff_stacks.py marks each cuff's button stack in buttons.json: "own" = the photographed buttons are in the
+  // overlay (redrawn in the chosen number from their own bottom button), "ref" = melted into the cloth on that photo
+  // (the reference photo's button is drawn there instead). Kissing or spaced as on the side view.
+  const CUFF_REF = {};
+  async function cuffRef() {
+    for (const s of 'LR') if (!CUFF_REF[s]) {
+      try { const im = await loadImg(`maps/_cuffbtn_${s}.png?v=${VER}`); CUFF_REF[s] = { w: im.width, h: im.height, d: pixels(im) }; } catch (e) { /* none */ }
+    }
+  }
+  function stackView(st) {
+    const S = st.meta.stacks; if (!S || !S.length) return st;
+    const o = cuffOpts(), key = 'stk' + o.n + '|' + o.kiss;
+    st.cuffs = st.cuffs || {};
+    if (st.cuffs[key]) return st.cuffs[key];
+    const OVP = new Uint8ClampedArray(st.OVP), A = st.A.slice(), B = new Uint8ClampedArray(st.B), Sh = new Uint8ClampedArray(st.S),
+      SH = st.SH.slice(), U = st.U.slice(), V = st.V.slice();
+    for (const [x, y, w, h, kind] of S) {
+      let spr; const left = x < W / 2;
+      if (kind === 'own') {
+        const bh = Math.round(h / 4); spr = { w, h: bh, d: new Uint8ClampedArray(w * bh * 4) };
+        for (let yy = 0; yy < bh; yy++) for (let xx = 0; xx < w; xx++) {
+          const q = ((y + h - bh + yy) * W + x + xx) * 4, t = (yy * w + xx) * 4;
+          for (let k = 0; k < 4; k++) spr.d[t + k] = st.OVP[q + k];
+        }
+        // the photographed buttons are taken out: outside the sleeve's edge (read just above and below the stack)
+        // becomes backdrop, over the sleeve becomes the cloth beside it
+        const edges = [];
+        for (const yy of [y - 14, y - 8, y + h + 8, y + h + 14]) {
+          if (yy < 0 || yy >= H) continue;
+          for (let k = 0; k < 60; k++) { const xx = left ? x - 20 + k : x + w + 20 - k; if (st.A[yy * W + xx] > 0.99) { edges.push(xx); break; } }
+        }
+        const ex = edges.length ? edges.sort((p, q) => p - q)[edges.length >> 1] : (left ? x + w / 2 : x + w / 2);
+        for (let yy = y - 3; yy < y + h + 3; yy++) for (let xx = x - 4; xx < x + w + 4; xx++) {
+          const i = yy * W + xx, p = i * 4; OVP[p + 3] = 0;
+          if (left ? xx < ex : xx > ex) { A[i] = 0; B[p] = B[p + 1] = B[p + 2] = BGC; B[p + 3] = 255; Sh[p] = Sh[p + 1] = Sh[p + 2] = BGC; continue; }
+          // weave from the cloth one stack-width further in; light from the cloth just above and below at this spot
+          const j = yy * W + (left ? xx + w + 6 : xx - w - 6), t = (y - 6) * W + xx, u = (y + h + 6) * W + xx, f = (yy - y + 6) / (h + 12);
+          A[i] = Math.max(st.A[t], st.A[u]); U[i] = st.U[j]; V[i] = st.V[j]; SH[i] = st.SH[t] * (1 - f) + st.SH[u] * f;
+          for (let k = 0; k < 4; k++) { B[p + k] = st.B[t * 4 + k]; Sh[p + k] = st.S[t * 4 + k] * (1 - f) + st.S[u * 4 + k] * f; }
+        }
+      } else { spr = CUFF_REF[left ? 'L' : 'R']; if (!spr) continue; }
+      const pitch = spr.h * (o.kiss ? 1 : 1.4);
+      for (let k = 0; k < o.n; k++) {
+        const top = Math.round(y + h - spr.h - k * pitch);
+        for (let yy = 0; yy < spr.h; yy++) for (let xx = 0; xx < spr.w; xx++) {
+          const t = (yy * spr.w + xx) * 4, a = spr.d[t + 3]; if (!a) continue;
+          const q = ((top + yy) * W + x + xx) * 4;
+          if (a > OVP[q + 3]) { OVP[q] = spr.d[t]; OVP[q + 1] = spr.d[t + 1]; OVP[q + 2] = spr.d[t + 2]; OVP[q + 3] = a; }
+        }
+      }
+    }
+    const ov = document.createElement('canvas'); ov.width = W; ov.height = H;
+    const ox = ov.getContext('2d'), im = ox.createImageData(W, H); im.data.set(OVP); ox.putImageData(im, 0, 0);
+    return (st.cuffs[key] = { ...st, A, B, S: Sh, SH, U, V, OVP, ov, ovCache: {} });
+  }
   function drawCuffHoles(st, zx, zy, Z) {
     const c = st.cuffAt, o = cuffOpts(); if (!c || !o.holes || !c.centres.length) return;
     const t = threadRGB('button');
@@ -1169,6 +1239,8 @@
 
   let ticket = 0;
   async function render() {
+    if (!viewOk(state.view)) { state.view = 'front'; state.zoom = null; state.closeup = null; $$('#views button').forEach(x => x.classList.toggle('on', x.dataset.view === 'front')); }
+    paintViews();
     const my = ++ticket, m = mapName(); state.mapName = m.name;
     busy.hidden = false; busy.textContent = 'Updating…';
     // a cloth shown from a photo of its swatch with an estimated scale says so on the picture (and on its card)
@@ -1179,7 +1251,8 @@
     const ls = stepNote && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
     if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(stepNote)}</p>`);
     try {
-      const st = cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk));
+      await cuffRef();
+      const st = stackView(cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk)));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
         if (g && g.L && g.R && (pos === 'D' || pos === 'E')) state.zoom = zoomBox((g.L.x + g.R.x) / 2, (g.L.y + g.R.y) / 2 + 80, 1.6);   // both lapels
@@ -1890,7 +1963,9 @@
   }
 
   // ---------- views / tabs ----------
-  $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; state.view = b.dataset.view; state.closeup = null; state.zoom = null; state.melton = false; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+  $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return;
+    if (!viewOk(b.dataset.view)) { toast(`There is no ${b.textContent.toLowerCase()} photo of the ${((choiceOf('front') || {}).label || 'chosen front').toLowerCase()} yet, so this angle is not shown (it would show a different jacket). Your choice is saved for the order.`); return; }
+    state.view = b.dataset.view; state.closeup = null; state.zoom = null; state.melton = false; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
