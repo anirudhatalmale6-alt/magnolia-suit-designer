@@ -798,61 +798,59 @@
     if (ex > 0) { ex = -ex; ey = -ey; }                      // as in the photos: towards the vent, on the left of the buttons
     return (st.cuffs[key] = { ...st, A, B, S, OVP, SH, U, V, ov, ovCache: {}, cuffs: undefined, elbowPx: undefined, cuffAt: { centres, r, ex, ey, dx, dy } });
   }
-  // ---------- sleeve buttons in the front, inside and back photos ----------
-  // build/cuff_stacks.py marks each cuff's button stack in buttons.json: "own" = the photographed buttons are in the
-  // overlay (redrawn in the chosen number from their own bottom button), "ref" = melted into the cloth on that photo
-  // (the reference photo's button is drawn there instead). Kissing or spaced as on the side view.
-  const CUFF_REF = {};
-  async function cuffRef() {
-    for (const s of 'LR') if (!CUFF_REF[s]) {
-      try { const im = await loadImg(`maps/_cuffbtn_${s}.png?v=${VER}`); CUFF_REF[s] = { w: im.width, h: im.height, d: pixels(im) }; } catch (e) { /* none */ }
-    }
+  // ---------- sleeve buttons: a flat, straight-on close-up of the cuff (owner, 17 Nov) ----------
+  // Shown while the customer chooses the sleeve buttons, their spacing, the buttonhole direction or the sleeve button /
+  // hole thread: the back of the sleeve end seen square on, at real size, in the chosen cloth, buttons and threads.
+  const CUFF_S = 46;                                // panel pixels per cm
+  async function cuffPanelReady() {
+    if (!state.fabric || state.custom) return;
+    state.cuffTile = await loadTile(state.fabric, CUFF_S / PX_PER_CM);
+    await loadBtn(sleeveBtn() || 'B001');
   }
-  function stackView(st) {
-    const S = st.meta.stacks; if (!S || !S.length) return st;
-    const o = cuffOpts(), key = 'stk' + o.n + '|' + o.kiss;
-    st.cuffs = st.cuffs || {};
-    if (st.cuffs[key]) return st.cuffs[key];
-    const OVP = new Uint8ClampedArray(st.OVP), A = st.A.slice(), B = new Uint8ClampedArray(st.B), Sh = new Uint8ClampedArray(st.S),
-      SH = st.SH.slice(), U = st.U.slice(), V = st.V.slice();
-    for (const [x, y, w, h, kind] of S) {
-      let spr; const left = x < W / 2;
-      if (kind === 'own') {
-        const bh = Math.round(h / 4); spr = { w, h: bh, d: new Uint8ClampedArray(w * bh * 4) };
-        for (let yy = 0; yy < bh; yy++) for (let xx = 0; xx < w; xx++) {
-          const q = ((y + h - bh + yy) * W + x + xx) * 4, t = (yy * w + xx) * 4;
-          for (let k = 0; k < 4; k++) spr.d[t + k] = st.OVP[q + k];
-        }
-        // the photographed buttons are taken out: outside the sleeve's edge (read just above and below the stack)
-        // becomes backdrop, over the sleeve becomes the cloth beside it
-        const edges = [];
-        for (const yy of [y - 14, y - 8, y + h + 8, y + h + 14]) {
-          if (yy < 0 || yy >= H) continue;
-          for (let k = 0; k < 60; k++) { const xx = left ? x - 20 + k : x + w + 20 - k; if (st.A[yy * W + xx] > 0.99) { edges.push(xx); break; } }
-        }
-        const ex = edges.length ? edges.sort((p, q) => p - q)[edges.length >> 1] : (left ? x + w / 2 : x + w / 2);
-        for (let yy = y - 3; yy < y + h + 3; yy++) for (let xx = x - 4; xx < x + w + 4; xx++) {
-          const i = yy * W + xx, p = i * 4; OVP[p + 3] = 0;
-          if (left ? xx < ex : xx > ex) { A[i] = 0; B[p] = B[p + 1] = B[p + 2] = BGC; B[p + 3] = 255; Sh[p] = Sh[p + 1] = Sh[p + 2] = BGC; continue; }
-          // weave from the cloth one stack-width further in; light from the cloth just above and below at this spot
-          const j = yy * W + (left ? xx + w + 6 : xx - w - 6), t = (y - 6) * W + xx, u = (y + h + 6) * W + xx, f = (yy - y + 6) / (h + 12);
-          A[i] = Math.max(st.A[t], st.A[u]); U[i] = st.U[j]; V[i] = st.V[j]; SH[i] = st.SH[t] * (1 - f) + st.SH[u] * f;
-          for (let k = 0; k < 4; k++) { B[p + k] = st.B[t * 4 + k]; Sh[p + k] = st.S[t * 4 + k] * (1 - f) + st.S[u * 4 + k] * f; }
-        }
-      } else { spr = CUFF_REF[left ? 'L' : 'R']; if (!spr) continue; }
-      const pitch = spr.h * (o.kiss ? 1 : 1.4);
-      for (let k = 0; k < o.n; k++) {
-        const top = Math.round(y + h - spr.h - k * pitch);
-        for (let yy = 0; yy < spr.h; yy++) for (let xx = 0; xx < spr.w; xx++) {
-          const t = (yy * spr.w + xx) * 4, a = spr.d[t + 3]; if (!a) continue;
-          const q = ((top + yy) * W + x + xx) * 4;
-          if (a > OVP[q + 3]) { OVP[q] = spr.d[t]; OVP[q + 1] = spr.d[t + 1]; OVP[q + 2] = spr.d[t + 2]; OVP[q + 3] = a; }
-        }
-      }
+  function drawCuffPanel() {
+    const t = state.cuffTile; if (!t) return;
+    const o = cuffOpts(), S = CUFF_S, T = t.T, N = t.n, SK = sheenOf(t);
+    const x0 = 230, x1 = 800, hem = 1240, top = 230, vent = 642;   // sleeve outline, the vent edge, the hem
+    ctx.save(); ctx.fillStyle = '#f3f0ea'; ctx.fillRect(0, 0, W, H);
+    const img = ctx.getImageData(0, 0, W, H), D = img.data;
+    for (let y = top; y < hem + 20; y++) for (let x = x0; x < x1; x++) {
+      const bot = hem + 10 * Math.sin(Math.PI * (x - x0) / (x1 - x0)); if (y > bot) continue;   // the hem, gently rounded
+      const r = (x - x0) / (x1 - x0), cyl = 0.5 + 0.62 * Math.pow(Math.sin(Math.PI * r), 0.55);   // the sleeve's roundness
+      let sh = cyl * (y > bot - 26 ? 0.86 : 1);     // the turned-up hem edge
+      if (Math.abs(x - vent) < 2 && y > hem - 11 * S) sh *= 0.45;                               // the vent edge
+      else if (x > vent && x < vent + 10 && y > hem - 11 * S) sh *= 0.8;                         // its overlap
+      const u = x % N, v = y % N, k = (v * N + u) * 3, p = (y * W + x) * 4;
+      for (let ch = 0; ch < 3; ch++) { let lin = T[k + ch] * sh + SK[ch] * sh * sh; if (lin > 2) lin = 2; D[p + ch] = TONE[(lin * OUTN) | 0]; }
     }
-    const ov = document.createElement('canvas'); ov.width = W; ov.height = H;
-    const ox = ov.getContext('2d'), im = ox.createImageData(W, H); im.data.set(OVP); ox.putImageData(im, 0, 0);
-    return (st.cuffs[key] = { ...st, A, B, S: Sh, SH, U, V, OVP, ov, ovCache: {}, cuffs: undefined, elbowPx: undefined });
+    ctx.putImageData(img, 0, 0);
+    // buttons: from 3 cm above the hem up the vent, kissing (just touching) or spaced
+    const d = 1.5 * S, pitch = o.kiss ? d * 0.97 : d * 1.5, cx = vent - 1.15 * S;
+    const bi = btnImgs[(sleeveBtn() || 'B001') + '|' + (state.thread.button || '')];
+    for (let k = 0; k < o.n; k++) {
+      const cy = hem - 3 * S - k * pitch;
+      if (o.holes) {                                 // the buttonhole: from the button towards the vent, in its thread
+        const tc = state.thread.sleeve[k] && (THREADS.find(x => x.id === state.thread.sleeve[k]) || {}).rgb, a = o.slant ? -0.42 : 0, L = 1.9 * S;
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(a); ctx.lineCap = 'round';
+        const own = clothRGB().map(v => Math.min(255, Math.round(v * 1.3 + 14)));   // matching thread: the cloth's colour, its stitched ridge a touch lighter
+        ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
+        ctx.strokeStyle = `rgb(${tc || own})`; ctx.lineWidth = 13; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(L, 0); ctx.stroke();
+        ctx.shadowColor = 'transparent'; ctx.setLineDash([2.5, 2]); ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 11; ctx.beginPath(); ctx.moveTo(2, 0); ctx.lineTo(L - 2, 0); ctx.stroke();
+        ctx.setLineDash([]); ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(L - 5, 0); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
+      ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.closePath();
+      if (bi) { ctx.fillStyle = '#000'; ctx.fill(); ctx.shadowColor = 'transparent'; ctx.clip(); ctx.drawImage(bi, cx - d / 2, cy - d / 2, d, d); }
+      ctx.restore();
+    }
+    // the key
+    ctx.fillStyle = '#222'; ctx.font = '600 40px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Sleeve buttons: close-up of the cuff', W / 2, 92);
+    ctx.font = '400 32px system-ui, sans-serif'; ctx.fillStyle = '#444';
+    const words = o.n ? `${o.n} button${o.n > 1 ? 's' : ''} · ${o.kiss ? 'kissing' : 'spaced'} · ${!o.holes ? 'no buttonholes' : o.slant ? 'slanted holes' : 'straight holes'}` : 'No sleeve buttons';
+    ctx.fillText(words, W / 2, 146); ctx.font = '400 26px system-ui, sans-serif'; ctx.fillStyle = '#666';
+    ctx.fillText('The back of the sleeve end, seen straight on', W / 2, 186);
+    ctx.restore();
   }
   function drawCuffHoles(st, zx, zy, Z) {
     const c = st.cuffAt, o = cuffOpts(); if (!c || !o.holes || !c.centres.length) return;
@@ -1300,8 +1298,7 @@
     const ls = stepNote && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
     if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(stepNote)}</p>`);
     try {
-      await cuffRef();
-      const st = stackView(cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk)));
+      const st = cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
         if (g && g.L && g.R && (pos === 'D' || pos === 'E')) state.zoom = zoomBox((g.L.x + g.R.x) / 2, (g.L.y + g.R.y) / 2 + 80, 1.6);   // both lapels
@@ -1318,12 +1315,14 @@
       const lo = st.LN && state.lining && LININGS.find(x => x.id === state.lining);
       if (lo) await (lo.kind === 'positional' ? loadPosTex(lo, st) : loadLinTex(lo, state.zoom ? state.zoom.z : 1));
       await monoReady();
+      if (state.cuffPanel) await cuffPanelReady();
       if (state.custom && state.zoom && state.ctileZ !== state.zoom.z) { state.ctile = linearTile(state.cup, 150 * state.zoom.z); state.ctileZ = state.zoom.z; }
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
         if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy, state.zoom.z); else draw(st);
         if (state.diagram && state.view === 'front' && !state.zoom) drawConstruction(st, state.diagram);
+        if (state.cuffPanel) drawCuffPanel();
         if (state.view === 'open' && !state.zoom) drawSleeveLining();
         if (st.name === 'side_elbow' && !state.zoom) drawElbow(st);
         paintMini(); popMini();                       // the small copy shows exactly what the big picture shows, zoom included
@@ -1595,7 +1594,11 @@
   function toggleStep(e) {
     const head = e.target.closest('.step-head'); if (!head) return false;
     const g = head.nextElementSibling, open = g.hidden;
-    head.closest('.step').classList.toggle('open', open); g.hidden = !open; return true;
+    head.closest('.step').classList.toggle('open', open); g.hidden = !open;
+    // opening another step leaves the construction diagram / cuff close-up behind: the picture returns to the jacket
+    const id = head.closest('[data-step]') && head.closest('[data-step]').dataset.step;
+    if ((state.diagram && id !== 'canvas') || (state.cuffPanel && !CUFF_STEPS.includes(id))) { state.diagram = null; state.cuffPanel = false; render(); }
+    return true;
   }
   function closeStep(tile) {
     const st = tile.closest('.step'); st.classList.remove('open'); st.querySelector('.sk-grid').hidden = true;
@@ -1672,32 +1675,36 @@
     const full = /full/i.test(kind), half = !full && /half/i.test(kind), CUT = 820;   // half canvas: chest and lapels, to about the waist
     // the canvas's weight: the same area, a lighter canvas = finer, fainter hatching (and its name in the key)
     const weight = /ultra/i.test(kind) ? 'ultra' : /light/i.test(kind) ? 'light' : '';
-    const pitch = weight === 'ultra' ? 30 : weight === 'light' ? 22 : 16, line = weight === 'ultra' ? 0.45 : weight === 'light' ? 0.58 : 0.7,
-      tint = weight === 'ultra' ? 0.14 : weight === 'light' ? 0.22 : 0.32;
+    // half canvas: dense cross-hatch; light: single diagonal hatch; ultra-thin: a sparse dot screen (and paler)
+    const canvasA = (x, y) => weight === 'ultra' ? ((x % 18 < 4 && y % 18 < 4) ? 0.75 : 0.1)
+      : weight === 'light' ? (((x + y) % 20) < 3 ? 0.62 : 0.2)
+      : ((((x + y) % 14) < 3 || ((x - y + 4096) % 14) < 3) ? 0.72 : 0.36);
     const img = ctx.getImageData(0, 0, W, H), O = img.data;
     for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i++) {
       if (!st.A[i] || x < 175 || x > 850 || st.OVP[i * 4 + 3]) continue;       // front panels only (not the sleeves), never the buttons
       const canvas = full || (half && y < CUT), c = canvas ? [26, 140, 145] : [214, 150, 40];
-      const a = st.A[i] * (canvas ? (((x + y) % pitch) < (weight === 'ultra' ? 2 : 3) ? line : tint) : (((x + y) % 16) < 3 ? 0.7 : 0.32));
+      const a = st.A[i] * (canvas ? canvasA(x, y) : (((x + y) % 16) < 3 ? 0.7 : 0.32));
       const p = i * 4; O[p] = O[p] * (1 - a) + c[0] * a; O[p + 1] = O[p + 1] * (1 - a) + c[1] * a; O[p + 2] = O[p + 2] * (1 - a) + c[2] * a;
     }
     ctx.putImageData(img, 0, 0);
     const cn = weight === 'ultra' ? 'Ultra-thin canvas' : weight === 'light' ? 'Light canvas' : 'Canvas';
+    const scale = half ? `Canvas weight: ${weight === 'ultra' ? '\u25A0\u25A1\u25A1 ultra-thin' : weight === 'light' ? '\u25A0\u25A0\u25A1 light' : '\u25A0\u25A0\u25A0 standard'}` : '';
     const rows = full ? [['Canvas (sewn in): whole front', [26, 140, 145]]]
-      : half ? [[`${cn} (sewn in): chest, lapels`, [26, 140, 145]], ['Fused (glued): below', [214, 150, 40]]] : [['Fused (glued): whole front', [214, 150, 40]]];
+      : half ? [[`${cn} (sewn in): chest, lapels`, [26, 140, 145]], ['Fused (glued): below', [214, 150, 40]], [scale, null]] : [['Fused (glued): whole front', [214, 150, 40]]];
     ctx.save(); ctx.font = '600 40px system-ui, sans-serif';
     const bw = Math.min(W - 20, 40 + Math.max(...rows.map(r => ctx.measureText(r[0]).width)) + 70), bh = 28 + rows.length * 60;
     const by0 = H - bh - 170;                      // above the view buttons that sit over the bottom of the picture
     ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillRect((W - bw) / 2, by0, bw, bh);
     rows.forEach(([t, c], k) => {
       const y = by0 + 22 + k * 60;
-      ctx.fillStyle = `rgb(${c})`; ctx.fillRect((W - bw) / 2 + 20, y, 44, 40);
+      if (c) { ctx.fillStyle = `rgb(${c})`; ctx.fillRect((W - bw) / 2 + 20, y, 44, 40); }
       ctx.fillStyle = '#222'; ctx.fillText(t, (W - bw) / 2 + 80, y + 33);
     });
     ctx.restore();
   }
+  const CUFF_STEPS = ['cuffButtons', 'kissing', 'sleeveHoleDir'];
   function setOpt(id, v) {
-    state.opts[id] = v; state.melton = false; state.lastStep = id;
+    state.opts[id] = v; state.melton = false; state.lastStep = id; state.cuffPanel = !isBk() && CUFF_STEPS.includes(id);
     state.diagram = id === 'canvas' ? (choiceOf('canvas') || {}).label || '' : null;
     if (id === 'cuffButtons') paintThreads();
     showPart(id); render();
@@ -1792,7 +1799,7 @@
   }
   $('#btnMat').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; btnFilter = b.dataset.m; paintButtons(); };
   $('#btnGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.button = b.dataset.b || null; paintButtons(); if (state.button) zoomTo(...FRONT_BTN); render(); goNext($('#sleeveSeg')); };
-  $('#sleeveGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.sleeveButton = b.dataset.b || null; paintButtons(); if (state.sleeveButton) zoomTo(...SLEEVE_BTN); render(); goNext($('#hThreads')); };
+  $('#sleeveGrid').onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; state.sleeveButton = b.dataset.b || null; paintButtons(); if (state.sleeveButton) zoomTo(...SLEEVE_BTN); state.cuffPanel = !isBk(); render(); goNext($('#hThreads')); };
   $('#sleeveSeg').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; state.sleeveSame = b.dataset.v === 'same';
     paintButtons(); paintSummary(); if (!state.sleeveSame) zoomTo(...SLEEVE_BTN); render(); };
   $('#sleeveMat').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; sleeveFilter = b.dataset.m; paintButtons(); };
@@ -1836,7 +1843,8 @@
     // is loaded), the sleeve holes; then redraw (the lapel and staff-only holes used to update the summary only)
     if (key === 'button' || key === 'front') zoomTo(...FRONT_BTN);
     else if (key === 'lapel') showLapelThread();
-    else if (key === 'sleeve') showPart('cuffButtons');
+    else if (key === 'sleeve') { showPart('cuffButtons'); state.cuffPanel = !isBk(); }
+    if (key !== 'sleeve') state.cuffPanel = false;
     render();
     if (key === 'sleeve' && state.holeSel) return;            // picking hole by hole: stay here
     const rows = [...document.querySelectorAll('#threadRows .pal')].map(p => p.closest('.thread-row'));
@@ -1867,7 +1875,7 @@
   }
   $('#sleeveLinSame').onchange = e => { state.sleeveLinSame = e.target.checked; paintLinings(); paintSummary(); showInside(); };
   $('#sleeveLinGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.sleeveLining = b.dataset.l || null; paintLinings(); paintSummary(); showInside(); goNext($('#hMono')); };
-  function showInside() { state.view = 'open'; state.zoom = null; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'open')); render(); }
+  function showInside() { state.cuffPanel = false; state.diagram = null; state.view = 'open'; state.zoom = null; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'open')); render(); }
   $('#linGrid').onclick = e => { const b = e.target.closest('[data-l]'); if (!b) return; state.lining = b.dataset.l || null; paintLinings(); paintSummary(); showInside(); goNext($('#sleeveLinSame').closest('label')); };
 
   // ---------- contrast fabrics (undercollar melton, elbow patch suede) ----------
@@ -2057,10 +2065,11 @@
   // ---------- views / tabs ----------
   $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return;
     if (!viewOk(b.dataset.view)) { toast(`There is no ${b.textContent.toLowerCase()} photo of the ${((choiceOf('front') || {}).label || 'chosen front').toLowerCase()} yet, so this angle is not shown (it would show a different jacket). Your choice is saved for the order.`); return; }
-    state.view = b.dataset.view; state.closeup = null; state.zoom = null; state.melton = false; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+    state.view = b.dataset.view; state.cuffPanel = false; state.diagram = null; state.closeup = null; state.zoom = null; state.melton = false; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
+    state.diagram = null; state.cuffPanel = false;          // a diagram / close-up belongs to its own step
     const ln = $('#lookNote'); if (ln) ln.hidden = true;
     $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
     updMini();
