@@ -334,3 +334,9 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
 .pv-modal { z-index: 100; }   /* above every bar on the page, including the demo guide bar */
 @media (max-width: 600px) { .pv-stage { max-height: 46vh; } .pv-card { padding: 14px; } .pv-nav { margin-top: 8px; } }   /* phones: "Choose this fabric" stays on screen */
 @supports (height: 1dvh) { .pv-card { max-height: calc(100dvh - 32px); } @media (max-width: 600px) { .pv-stage { max-height: 42dvh; } } }   /* iPhone Safari: the height left by its toolbars */
+/* Back beside Next on each step */
+.nav-row { display: flex; gap: 10px; align-items: stretch; }
+.nav-row .back-btn { flex: 0 0 auto; border-radius: 999px; padding: 10px 16px; font-size: 14px; }
+.nav-row .next-btn, .nav-row #sendToRequest { flex: 1 1 auto; }
+.inline-thread { margin: 8px 0 4px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+@media (max-width: 900px) { .inline-thread { scroll-margin-top: calc(42vh + 10px); } }

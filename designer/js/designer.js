@@ -37,7 +37,12 @@
   const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
                   set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } } };
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const loadImg = src => new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = src; });
+  // a picture that fails (a passing network or hosting hiccup) is asked for again, twice, before giving up
+  const loadImg = (src, tries = 2) => new Promise((ok, bad) => {
+    const i = new Image(); i.onload = () => ok(i);
+    i.onerror = e => tries > 0 ? setTimeout(() => loadImg(src + (src.includes('?') ? '&' : '?') + 'r=' + tries, tries - 1).then(ok, bad), 800) : bad(e);
+    i.src = src;
+  });
   function pixels(img) {
     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
     const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
@@ -1209,7 +1214,7 @@
     $('#grid').innerHTML = list.length ? list.map(f => {
       const s = STAFF && STAFF[f.id];
       return `<div class="fab-cell"><button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
-        <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)}${s.band ? ` · ${esc(s.band)}` : ''}</small>` : ''}</button>` +
+        <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160" onerror="if(!this.dataset.r){this.dataset.r=1;setTimeout(()=>{this.src=this.src+'&r=1'},800)}"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)}${s.band ? ` · ${esc(s.band)}` : ''}</small>` : ''}</button>` +
         `<button type="button" class="pv-open" data-pv-open="${f.id}" aria-label="See No. ${num(f)} close up${PREV[f.id] ? ' and draped' : ''}">Close-up${PREV[f.id] ? ' · Drape' : ''}</button></div>`;
     }).join('') : '<p class="empty">No fabric matches these filters.</p>';
   }
@@ -1406,8 +1411,10 @@
       if (o.section !== sec) { sec = o.section; html += `<p class="sec-title">${esc(sec)}</p>`; }
       const list = o.show.map(code => o.choices.find(c => c.code === code)).filter(Boolean).map(c => ({ v: c.code, label: c.label + (optExtra(o.id, c.code) ? ` (+$${optExtra(o.id, c.code)})` : ''), img: c.img }));
       html += stepRow(`data-step="${o.id}"`, o.label, state.opts[o.id] || o.default, list, STYLE_HINT[o.id]);
+      if (o.id === 'lapelHoleStyle') html += '<div class="thread-row inline-thread" id="lapelThreadInline" hidden></div>';
     }
     $('#styleSteps').innerHTML = html;
+    paintInlineThread();
     paintHidden();
   }
   // staff only: the factory options the order screen hides (shoulder pad, gorge, contrast, labels, inner pockets ...)
@@ -1496,6 +1503,12 @@
     showPart(id); render();
   }
   $('#styleSteps').onclick = e => {
+    const tc = e.target.closest('#lapelThreadInline [data-c]');
+    if (tc) {
+      state.thread.lapel = tc.dataset.c || null; paintThreads(); showPart('lapelHole'); render();
+      openNext(document.querySelector('[data-step="lapelHoleStyle"]'), '#styleSteps .step', $('[data-next=style]'));
+      return;
+    }
     if (toggleStep(e)) return;
     const b = e.target.closest('.sk'); if (!b) return;
     const st = b.closest('[data-step]'), id = st.dataset.step;
@@ -1505,6 +1518,10 @@
     st.querySelector('.step-thumb').innerHTML = c && c.img ? skImg(c.img) : '';
     closeStep(b);
     setOpt(id, b.dataset.v);
+    if (id === 'lapelHoleStyle') {                  // its thread colour right here, before moving on
+      paintInlineThread(); const box = document.getElementById('lapelThreadInline');
+      if (box && !box.hidden) { setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120); return; }
+    }
     openNext(document.querySelector(`[data-step="${id}"]`), '#styleSteps .step', $('[data-next=style]'));
   };
   // after a choice the next section opens by itself, its options in view (below the picture on phones)
@@ -1585,12 +1602,20 @@
     return `<div class="pal" data-t="${key}"><button type="button" class="match${!cur ? ' on' : ''}" data-c="">Match the cloth</button>` +
       THREADS.map(t => `<button type="button" data-c="${t.id}" title="${threadName(t.id)}${trimCode('threads', t.id) ? ' · ' + trimCode('threads', t.id) : ''}" style="background:${rgbCss(t.rgb)}" class="${t.id === cur ? 'on' : ''}"></button>`).join('') + '</div>';
   }
+  // the lapel buttonhole thread, offered right under the lapel buttonhole style (the same choice as in Trims)
+  function paintInlineThread() {
+    const box = document.getElementById('lapelThreadInline'); if (!box) return;
+    const style = (choiceOf('lapelHoleStyle') || {}).code || 'A';
+    box.hidden = style === 'A';                     // 'None': no buttonhole, so no thread to choose
+    box.innerHTML = `<b>Lapel buttonhole thread colour</b><p class="hint">The same choice as in Trims.</p>${palette(state.thread.lapel, 'lapel')}`;
+  }
   function paintThreads() {
     const n = sleeveHoles(), sel = Math.min(state.holeSel, n);
     const dot = c => { const t = THREADS.find(x => x.id === c); return `<i style="background:${t ? rgbCss(t.rgb) : 'transparent'}"></i>`; };
     const holes = `<div class="sleeve-holes"><button type="button" data-h="0" class="${sel === 0 ? 'on' : ''}">All holes</button>` +
       Array.from({ length: n }, (_, i) => `<button type="button" data-h="${i + 1}" class="${sel === i + 1 ? 'on' : ''}">${dot(state.thread.sleeve[i])}Hole ${i + 1}</button>`).join('') + '</div>';
     const cur = sel ? state.thread.sleeve[sel - 1] : (state.thread.sleeve.slice(0, n).every(c => c === state.thread.sleeve[0]) ? state.thread.sleeve[0] : undefined);
+    paintInlineThread();
     $('#threadRows').innerHTML =
       `<div class="thread-row"><b>Button thread</b>${palette(state.thread.button, 'button')}</div>` +
       `<div class="thread-row"><b>Lapel buttonhole</b>${palette(state.thread.lapel, 'lapel')}</div>` +
@@ -1836,7 +1861,11 @@
     $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
     updMini();
     $$('.tab').forEach(p => { p.hidden = p.dataset.pane !== name; });
-    $('.panel').scrollTop = 0; if (innerWidth <= 900) $('.tabs').scrollIntoView({ block: 'start' });
+    $('.panel').scrollTop = 0;
+    if (innerWidth <= 900) {                        // phones: the step starts at its top, right under the (sticky) jacket
+      const panelTop = $('.panel').getBoundingClientRect().top + scrollY, stageH = $('#stage').getBoundingClientRect().height;
+      window.scrollTo(0, Math.max(0, panelTop - stageH));
+    }
     paintProgress();
   }
   function paintSteps() {
@@ -1853,6 +1882,8 @@
     }
     showTab(b.dataset.tab);
   });
+  // Back beside Next on every step: the previous step, every choice kept (the state is not touched)
+  $$('.back-btn').forEach(b => b.onclick = () => showTab(b.dataset.back));
   $$('.next-btn').forEach(b => b.onclick = () => {
     const i = STEPS_ORDER.indexOf(b.dataset.next);
     if (b.disabled) return;
@@ -2031,6 +2062,8 @@
       try { PREV = await get('previews.json'); } catch (e) { PREV = {}; }
       try { EXTRAS = await get('extras.json'); } catch (e) { /* no extra charges listed */ }
     } catch (e) { busy.textContent = 'Could not load the fabrics. Please refresh the page.'; return; }
+    const byNo = (a, b) => parseInt(a.id.replace(/\D/g, ''), 10) - parseInt(b.id.replace(/\D/g, ''), 10) || (a.id < b.id ? -1 : 1);
+    FABRICS.sort(byNo);                               // in number order, so every fabric is where the customer expects it (bekeshe cloths keep their book order)
     JF = FABRICS; JOPTS = OPTS;
     FABRICS.concat(BKF).forEach(f => { f._cloth = clothOf(f); f._weight = weightOf(f); });
     state.fabric = FABRICS.find(f => f.colour === 'navy' && f.pattern === 'solid' && f.use === 'Suit' && f.composition === '100% wool') || FABRICS[0];

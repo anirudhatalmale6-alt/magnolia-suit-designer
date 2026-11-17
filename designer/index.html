@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '64';
+    var V = '65';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -20,7 +20,7 @@
   })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Archivo+Black&family=Arimo&family=Caveat&family=Crimson+Text&family=Cormorant+Garamond:ital,wght@1,600&family=Kalam&family=Merienda:wght@500&family=Fondamento&family=Marck+Script&family=Great+Vibes&family=Bangers&family=Poiret+One&family=UnifrakturMaguntia&family=Yesteryear&family=Tinos&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=64">
+<link rel="stylesheet" href="css/designer.css?v=65">
 </head>
 <body>
 <header class="topbar">
@@ -174,7 +174,7 @@
         <p class="hint">Not shown to customers. Each one starts on the factory default; change only what the order needs.</p>
         <div id="staffHidden"></div>
       </div>
-      <div class="next-bar"><button type="button" class="primary next-btn" data-next="style">Next: Trims &rsaquo;</button><small class="next-hint"></small></div>
+      <div class="next-bar"><div class="nav-row"><button type="button" class="ghost dark back-btn" data-back="fabric">&lsaquo; Back: Fabric</button><button type="button" class="primary next-btn" data-next="style">Next: Trims &rsaquo;</button></div><small class="next-hint"></small></div>
     </section>
 
     <section class="tab" data-pane="trims" hidden>
@@ -213,7 +213,7 @@
           <div class="grid lin-grid" id="elbowGrid" hidden></div></div>
         <p class="hint">Satin and other contrast parts: Style tab, "Contrast position" and "Contrast fabric".</p>
       </div>
-      <div class="next-bar"><button type="button" class="primary next-btn" data-next="trims">Next: Summary &rsaquo;</button><small class="next-hint"></small></div>
+      <div class="next-bar"><div class="nav-row"><button type="button" class="ghost dark back-btn" data-back="style">&lsaquo; Back: Style</button><button type="button" class="primary next-btn" data-next="trims">Next: Summary &rsaquo;</button></div><small class="next-hint"></small></div>
     </section>
 
     <section class="tab" data-pane="summary" hidden>
@@ -235,7 +235,7 @@
         <div class="adv-row">Urgent<div class="seg" id="urgentSeg"></div></div>
       </div>
       <p class="hint">Review your choices, then continue to add your measurements and contact details. Nothing is sent or confirmed yet.</p>
-      <p><button type="button" class="primary" id="sendToRequest">Continue to fit &amp; request &rsaquo;</button></p><p class="hint warn" id="transferError" role="alert"></p>
+      <div class="nav-row"><button type="button" class="ghost dark back-btn" data-back="trims">&lsaquo; Back: Trims</button><button type="button" class="primary" id="sendToRequest">Continue to fit &amp; request &rsaquo;</button></div><p class="hint warn" id="transferError" role="alert"></p>
     </section>
   </aside>
 </div>
@@ -284,6 +284,6 @@
 </div>
 <script>window.MAGNOLIA_PREVIEW_BASE = 'https://anirudhatalmale6-alt.github.io/magnolia-fabric-previews/';  /* the fabric preview files (own site) */</script>
 <script src="../demo-guide.js?v=2"></script>
-<script src="js/designer.js?v=64"></script>
+<script src="js/designer.js?v=65"></script>
 </body>
 </html>
