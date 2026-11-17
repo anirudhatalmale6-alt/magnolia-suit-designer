@@ -11,7 +11,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '63';
+    var V = '64';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -20,7 +20,7 @@
   })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Archivo+Black&family=Arimo&family=Caveat&family=Crimson+Text&family=Cormorant+Garamond:ital,wght@1,600&family=Kalam&family=Merienda:wght@500&family=Fondamento&family=Marck+Script&family=Great+Vibes&family=Bangers&family=Poiret+One&family=UnifrakturMaguntia&family=Yesteryear&family=Tinos&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=63">
+<link rel="stylesheet" href="css/designer.css?v=64">
 </head>
 <body>
 <header class="topbar">
@@ -243,7 +243,7 @@
 <div class="modal pv-modal" id="pvModal" hidden>
   <div class="modal-card pv-card" role="dialog" aria-modal="true" aria-labelledby="pvTitle">
     <div class="pv-head"><div><b id="pvTitle"></b><small id="pvSub"></small></div><button type="button" class="pv-x" id="pvClose" aria-label="Close the fabric preview">&times;</button></div>
-    <div class="seg pv-tabs" role="group" aria-label="Preview"><button type="button" data-pv="drape" class="on">Draped</button><button type="button" data-pv="close">Close-up</button></div>
+    <div class="seg pv-tabs" role="group" aria-label="Preview"><button type="button" data-pv="close" class="on">Close-up</button><button type="button" data-pv="drape">Draped</button></div>
     <div class="pv-stage" id="pvStage">
       <video id="pvVideo" muted loop playsinline preload="none" aria-label="Draped preview of the cloth"></video>
       <div class="pv-zoom" id="pvZoom" hidden><img id="pvImg" alt="Close-up of the actual swatch" draggable="false"></div>
@@ -284,6 +284,6 @@
 </div>
 <script>window.MAGNOLIA_PREVIEW_BASE = 'https://anirudhatalmale6-alt.github.io/magnolia-fabric-previews/';  /* the fabric preview files (own site) */</script>
 <script src="../demo-guide.js?v=2"></script>
-<script src="js/designer.js?v=63"></script>
+<script src="js/designer.js?v=64"></script>
 </body>
 </html>

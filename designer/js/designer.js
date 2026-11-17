@@ -1210,7 +1210,7 @@
       const s = STAFF && STAFF[f.id];
       return `<div class="fab-cell"><button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
         <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)}${s.band ? ` · ${esc(s.band)}` : ''}</small>` : ''}</button>` +
-        `<button type="button" class="pv-open${PREV[f.id] ? '' : ' soon'}" data-pv-open="${f.id}" aria-label="Preview No. ${num(f)}: draped and close-up">${PREV[f.id] ? '&#9654; Drape' : 'Close-up'}</button></div>`;
+        `<button type="button" class="pv-open" data-pv-open="${f.id}" aria-label="See No. ${num(f)} close up${PREV[f.id] ? ' and draped' : ''}">Close-up${PREV[f.id] ? ' · Drape' : ''}</button></div>`;
     }).join('') : '<p class="empty">No fabric matches these filters.</p>';
   }
   function paintChosen() {
@@ -1871,15 +1871,15 @@
   }
   $('#chosen').onclick = e => { if (e.target.closest('.sw-open, .sw-link') && state.fabric && !state.custom) openPreview(state.fabric.id); };
 
-  // ---------- fabric preview: Draped (the owner's video, labelled when simulated) / Close-up (actual swatch photo,
-  // zoom and drag); previous / next through the fabrics in the current filter; "Choose this fabric" selects it.
+  // ---------- fabric preview: Close-up first (actual swatch photo, zoom and drag), then Draped (the owner's video,
+  // labelled when simulated); previous / next through the fabrics in the current filter; "Choose this fabric" selects it.
   // Fabrics without preview files show the swatch close-up and "Draped preview coming". previews.json comes from
   // build/import_previews.py; the videos load only when that fabric's Draped view is opened.
-  let pvList = [], pvAt = 0, pvTab = 'drape', zs = 1, zx = 0, zy = 0;
+  let pvList = [], pvAt = 0, pvTab = 'close', zs = 1, zx = 0, zy = 0;
   const pvFab = () => FABRICS.concat(BKF).find(f => f.id === pvList[pvAt]);
   function openPreview(id) {
     pvList = FABRICS.filter(matches).map(f => f.id); if (!pvList.includes(id)) pvList = [id];
-    pvAt = pvList.indexOf(id); pvTab = PREV[id] ? 'drape' : 'close'; $('#pvModal').hidden = false; paintPreview();
+    pvAt = pvList.indexOf(id); pvTab = 'close'; $('#pvModal').hidden = false; paintPreview();   // the actual swatch first, then the drape (owner, 17 Nov)
     setTimeout(() => $('#pvClose').focus(), 0);
   }
   function closePreview() { const v = $('#pvVideo'); v.pause(); v.removeAttribute('src'); v.load(); $('#pvModal').hidden = true; }

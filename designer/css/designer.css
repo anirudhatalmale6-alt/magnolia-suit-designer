@@ -332,3 +332,5 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
 .pv-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--muted); }
 .pv-modal[hidden], .pv-zoom[hidden], .pv-missing[hidden], .pv-zbtns[hidden] { display: none !important; }
 .pv-modal { z-index: 100; }   /* above every bar on the page, including the demo guide bar */
+@media (max-width: 600px) { .pv-stage { max-height: 46vh; } .pv-card { padding: 14px; } .pv-nav { margin-top: 8px; } }   /* phones: "Choose this fabric" stays on screen */
+@supports (height: 1dvh) { .pv-card { max-height: calc(100dvh - 32px); } @media (max-width: 600px) { .pv-stage { max-height: 42dvh; } } }   /* iPhone Safari: the height left by its toolbars */
