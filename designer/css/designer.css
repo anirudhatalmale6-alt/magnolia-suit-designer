@@ -343,3 +343,5 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
 /* an angle with no photo of the chosen front: shown, but not offered */
 .views button.na { color: var(--muted, #8a8f8f); text-decoration: line-through; text-decoration-thickness: 1px; opacity: .6; cursor: not-allowed; }
 .toast { border-radius: 14px; width: max-content; max-width: min(420px, calc(100vw - 32px)); text-align: left; line-height: 1.4; }
+#cv { transition: opacity .12s; }
+#cv.stale { opacity: .45; }
