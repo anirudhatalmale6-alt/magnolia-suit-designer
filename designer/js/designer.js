@@ -204,6 +204,9 @@
   function paintViews() {
     $$('#views button').forEach(b => { const ok = viewOk(b.dataset.view); b.classList.toggle('na', !ok);
       b.title = ok ? '' : 'No photo of this front from this angle yet'; });
+    // the cuff close-up names itself in the view row; the angle tabs stay available to go back to the jacket
+    const cuff = $('#views [data-view="cuff"]'); if (cuff) cuff.hidden = !state.cuffPanel;
+    $$('#views button').forEach(b => b.classList.toggle('on', state.cuffPanel ? b.dataset.view === 'cuff' : b.dataset.view === state.view));
   }
   const FRONTISH = ['front', 'three4', 'side'];
   const APPROX = [
@@ -801,7 +804,7 @@
   // ---------- sleeve buttons: a flat, straight-on close-up of the cuff (owner, 17 Nov) ----------
   // Shown while the customer chooses the sleeve buttons, their spacing, the buttonhole direction or the sleeve button /
   // hole thread: the back of the sleeve end seen square on, at real size, in the chosen cloth, buttons and threads.
-  const CUFF_S = 46, CUFF_BTN = 'B007';            // panel pixels per cm; until buttons are chosen: a plain dark horn button, like the photos'
+  const CUFF_S = 64, CUFF_BTN = 'B007';            // panel pixels per cm; until buttons are chosen: a plain dark horn button, like the photos'
   async function cuffPanelReady() {
     if (!state.fabric || state.custom) return;
     state.cuffTile = await loadTile(state.fabric, CUFF_S / PX_PER_CM);
@@ -810,7 +813,7 @@
   function drawCuffPanel() {
     const t = state.cuffTile; if (!t) return;
     const o = cuffOpts(), S = CUFF_S, T = t.T, N = t.n, SK = sheenOf(t);
-    const x0 = 230, x1 = 800, hem = 1240, top = 230, vent = 642;   // sleeve outline, the vent edge, the hem
+    const x0 = 190, x1 = 840, hem = 1450, top = 250, vent = 700;   // sleeve outline, the vent edge, the hem (a close crop: readable on a phone)
     ctx.save(); ctx.fillStyle = '#f3f0ea'; ctx.fillRect(0, 0, W, H);
     const img = ctx.getImageData(0, 0, W, H), D = img.data;
     for (let y = top; y < hem + 20; y++) for (let x = x0; x < x1; x++) {
@@ -825,23 +828,27 @@
     ctx.putImageData(img, 0, 0);
     // buttons: from 3 cm above the hem up the vent, kissing (just touching) or spaced
     // buttons: from 3 cm above the hem up the vent; kissing = touching and slightly overlapping, as sewn
-    const d = 1.5 * S, pitch = o.kiss ? d * 0.9 : d * 1.5, cx = vent - 1.15 * S, R = d / 2;
+    const d = 1.5 * S, pitch = o.kiss ? d * 0.9 : d * 1.5, cx = vent - 2.3 * S, R = d / 2;   // the holes run towards the vent and stop short of it
     const code = sleeveBtn() || CUFF_BTN, bi = btnImgs[code + '|' + (state.thread.button || '')];
     const ys = Array.from({ length: o.n }, (_, k) => hem - 3 * S - k * pitch);
     const own = clothRGB().map(v => Math.min(255, Math.round(v * 1.3 + 14)));   // matching thread: the cloth's colour, its stitched ridge a touch lighter
     if (o.holes) ys.forEach((cy, k) => {             // hand-worked buttonholes: purl stitches along both lips, a dark slit, bar-tacked end
       const tc = (state.thread.sleeve[k] && (THREADS.find(x => x.id === state.thread.sleeve[k]) || {}).rgb) || own;
-      const a = o.slant ? -0.42 : 0, L = 1.9 * S, hw = 5.5;
+      const a = o.slant ? -0.42 : 0, L = 1.75 * S, hw = 0.15 * S;
       ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
-      // the worked lips: a soft raised band of thread, lit on top, shaded below, a fine purl texture on it
-      ctx.filter = 'blur(1.2px)';
+      // the worked lips: a raised band of thread, clearly lit on top and shaded below, outlined by its own shadow,
+      // with purl stitches that read at normal size
+      ctx.filter = 'blur(1.6px)'; ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.roundRect(-1, -hw + 1.5, L + 2, 2 * hw + 1.5, hw); ctx.fill();   // its shadow
+      ctx.filter = 'blur(0.7px)';
       ctx.fillStyle = `rgb(${tc})`; ctx.beginPath(); ctx.roundRect(0, -hw, L, 2 * hw, hw); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(1, -hw + 1, L - 2, hw * 0.7);
-      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(1, hw * 0.35, L - 2, hw * 0.6);
-      ctx.filter = 'none'; ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 0.8;
-      for (let x = 2; x < L - 2; x += 1.8) { ctx.beginPath(); ctx.moveTo(x, -hw + 1.5); ctx.lineTo(x + 0.6, -1.4); ctx.moveTo(x + 0.4, 1.4); ctx.lineTo(x + 1, hw - 1.5); ctx.stroke(); }
-      ctx.filter = 'blur(0.6px)'; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(3, 0); ctx.lineTo(L - 4, 0); ctx.stroke();   // the cut
-      ctx.filter = 'none';
+      ctx.fillStyle = 'rgba(255,255,255,0.24)'; ctx.beginPath(); ctx.roundRect(1, -hw + 0.5, L - 2, hw * 0.75, hw * 0.4); ctx.fill();   // light on the upper lip
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(1, 1.2, L - 2, hw * 0.45);                                                // and on the lower
+      ctx.filter = 'none'; ctx.lineWidth = 1;
+      for (let x = 2.5; x < L - 3; x += 2.2) {
+        ctx.strokeStyle = 'rgba(0,0,0,0.38)'; ctx.beginPath(); ctx.moveTo(x, -hw + 1); ctx.lineTo(x + 0.8, -1.6); ctx.moveTo(x + 0.3, 1.6); ctx.lineTo(x + 1.1, hw - 1); ctx.stroke();
+        ctx.strokeStyle = `rgba(${tc.map(v => Math.min(255, v + 70))},0.45)`; ctx.beginPath(); ctx.moveTo(x + 1.1, -hw + 1.2); ctx.lineTo(x + 1.7, -2); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(3, 0); ctx.lineTo(L - 4, 0); ctx.stroke();   // the cut
       ctx.restore();
     });
     // shadows first (each button casts a soft shadow on the cloth, and on the button below when kissing)
@@ -864,12 +871,12 @@
       ctx.save(); ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, R - 0.5, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
     });
     // the key
-    ctx.fillStyle = '#222'; ctx.font = '600 40px system-ui, sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('Sleeve buttons: close-up of the cuff', W / 2, 92);
-    ctx.font = '400 32px system-ui, sans-serif'; ctx.fillStyle = '#444';
+    ctx.fillStyle = '#222'; ctx.font = '600 54px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Sleeve buttons: cuff close-up', W / 2, 92);
+    ctx.font = '400 42px system-ui, sans-serif'; ctx.fillStyle = '#444';
     const words = o.n ? `${o.n} button${o.n > 1 ? 's' : ''} · ${o.kiss ? 'kissing' : 'spaced'} · ${!o.holes ? 'no buttonholes' : o.slant ? 'slanted holes' : 'straight holes'}` : 'No sleeve buttons';
-    ctx.fillText(words, W / 2, 146); ctx.font = '400 26px system-ui, sans-serif'; ctx.fillStyle = '#666';
-    ctx.fillText('The back of the sleeve end, seen straight on', W / 2, 186);
+    ctx.fillText(words, W / 2, 152); ctx.font = '400 32px system-ui, sans-serif'; ctx.fillStyle = '#666';
+    ctx.fillText('The back of the sleeve end, seen straight on', W / 2, 200);
     ctx.restore();
   }
   function drawCuffHoles(st, zx, zy, Z) {
@@ -1335,7 +1342,7 @@
       const lo = st.LN && state.lining && LININGS.find(x => x.id === state.lining);
       if (lo) await (lo.kind === 'positional' ? loadPosTex(lo, st) : loadLinTex(lo, state.zoom ? state.zoom.z : 1));
       await monoReady();
-      if (state.cuffPanel) await cuffPanelReady();
+      if (state.cuffPanel) { state.zoom = null; state.zoomAt = null; await cuffPanelReady(); }   // the close-up is the whole picture: no zoom under it
       if (state.custom && state.zoom && state.ctileZ !== state.zoom.z) { state.ctile = linearTile(state.cup, 150 * state.zoom.z); state.ctileZ = state.zoom.z; }
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
@@ -1348,7 +1355,7 @@
         paintMini(); popMini();                       // the small copy shows exactly what the big picture shows, zoom included
         if (state.melton && state.view === 'back' && !state.zoom) { drawMelton(); paintMini(); }
         $('#stage').classList.toggle('zoom', !!state.zoom);
-        $('#zoomHint').textContent = state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
+        $('#zoomHint').textContent = state.cuffPanel ? 'Pick Front, Side or another view to see the whole jacket' : state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
         if (my === ticket) { busy.hidden = true; clearTimeout(staleT); cv.classList.remove('stale'); }
       }, 0));
     } catch (e) {
@@ -2083,17 +2090,19 @@
   }
 
   // ---------- views / tabs ----------
-  $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return;
+  $('#views').onclick = e => { const b = e.target.closest('[data-view]'); if (!b) return; if (b.dataset.view === 'cuff') return;
     if (!viewOk(b.dataset.view)) { toast(`There is no ${b.textContent.toLowerCase()} photo of the ${((choiceOf('front') || {}).label || 'chosen front').toLowerCase()} yet, so this angle is not shown (it would show a different jacket). Your choice is saved for the order.`); return; }
     state.view = b.dataset.view; state.cuffPanel = false; state.diagram = null; state.closeup = null; state.zoom = null; state.melton = false; $$('#views button').forEach(x => x.classList.toggle('on', x === b)); render(); };
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
-    state.diagram = null; state.cuffPanel = false;          // a diagram / close-up belongs to its own step
+    const had = state.diagram || state.cuffPanel;
+    state.diagram = null; state.cuffPanel = false;          // a diagram / close-up belongs to its own step: redrawn without it
     const ln = $('#lookNote'); if (ln) ln.hidden = true;
     $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
     updMini();
     $$('.tab').forEach(p => { p.hidden = p.dataset.pane !== name; });
+    if (had) render();
     $('.panel').scrollTop = 0;
     if (innerWidth <= 900) {                        // phones: the step starts at its top, right under the (sticky) jacket
       const panelTop = $('.panel').getBoundingClientRect().top + scrollY, stageH = $('#stage').getBoundingClientRect().height;
