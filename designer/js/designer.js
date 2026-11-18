@@ -801,11 +801,11 @@
   // ---------- sleeve buttons: a flat, straight-on close-up of the cuff (owner, 17 Nov) ----------
   // Shown while the customer chooses the sleeve buttons, their spacing, the buttonhole direction or the sleeve button /
   // hole thread: the back of the sleeve end seen square on, at real size, in the chosen cloth, buttons and threads.
-  const CUFF_S = 46;                                // panel pixels per cm
+  const CUFF_S = 46, CUFF_BTN = 'B007';            // panel pixels per cm; until buttons are chosen: a plain dark horn button, like the photos'
   async function cuffPanelReady() {
     if (!state.fabric || state.custom) return;
     state.cuffTile = await loadTile(state.fabric, CUFF_S / PX_PER_CM);
-    await loadBtn(sleeveBtn() || 'B001');
+    await loadBtn(sleeveBtn() || CUFF_BTN);
   }
   function drawCuffPanel() {
     const t = state.cuffTile; if (!t) return;
@@ -824,25 +824,45 @@
     }
     ctx.putImageData(img, 0, 0);
     // buttons: from 3 cm above the hem up the vent, kissing (just touching) or spaced
-    const d = 1.5 * S, pitch = o.kiss ? d * 0.97 : d * 1.5, cx = vent - 1.15 * S;
-    const bi = btnImgs[(sleeveBtn() || 'B001') + '|' + (state.thread.button || '')];
-    for (let k = 0; k < o.n; k++) {
-      const cy = hem - 3 * S - k * pitch;
-      if (o.holes) {                                 // the buttonhole: from the button towards the vent, in its thread
-        const tc = state.thread.sleeve[k] && (THREADS.find(x => x.id === state.thread.sleeve[k]) || {}).rgb, a = o.slant ? -0.42 : 0, L = 1.9 * S;
-        ctx.save(); ctx.translate(cx, cy); ctx.rotate(a); ctx.lineCap = 'round';
-        const own = clothRGB().map(v => Math.min(255, Math.round(v * 1.3 + 14)));   // matching thread: the cloth's colour, its stitched ridge a touch lighter
-        ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
-        ctx.strokeStyle = `rgb(${tc || own})`; ctx.lineWidth = 13; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(L, 0); ctx.stroke();
-        ctx.shadowColor = 'transparent'; ctx.setLineDash([2.5, 2]); ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 11; ctx.beginPath(); ctx.moveTo(2, 0); ctx.lineTo(L - 2, 0); ctx.stroke();
-        ctx.setLineDash([]); ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(5, 0); ctx.lineTo(L - 5, 0); ctx.stroke();
-        ctx.restore();
-      }
-      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10; ctx.shadowOffsetY = 4;
-      ctx.beginPath(); ctx.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx.closePath();
-      if (bi) { ctx.fillStyle = '#000'; ctx.fill(); ctx.shadowColor = 'transparent'; ctx.clip(); ctx.drawImage(bi, cx - d / 2, cy - d / 2, d, d); }
+    // buttons: from 3 cm above the hem up the vent; kissing = touching and slightly overlapping, as sewn
+    const d = 1.5 * S, pitch = o.kiss ? d * 0.9 : d * 1.5, cx = vent - 1.15 * S, R = d / 2;
+    const code = sleeveBtn() || CUFF_BTN, bi = btnImgs[code + '|' + (state.thread.button || '')];
+    const ys = Array.from({ length: o.n }, (_, k) => hem - 3 * S - k * pitch);
+    const own = clothRGB().map(v => Math.min(255, Math.round(v * 1.3 + 14)));   // matching thread: the cloth's colour, its stitched ridge a touch lighter
+    if (o.holes) ys.forEach((cy, k) => {             // hand-worked buttonholes: purl stitches along both lips, a dark slit, bar-tacked end
+      const tc = (state.thread.sleeve[k] && (THREADS.find(x => x.id === state.thread.sleeve[k]) || {}).rgb) || own;
+      const a = o.slant ? -0.42 : 0, L = 1.9 * S, hw = 5.5;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+      // the worked lips: a soft raised band of thread, lit on top, shaded below, a fine purl texture on it
+      ctx.filter = 'blur(1.2px)';
+      ctx.fillStyle = `rgb(${tc})`; ctx.beginPath(); ctx.roundRect(0, -hw, L, 2 * hw, hw); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(1, -hw + 1, L - 2, hw * 0.7);
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(1, hw * 0.35, L - 2, hw * 0.6);
+      ctx.filter = 'none'; ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 0.8;
+      for (let x = 2; x < L - 2; x += 1.8) { ctx.beginPath(); ctx.moveTo(x, -hw + 1.5); ctx.lineTo(x + 0.6, -1.4); ctx.moveTo(x + 0.4, 1.4); ctx.lineTo(x + 1, hw - 1.5); ctx.stroke(); }
+      ctx.filter = 'blur(0.6px)'; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(3, 0); ctx.lineTo(L - 4, 0); ctx.stroke();   // the cut
+      ctx.filter = 'none';
       ctx.restore();
-    }
+    });
+    // shadows first (each button casts a soft shadow on the cloth, and on the button below when kissing)
+    ys.forEach(cy => {
+      ctx.save(); ctx.filter = 'blur(6px)'; ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath(); ctx.ellipse(cx + 4, cy + 7, R * 1.02, R * 0.98, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    });
+    // from the top down: each lower button sits over the one above, as kissing buttons are sewn
+    [...ys].reverse().forEach(cy => {
+      ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+      if (bi) ctx.drawImage(bi, cx - R, cy - R, d, d); else { ctx.fillStyle = '#2a2420'; ctx.fill(); }
+      // the button's curve: lit from the upper left, the far rim in shade
+      const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+      g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(0.6, 'rgba(0,0,0,0)'); g.addColorStop(0.88, 'rgba(0,0,0,0.18)'); g.addColorStop(1, 'rgba(0,0,0,0.5)');
+      ctx.fillStyle = g; ctx.fillRect(cx - R, cy - R, d, d);
+      // a soft gloss on the rim (polished horn / resin) and a fine edge line
+      ctx.filter = 'blur(1.5px)'; ctx.strokeStyle = 'rgba(255,255,255,0.32)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.86, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke(); ctx.filter = 'none';
+      ctx.restore();
+      ctx.save(); ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, R - 0.5, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    });
     // the key
     ctx.fillStyle = '#222'; ctx.font = '600 40px system-ui, sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('Sleeve buttons: close-up of the cuff', W / 2, 92);
