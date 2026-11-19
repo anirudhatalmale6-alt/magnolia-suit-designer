@@ -9,7 +9,7 @@ window.DEFAULT_CATALOG = {
     notifyNote: 'New designs appear in the dashboard under Submissions.'
   },
   fabrics: [
-    // Real Bosinno swatch photos (26SS books), tiled seamlessly
+    // Real swatch photos (26SS books), tiled seamlessly
     { id: 'RMB20E708', name: 'RMB20E708', type: 'Grey Glen Check (real swatch)', price: 395, visible: true, img: 'swatches/RMB20E708.jpg', scale: 54 },
     { id: 'RMB22G222', name: 'RMB22G222', type: 'Blue Check (real swatch)', price: 395, visible: true, img: 'swatches/RMB22G222.jpg', scale: 54 },
     { id: 'RMB23E009', name: 'RMB23E009', type: 'Brown Chalk Stripe (real swatch)', price: 395, visible: true, img: 'swatches/RMB23E009.jpg', scale: 54 },

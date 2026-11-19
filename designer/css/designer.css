@@ -361,3 +361,35 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
     margin: 0; padding: 5px 10px; border-radius: 8px; background: #fff4dc; color: #5a3d00; font-size: 11.5px; line-height: 1.3; }
   .stage.has-note ~ .panel .step, .stage.has-note ~ .panel .next-bar { scroll-margin-top: calc(42vh + 62px); }
 }
+/* 19 Nov (2): phones */
+.pv-i { display: none; }
+.pv-i svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; display: block; }
+.pv-i svg .f { fill: currentColor; stroke: none; }
+@media (max-width: 600px) {
+  .pv-w { display: none; }                               /* the words wrapped and were clipped on a phone swatch: two small icons */
+  .pv-i { display: flex; gap: 6px; align-items: center; }
+  .pv-open { top: 6px; right: 6px; padding: 5px 7px; }
+}
+.brand img { width: auto; }                              /* width / height on the tag keep its space while it loads */
+@media (max-width: 900px) {
+  /* the picture shrinks once the options scroll under it (it took about 40% of the screen); the panel's top margin grows
+     by the same amount, so nothing under it moves */
+  body.st-compact .stage { height: 30vh; }
+  body.st-compact .stage.has-note { height: calc(30vh + 52px); }
+  body.st-compact .panel { margin-top: 12vh; }
+  body.st-compact .stage canvas { max-height: calc(30vh - 52px); }
+  body.st-compact .zoom-hint:not(.warn) { display: none; }
+  body.st-compact .views { bottom: 6px; }
+  body.st-compact .stage.has-note .views { bottom: 58px; }
+  body.st-compact .stage:has(.zoom-hint.warn) .views { bottom: 30px; }
+  body.st-compact .stage.has-note:has(.zoom-hint.warn) .views { bottom: 82px; }
+  body.st-compact .stage:has(.zoom-hint.warn) canvas { max-height: calc(30vh - 76px); }
+  .panel .step, .panel .next-bar, .panel .thread-row, .inline-thread, #grid { scroll-margin-top: calc(30vh + 10px); }
+  .stage.has-note ~ .panel .step, .stage.has-note ~ .panel .next-bar, .stage.has-note ~ .panel #grid { scroll-margin-top: calc(30vh + 62px); }
+  /* WhatsApp: in the picture's top corner while designing, not over the options */
+  body #stage .wa.in-stage { position: absolute; top: 6px; right: 6px; left: auto; bottom: auto; z-index: 7; flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
+  body #stage .wa.in-stage .wa-btn { width: 40px; height: 40px; padding: 0; justify-content: center; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  body #stage .wa.in-stage .wa-btn span { display: none; }
+  body #stage .wa.in-stage .wa-btn svg { width: 22px; height: 22px; }
+  body #stage .wa.in-stage .wa-menu { width: 230px; padding: 10px; }
+}

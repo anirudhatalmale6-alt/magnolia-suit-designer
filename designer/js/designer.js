@@ -40,6 +40,9 @@
     monos: [], monoSel: 0, fabricPicked: false, reached: 0, mode: '', location: '', build: '',
     remark: '', photos: [null, null, null], body: { front: null, side: null, back: null }, prefit: 'No', urgent: 'normal' };
   const views = {}, tiles = {};
+  const PV_ICONS = [0, 1].map(d => '<span class="pv-i" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.3"/><path d="M9.8 9.8 14 14"/></svg>' +
+    (d ? '<svg viewBox="0 0 16 16"><path class="f" d="M5 3.2v9.6L12.6 8z"/></svg>' : '') + '</span>');   // phones: magnifier = close-up, play = draped video
+  let compact = false;                             // phones: the sticky picture in its smaller size (stageCompact)
   let PREV = {};                                   // fabric code -> its preview files (previews.json)
   const PVB = window.MAGNOLIA_PREVIEW_BASE || 'previews/';   // where the preview files are served (set in index.html)
   let FABRICS = [], JF = [], BKF = [], JOPTS = [], STAFF = null, OPTS = [], BUTTONS = [], SLEEVES = [], LININGS = [], THREADS = [], CONTRAST = [], MONO = null, SUGG = null, EXTRAS = { opts: {}, lining: {} };
@@ -223,7 +226,6 @@
     ['shoulder', FRONTISH, { E: 'the shirt-head shoulder' }],
     ['vent', ['three4', 'side', 'open'], { D: 'the inner belt (shown in the Back view)', F: 'the belt (shown in the Back view)' }],
     ['front', ['front'], { 6: 'the 4 roll 3 front', 9: 'the 4-button double-breasted (1 to close)', 13: 'the 6-button double-breasted (3 to close)' }],
-    ['front', FRONTISH, { Z998: 'your own buttons (shown with standard buttons)' }],
     ['collarBack', ['front', 'three4', 'side'], { B: 'the collar turned back at the end' }],
     ['facing', ['open'], { A: 'this facing shape', C: 'the sword-shaped facing', DGG: 'this facing shape', E: 'this facing shape',
       G: 'the half-lining facing', G03: 'the unlined facing', US66: 'this facing shape' }]];
@@ -261,6 +263,8 @@
     const say = () => ({ all: sayFor(null), by: sayFor });
     if ((state.opts.pick || 'A') !== 'A' && state.closeup !== 'pick' && FRONTISH.includes(state.view))
       info.push(['At this size every stitching style looks alike: your style shows in its close-up (open Pick stitching).', ['pick']]);
+    if (state.opts.front === 'Z998' && FRONTISH.includes(state.view))   // the customer's buttons cannot be photographed in advance
+      info.push(['Your own buttons: the picture shows standard buttons in their place; the buttons you bring are the ones sewn on.', ['front']]);
     const cl = state.view === 'front' && closeName();
     if (cl) { if (!cl.exact) miss.push(state.closeup === 'pick' ? ['this stitching', ['pick']] : ['this buttonhole style', ['lapelHoleStyle']]); return { name: cl.name, note: say() }; }
     if (state.view === 'back') {
@@ -315,7 +319,7 @@
     let pk = null, ck = null;
     const V = PK[state.view], has = (p, t) => V && V.patches.some(x => x[0] === p && (t === undefined || x[1] === t));
     let wp = want.pocket, wt = want.ticket;
-    if (!has(wp)) wp = POCKET_FALLBACK[wp] || wp;
+    if (!has(wp) && !(best.p === wp && !wt)) wp = POCKET_FALLBACK[wp] || wp;   // a photo that shows this pocket keeps it (no plain pocket laid over)
     if (wt === 'card' && !has(wp, 'card') && !V?.patches.some(x => x[1] === 'card')) wt = 'jet';
     const sx = s.db ? 14 : 0;                       // double-breasted: pockets further from the buttons
     if ((best.p !== wp || best.t !== wt || sx) && V) {
@@ -1569,7 +1573,7 @@
       const s = STAFF && STAFF[f.id];
       return `<div class="fab-cell"><button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
         <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160" onerror="if(!this.dataset.r){this.dataset.r=1;setTimeout(()=>{this.src=this.src+'&r=1'},800)}"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)}${s.band ? ` · ${esc(s.band)}` : ''}</small>` : ''}</button>` +
-        `<button type="button" class="pv-open" data-pv-open="${f.id}" aria-label="See No. ${num(f)} close up${PREV[f.id] ? ' and draped' : ''}">Close-up${PREV[f.id] ? ' · Drape' : ''}</button></div>`;
+        `<button type="button" class="pv-open" data-pv-open="${f.id}" aria-label="See No. ${num(f)} close up${PREV[f.id] ? ' and draped' : ''}"><span class="pv-w">Close-up${PREV[f.id] ? ' · Drape' : ''}</span>${PV_ICONS[PREV[f.id] ? 1 : 0]}</button></div>`;
     }).join('') : '<p class="empty">No fabric matches these filters.</p>';
   }
   function paintChosen() {
@@ -2246,12 +2250,12 @@
       $('[data-price=suit]').textContent = `From $${from}`;
       $('#wBuildNote').textContent = '';
     }
-    window.scrollTo(0, 0);
+    window.scrollTo(0, 0); stageCompact(false); placeWa();
   }
   function startDesigner() {
     $('#welcome').hidden = true; $('#designer').hidden = false; $('#restartBtn').hidden = false;
     store.set('mb_flow', JSON.stringify({ mode: state.mode, location: state.location, build: state.build }));
-    applyBuild(); paintProgress(); paintSummary(); render();
+    applyBuild(); paintProgress(); paintSummary(); render(); placeWa();
   }
   $('#welcome').onclick = e => {
     const go = e.target.closest('[data-go]'); if (go) return showWelcome(go.dataset.go);
@@ -2280,8 +2284,8 @@
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
-    const had = state.diagram || state.cuffPanel;
-    state.diagram = null; state.cuffPanel = false;          // a diagram / close-up belongs to its own step: redrawn without it
+    const had = state.diagram || state.cuffPanel || state.zoom || state.zoomAt;
+    state.diagram = null; state.cuffPanel = false; state.zoom = null; state.zoomAt = null;          // a diagram / close-up belongs to its own step: redrawn without it
     const ln = $('#lookNote'); if (ln) ln.hidden = true;
     $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
     updMini();
@@ -2289,6 +2293,7 @@
     if (had) render();
     $('.panel').scrollTop = 0;
     if (innerWidth <= 900) {                        // phones: the step starts at its top, right under the (sticky) jacket
+      stageCompact(true);
       const panelTop = $('.panel').getBoundingClientRect().top + scrollY, stageH = $('#stage').getBoundingClientRect().height;
       window.scrollTo(0, Math.max(0, panelTop - stageH));
     }
@@ -2315,10 +2320,24 @@
   $$('.next-btn').forEach(b => b.onclick = () => {
     const i = STEPS_ORDER.indexOf(b.dataset.next);
     if (b.disabled) return;
-    if (b.classList.contains('wait')) { toast('Choose a fabric first: tap one of the swatches.'); $('#grid').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    if (b.classList.contains('wait')) { toast('Choose a fabric first: tap one of the swatches.'); $('#grid').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }   // the first row, under the picture
     state.reached = Math.max(state.reached, i + 1); paintSteps(); showTab(STEPS_ORDER[i + 1]);
   });
   let toastT;
+  // phones: while designing, the WhatsApp button sits in the picture's top corner (floating at the bottom it covered hints
+  // and cards); on the welcome screens and wide screens it floats at the bottom right as before
+  function placeWa() {
+    const wa = $('#wa'); if (!wa) return;
+    const inStage = innerWidth <= 900 && !$('#designer').hidden;
+    if (inStage !== (wa.parentNode === $('#stage'))) { $('#waMenu').hidden = true; (inStage ? $('#stage') : document.body).appendChild(wa); }
+    wa.classList.toggle('in-stage', inStage);
+  }
+  // phones: the sticky picture is smaller once the page is scrolled (it took about 40% of the screen); the panel's top
+  // margin grows by the same amount, so nothing under it moves when it changes
+  function stageCompact(on) {
+    if (innerWidth > 900) on = false;
+    if (on === compact) return; compact = on; document.body.classList.toggle('st-compact', on);
+  }
   function toast(msg) {
     let t = $('#toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
     t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600);
@@ -2517,4 +2536,11 @@
     document.addEventListener('click', e => { if (!menu.hidden && !menu.contains(e.target)) set(false); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') set(false); });
   })();
+  addEventListener('resize', () => { placeWa(); if (innerWidth > 900) stageCompact(false); });
+  addEventListener('scroll', () => {                // phones: the picture shrinks once the options scroll under it, grows back at the top
+    if (innerWidth > 900 || $('#designer').hidden) return;
+    const top = $('#designer').offsetTop;
+    if (!compact && scrollY > top + 40) stageCompact(true); else if (compact && scrollY < top + 8) stageCompact(false);
+  }, { passive: true });
+  placeWa();
 })();

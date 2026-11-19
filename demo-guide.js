@@ -33,14 +33,18 @@
     + '.mdg a{color:#bfe7e4}.mdg .mdg-row{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;max-width:1440px;margin:auto}'
     + '.mdg b{font-weight:700}.mdg .mdg-j{opacity:.8}.mdg details{max-width:1440px;margin:4px auto 0}.mdg summary{cursor:pointer;color:#bfe7e4}'
     + '.mdg ul{margin:6px 0 2px;padding-left:18px}.mdg li{margin:2px 0}.mdg .t{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;border-radius:99px;padding:0 7px;margin-right:6px}'
-    + '.mdg .t-e{background:#d9efe9;color:#173b3d}.mdg .t-n{background:#ffe1a8;color:#4d3b16}.mdg .t-x{background:#e9e2e2;color:#5b2730}';
+    + '.mdg .t-e{background:#d9efe9;color:#173b3d}.mdg .t-n{background:#ffe1a8;color:#4d3b16}.mdg .t-x{background:#e9e2e2;color:#5b2730}'
+    + '.mdg i{font-style:normal}.mdg .mdg-p{display:none}'
+    + '@media (max-width:600px){.mdg{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 12px;padding:6px 12px;font-size:12.5px}.mdg .mdg-row{flex:1 1 0;min-width:0;flex-wrap:nowrap;gap:10px;white-space:nowrap;overflow:hidden}'
+    + '.mdg .mdg-l{display:none}.mdg .mdg-p{display:inline}.mdg details{margin:0;flex:0 0 auto}.mdg details[open]{flex-basis:100%;order:2}.mdg details[open] .mdg-p{display:none}.mdg details[open] .mdg-l{display:inline}}';
   function bar() {
     if (document.getElementById('mdg')) return;
     var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
     var d = document.createElement('div'); d.className = 'mdg'; d.id = 'mdg'; d.setAttribute('role', 'note');
-    d.innerHTML = '<div class="mdg-row"><b>Connected demo</b><span class="mdg-j">' + (online ? 'Online journey' : 'In-person journey' + (demo.loc ? ' · ' + (demo.loc === 'lakewood' ? 'Lakewood' : 'Jerusalem') : '')) + '</span>'
-      + '<span>' + where.step + ': ' + where.name + '</span><a href="' + (page === 'designer' ? '../start/' : '../start/') + '">Start again</a></div>'
-      + '<details><summary>What to do here, and what is built</summary><p style="margin:6px 0 0">' + where.next + '</p><ul>'
+    var st2 = where.step.split(' · ');               // phones: one line (short step, no page name), the guide behind "Guide"
+    d.innerHTML = '<div class="mdg-row"><b>Connected demo</b><span class="mdg-j">' + (online ? 'Online<i class="mdg-l"> journey</i>' : 'In-person<i class="mdg-l"> journey</i>' + (demo.loc ? ' · ' + (demo.loc === 'lakewood' ? 'Lakewood' : 'Jerusalem') : '')) + '</span>'
+      + '<span class="mdg-s">' + st2[0] + '<i class="mdg-l">' + (st2[1] ? ' · ' + st2[1] : '') + ': ' + where.name + '</i></span><a href="../start/">Start again</a></div>'
+      + '<details><summary><i class="mdg-l">What to do here, and what is built</i><i class="mdg-p">Guide</i></summary><p style="margin:6px 0 0">' + where.next + '</p><ul>'
       + '<li><span class="t t-e">ESTABLISHED</span>' + where.est + '</li><li><span class="t t-n">NEW</span>' + where.neu + '</li><li><span class="t t-x">NOT CONNECTED</span>' + where.not + '</li></ul></details>';
     document.body.insertBefore(d, document.body.firstChild);
   }
