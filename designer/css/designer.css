@@ -393,3 +393,6 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
   body #stage .wa.in-stage .wa-btn svg { width: 22px; height: 22px; }
   body #stage .wa.in-stage .wa-menu { width: 230px; padding: 10px; }
 }
+/* 20 Nov: phones: the tap-zoom on the cloth fills the width of the picture area (it showed a narrow strip with hard edges) */
+@media (max-width: 900px) { .stage.cloth-zoom canvas { width: 100%; height: 100vh; object-fit: cover; } }   /* height: held by max-height */
+.chosen-wait { display: block; margin-top: 4px; color: #7a4b00; }

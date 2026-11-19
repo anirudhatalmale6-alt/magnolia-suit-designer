@@ -42,6 +42,9 @@
   const views = {}, tiles = {};
   const PV_ICONS = [0, 1].map(d => '<span class="pv-i" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.3"/><path d="M9.8 9.8 14 14"/></svg>' +
     (d ? '<svg viewBox="0 0 16 16"><path class="f" d="M5 3.2v9.6L12.6 8z"/></svg>' : '') + '</span>');   // phones: magnifier = close-up, play = draped video
+  // the "from" prices on the start screens and the summary: change them here only (owner's figures: in person $445,
+  // online $395, bekeshe $450 with the belt included)
+  const START_PRICE = { inperson: 445, online: 395, bekeshe: 450 };
   let compact = false;                             // phones: the sticky picture in its smaller size (stageCompact)
   let PREV = {};                                   // fabric code -> its preview files (previews.json)
   const PVB = window.MAGNOLIA_PREVIEW_BASE || 'previews/';   // where the preview files are served (set in index.html)
@@ -1524,7 +1527,7 @@
         if (st.name === 'side_elbow' && !state.zoom) drawElbow(st);
         paintMini(); popMini();                       // the small copy shows exactly what the big picture shows, zoom included
         if (state.melton && state.view === 'back' && !state.zoom) { drawMelton(); paintMini(); }
-        $('#stage').classList.toggle('zoom', !!state.zoom);
+        $('#stage').classList.toggle('zoom', !!state.zoom); $('#stage').classList.toggle('cloth-zoom', !!state.zoom && state.zoom.z >= 5);
         $('#zoomHint').textContent = state.cuffPanel ? 'Pick Front, Side or another view to see the whole jacket' : state.zoom ? 'Tap again to zoom out'
           : state.viewNote || 'Tap the jacket to zoom into the cloth';   // the angles not shown are said right under the view tabs
         $('#zoomHint').classList.toggle('warn', !state.cuffPanel && !state.zoom && !!state.viewNote);
@@ -1571,7 +1574,7 @@
       : `Showing ${list.length} of the ${FABRICS.length} sample fabrics. These are samples, not the full catalogue.`;
     $('#grid').innerHTML = list.length ? list.map(f => {
       const s = STAFF && STAFF[f.id];
-      return `<div class="fab-cell"><button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom ? ' on' : ''}" data-id="${f.id}">
+      return `<div class="fab-cell"><button type="button" class="fab${state.fabric && state.fabric.id === f.id && !state.custom && (state.fabricPicked || STAFF) ? ' on' : ''}" data-id="${f.id}">
         <img src="thumbs/${f.id}.jpg?v=${VER}" alt="" loading="lazy" width="160" height="160" onerror="if(!this.dataset.r){this.dataset.r=1;setTimeout(()=>{this.src=this.src+'&r=1'},800)}"><b>No. ${num(f)}</b><small>${esc(f.name)}</small>${s ? `<small class="code">${esc(s.code)}${s.band ? ` · ${esc(s.band)}` : ''}</small>` : ''}</button>` +
         `<button type="button" class="pv-open" data-pv-open="${f.id}" aria-label="See No. ${num(f)} close up${PREV[f.id] ? ' and draped' : ''}"><span class="pv-w">Close-up${PREV[f.id] ? ' · Drape' : ''}</span>${PV_ICONS[PREV[f.id] ? 1 : 0]}</button></div>`;
     }).join('') : '<p class="empty">No fabric matches these filters.</p>';
@@ -1585,6 +1588,7 @@
       <small>${f.composition ? esc(f.composition) : 'Composition to follow'}${f.weight ? ` · ${f.weight} g` : ''} · ${f.use === 'Blazer' ? 'Blazer cloth' : f.use === 'Bekeshe' ? 'Bekeshe cloth' : 'Suit cloth'} · ${SEASONS[f.season] || ''}</small>
       ${f.preview ? `<small class="prev-note">${esc(f.preview)}</small>` : ''}
       <button type="button" class="sw-link">See the real swatch photo</button>
+      ${!state.fabricPicked && !STAFF ? '<small class="chosen-wait">Shown on the jacket as an example. Tap a swatch below to choose your fabric.</small>' : ''}
       ${s ? `<small class="staffline">Factory code ${esc(s.code)} · ${s.band ? `Band ${esc(s.band)}` : (s.usd ? `Cost $${esc(s.usd)}/m (band not set yet)` : 'Band not set yet')}${s.origin ? ` · ${esc(s.origin)}` : ''} · ${esc(s.book || '')}</small>` : ''}</div>`;
   }
   let sumRows = [];                                  // the last summary, for the request form hand-over (no codes)
@@ -1592,7 +1596,7 @@
     const f = state.fabric, s = f && STAFF && STAFF[f.id];
     const rows = [
       ['Design', state.mode === 'online' ? 'Online' : state.mode === 'inperson' ? `In person${state.location ? ', ' + LOCS[state.location] : ''}` : 'Not chosen', ''],
-      ['Building', { suit: 'Full suit (jacket now, trousers coming soon)', jacket: 'Jacket only', pants: 'Trousers only', bekeshe: 'Bekeshe, $450 (belt included)' }[state.build] || 'Jacket', ''],
+      ['Building', { suit: 'Full suit (jacket now, trousers coming soon)', jacket: 'Jacket only', pants: 'Trousers only', bekeshe: `Bekeshe, $${START_PRICE.bekeshe} (belt included)` }[state.build] || 'Jacket', ''],
       ['Fabric', state.custom ? 'Uploaded swatch' : `No. ${num(f)}, ${f.name}`, s && !state.custom ? `${s.code} · band ${s.band || 'not set yet'}` : ''],
       ['Cloth', state.custom ? '' : `${f.composition || 'Composition to follow'}${f.weight ? `, ${f.weight} g` : ''}`, '']
     ];
@@ -1679,7 +1683,7 @@
     $('#grid').onclick = e => {
       const pv = e.target.closest('[data-pv-open]'); if (pv) return openPreview(pv.dataset.pvOpen);
       const b = e.target.closest('[data-id]'); if (!b) return;
-      state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; paintSteps(); paintProgress(); goNext($('[data-next=fabric]'));
+      state.fabric = FABRICS.find(f => f.id === b.dataset.id); state.custom = false; state.fabricPicked = true; state.reached = Math.max(state.reached, 1); paintSteps(); paintProgress(); goNext($('[data-next=fabric]'));
       store.set('mb_look', ''); paintSugg(); paintTips();
       $$('#grid .fab').forEach(x => x.classList.toggle('on', x === b)); render();
     };
@@ -2241,12 +2245,13 @@
 
   // ---------- welcome: home, how it works, in person / online, what are we building ----------
   const LOCS = { jerusalem: 'Jerusalem (Ramat Eshkol / Sanhedria)', lakewood: 'Lakewood, NJ' };
+  $$('[data-start]').forEach(e => { e.textContent = '$' + START_PRICE[e.dataset.start]; });
   function showWelcome(w) {
     $('#welcome').hidden = false; $('#designer').hidden = true; $('#restartBtn').hidden = true; busy.hidden = true;
     $$('.w-screen').forEach(x => { x.hidden = x.dataset.w !== w; });
     if (w === 'mode') { $$('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === state.mode)); $('#wLocs').hidden = state.mode !== 'inperson'; }
     if (w === 'build') {
-      const from = state.mode === 'online' ? 395 : 445;
+      const from = START_PRICE[state.mode === 'online' ? 'online' : 'inperson'];
       $('[data-price=suit]').textContent = `From $${from}`;
       $('#wBuildNote').textContent = '';
     }
@@ -2311,6 +2316,7 @@
     const i = STEPS_ORDER.indexOf(b.dataset.tab);
     if (!STAFF && i > state.reached) {
       const need = STEPS_ORDER[state.reached];
+      if (need === 'fabric') { toast('Choose a fabric first: tap one of the swatches.'); return; }
       toast(`Please finish the ${need[0].toUpperCase() + need.slice(1)} step first, then tap Next.`); return;
     }
     showTab(b.dataset.tab);
@@ -2413,7 +2419,7 @@
   $('#pvPrev').onclick = () => { if (pvAt > 0) { pvAt--; paintPreview(); } };
   $('#pvNext').onclick = () => { if (pvAt < pvList.length - 1) { pvAt++; paintPreview(); } };
   $('#pvChoose').onclick = () => {
-    const f = pvFab(); state.fabric = f; state.custom = false; state.fabricPicked = true;
+    const f = pvFab(); state.fabric = f; state.custom = false; state.fabricPicked = true; state.reached = Math.max(state.reached, 1);
     paintSteps(); paintProgress(); store.set('mb_look', ''); paintSugg(); paintTips(); paintGrid(); render(); paintPreview();
   };
   $('#pvZbtns').onclick = e => { const b = e.target.closest('[data-z]'); if (b) zoomSet(zs * (+b.dataset.z > 0 ? 1.6 : 1 / 1.6)); };
