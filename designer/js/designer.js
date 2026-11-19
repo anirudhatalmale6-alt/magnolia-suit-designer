@@ -801,39 +801,108 @@
     if (ex > 0) { ex = -ex; ey = -ey; }                      // as in the photos: towards the vent, on the left of the buttons
     return (st.cuffs[key] = { ...st, A, B, S, OVP, SH, U, V, ov, ovCache: {}, cuffs: undefined, elbowPx: undefined, cuffAt: { centres, r, ex, ey, dx, dy } });
   }
+  // ---------- sleeve buttons in the front and inside photos: the chosen number (owner, 19 Nov: Front must match) ----------
+  // build/cuff_stacks.py marks each cuff's button stack in buttons.json: "own" = the photographed buttons are in the
+  // overlay (redrawn in the chosen number from their own bottom button), "ref" = melted into the cloth on that photo
+  // (the reference photo's button is drawn there instead). Kissing or spaced as on the side view.
+  const CUFF_REF = {};
+  async function cuffRef() {
+    for (const s of 'LR') if (!CUFF_REF[s]) {
+      try { const im = await loadImg(`maps/_cuffbtn_${s}.png?v=${VER}`); CUFF_REF[s] = { w: im.width, h: im.height, d: pixels(im) }; } catch (e) { /* none */ }
+    }
+  }
+  function stackView(st) {
+    const S = st.meta.stacks; if (!S || !S.length) return st;
+    const o = cuffOpts(), key = 'stk' + o.n + '|' + o.kiss;
+    st.cuffs = st.cuffs || {};
+    if (st.cuffs[key]) return st.cuffs[key];
+    const OVP = new Uint8ClampedArray(st.OVP), A = st.A.slice(), B = new Uint8ClampedArray(st.B), Sh = new Uint8ClampedArray(st.S),
+      SH = st.SH.slice(), U = st.U.slice(), V = st.V.slice();
+    for (const [x, y, w, h, kind] of S) {
+      let spr; const left = x < W / 2;
+      if (kind === 'own') {
+        const bh = Math.round(h / 4); spr = { w, h: bh, d: new Uint8ClampedArray(w * bh * 4) };
+        for (let yy = 0; yy < bh; yy++) for (let xx = 0; xx < w; xx++) {
+          const q = ((y + h - bh + yy) * W + x + xx) * 4, t = (yy * w + xx) * 4;
+          for (let k = 0; k < 4; k++) spr.d[t + k] = st.OVP[q + k];
+        }
+        // the photographed buttons are taken out: outside the sleeve's edge (read just above and below the stack)
+        // becomes backdrop, over the sleeve becomes the cloth beside it
+        const edges = [];
+        for (const yy of [y - 14, y - 8, y + h + 8, y + h + 14]) {
+          if (yy < 0 || yy >= H) continue;
+          for (let k = 0; k < 60; k++) { const xx = left ? x - 20 + k : x + w + 20 - k; if (st.A[yy * W + xx] > 0.99) { edges.push(xx); break; } }
+        }
+        const ex = edges.length ? edges.sort((p, q) => p - q)[edges.length >> 1] : (left ? x + w / 2 : x + w / 2);
+        for (let yy = y - 3; yy < y + h + 3; yy++) for (let xx = x - 4; xx < x + w + 4; xx++) {
+          const i = yy * W + xx, p = i * 4; OVP[p + 3] = 0;
+          if (left ? xx < ex : xx > ex) { A[i] = 0; B[p] = B[p + 1] = B[p + 2] = BGC; B[p + 3] = 255; Sh[p] = Sh[p + 1] = Sh[p + 2] = BGC; continue; }
+          // weave from the cloth one stack-width further in; light from the cloth just above and below at this spot
+          const j = yy * W + (left ? xx + w + 6 : xx - w - 6), t = (y - 6) * W + xx, u = (y + h + 6) * W + xx, f = (yy - y + 6) / (h + 12);
+          A[i] = Math.max(st.A[t], st.A[u]); U[i] = st.U[j]; V[i] = st.V[j]; SH[i] = st.SH[t] * (1 - f) + st.SH[u] * f;
+          for (let k = 0; k < 4; k++) { B[p + k] = st.B[t * 4 + k]; Sh[p + k] = st.S[t * 4 + k] * (1 - f) + st.S[u * 4 + k] * f; }
+        }
+      } else { spr = CUFF_REF[left ? 'L' : 'R']; if (!spr) continue; }
+      const pitch = spr.h * (o.kiss ? 1 : 1.4);
+      for (let k = 0; k < o.n; k++) {
+        const top = Math.round(y + h - spr.h - k * pitch);
+        for (let yy = 0; yy < spr.h; yy++) for (let xx = 0; xx < spr.w; xx++) {
+          const t = (yy * spr.w + xx) * 4, a = spr.d[t + 3]; if (!a) continue;
+          const q = ((top + yy) * W + x + xx) * 4;
+          if (a > OVP[q + 3]) { OVP[q] = spr.d[t]; OVP[q + 1] = spr.d[t + 1]; OVP[q + 2] = spr.d[t + 2]; OVP[q + 3] = a; }
+        }
+      }
+    }
+    const ov = document.createElement('canvas'); ov.width = W; ov.height = H;
+    const ox = ov.getContext('2d'), im = ox.createImageData(W, H); im.data.set(OVP); ox.putImageData(im, 0, 0);
+    return (st.cuffs[key] = { ...st, A, B, S: Sh, SH, U, V, OVP, ov, ovCache: {}, cuffs: undefined, elbowPx: undefined });
+  }
   // ---------- a worked buttonhole (owner, 19 Nov): a narrow dark opening between two thick stitched lips, a small
   // round eye at the button end, a bar-tack across the far end. Local frame: along +x from the button (0) to the tack (L).
   function workedButtonhole(c, x, y, ang, L, hw, rgb) {
     const t = rgb.map(v => Math.round(v)), sh = k => `rgb(${t.map(v => Math.max(0, Math.min(255, Math.round(v * k))))})`;
-    const o = Math.max(0.9, hw * 0.24), step = Math.max(1.1, hw * 0.2), lw = Math.max(0.7, step * 0.62);
+    const o = Math.max(0.9, hw * 0.24), step = Math.max(1.1, hw * 0.21), lw = Math.max(0.7, step * 0.6);
+    let seed = Math.abs(Math.round(x * 7.13 + y * 3.71)) % 9973 + 1;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };   // the same small irregularities every redraw
     c.save(); c.translate(x, y); c.rotate(ang); c.lineCap = 'round';
-    const capsule = (x0, x1, r) => { c.beginPath(); c.moveTo(x0, -r); c.lineTo(x1, -r); c.arc(x1, 0, r, -Math.PI / 2, Math.PI / 2); c.lineTo(x0, r); c.arc(x0, 0, r, Math.PI / 2, Math.PI * 1.5); c.closePath(); };
-    // the hole sits a touch into the cloth: soft shadow round it
-    c.filter = `blur(${Math.max(0.8, hw * 0.25)}px)`; c.fillStyle = 'rgba(0,0,0,0.5)'; capsule(hw * 0.2, L - hw * 0.2, hw * 1.05); c.translate(0, hw * 0.18); c.fill(); c.translate(0, -hw * 0.18); c.filter = 'none';
-    // the lips: a cord of thread on each side
-    c.fillStyle = sh(0.78); capsule(hw * 0.2, L - hw * 0.2, hw); c.fill();
-    // purl stitches, each a tiny bead: lit side, shaded side
-    for (const sgn of [-1, 1]) for (let xx = hw * 0.75; xx < L - hw * 0.6; xx += step) {
-      c.lineWidth = lw; c.strokeStyle = sh(1.18); c.beginPath(); c.moveTo(xx, sgn * (o + 0.3)); c.lineTo(xx + step * 0.25, sgn * (hw - 0.4)); c.stroke();
-      c.lineWidth = lw * 0.55; c.strokeStyle = sh(0.5); c.beginPath(); c.moveTo(xx + step * 0.5, sgn * (o + 0.3)); c.lineTo(xx + step * 0.7, sgn * (hw - 0.4)); c.stroke();
+    const x0 = hw * 0.2, x1 = L - hw * 0.2;
+    // each lip's outer edge: a little uneven, as hand-worked thread is
+    const edge = sgn => { const pts = []; for (let xx = x0 + hw; xx <= x1 - hw; xx += step) pts.push([xx, sgn * hw * (1 + (rnd() - 0.5) * 0.14)]); return pts; };
+    const top = edge(-1), bot = edge(1);
+    const lipPath = () => { c.beginPath(); c.moveTo(top[0][0], top[0][1]); top.forEach(([a, b]) => c.lineTo(a, b));
+      c.arc(x1 - hw, 0, hw, -Math.PI / 2, Math.PI / 2); [...bot].reverse().forEach(([a, b]) => c.lineTo(a, b)); c.arc(x0 + hw, 0, hw, Math.PI / 2, Math.PI * 1.5); c.closePath(); };
+    // sits a touch into the cloth: soft shadow round it
+    c.save(); c.filter = `blur(${Math.max(0.8, hw * 0.25)}px)`; c.fillStyle = 'rgba(0,0,0,0.45)'; c.translate(0, hw * 0.16); lipPath(); c.fill(); c.restore();
+    c.fillStyle = sh(0.74); lipPath(); c.fill();
+    // the stitches: short diagonal purls across each lip, each a little different in slant, length and light
+    c.save(); lipPath(); c.clip();
+    for (const sgn of [-1, 1]) for (let xx = x0 + hw * 0.55; xx < x1 - hw * 0.3; xx += step * (0.85 + rnd() * 0.3)) {
+      const sl = (0.45 + (rnd() - 0.5) * 0.25) * hw, inner = sgn * (o + 0.2), outer = sgn * hw * (0.92 + rnd() * 0.12), k = 0.95 + rnd() * 0.3;
+      c.lineWidth = lw * (0.85 + rnd() * 0.3); c.strokeStyle = sh(k);
+      c.beginPath(); c.moveTo(xx, inner); c.quadraticCurveTo(xx + sl * 0.45, (inner + outer) / 2 + (rnd() - 0.5) * 0.6, xx + sl, outer); c.stroke();
+      c.lineWidth = lw * 0.45; c.strokeStyle = sh(0.48);                                 // the groove between two purls
+      c.beginPath(); c.moveTo(xx + step * 0.5, inner); c.lineTo(xx + step * 0.5 + sl, outer); c.stroke();
     }
-    for (let a = Math.PI * 0.55; a < Math.PI * 1.45; a += step / hw) {   // stitches fanned round the eye end
-      const cx = hw * 0.75; c.lineWidth = lw; c.strokeStyle = sh(1.15);
-      c.beginPath(); c.moveTo(cx + Math.cos(a) * o * 1.6, Math.sin(a) * o * 1.6); c.lineTo(cx + Math.cos(a) * (hw - 0.3), Math.sin(a) * (hw - 0.3)); c.stroke();
+    for (let a = Math.PI * 0.55; a < Math.PI * 1.45; a += step / hw) {                 // stitches fanned round the eye end
+      const cx = hw * 0.75, k = 0.95 + rnd() * 0.25; c.lineWidth = lw; c.strokeStyle = sh(k);
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * o * 1.6, Math.sin(a) * o * 1.6); c.lineTo(cx + Math.cos(a + 0.18) * (hw - 0.3), Math.sin(a + 0.18) * (hw - 0.3)); c.stroke();
     }
-    // the cord's roundness: light along the outer top, shade into the opening
-    let g = c.createLinearGradient(0, -hw, 0, hw);
-    g.addColorStop(0, 'rgba(255,255,255,0.20)'); g.addColorStop(0.32, 'rgba(0,0,0,0.0)'); g.addColorStop(0.46, 'rgba(0,0,0,0.35)');
-    g.addColorStop(0.54, 'rgba(0,0,0,0.35)'); g.addColorStop(0.68, 'rgba(255,255,255,0.08)'); g.addColorStop(1, 'rgba(0,0,0,0.30)');
-    c.fillStyle = g; capsule(hw * 0.2, L - hw * 0.2, hw); c.fill();
+    c.restore();
+    // the cord's roundness, gently: a soft light on top, shade into the opening (no bright lines)
+    const g = c.createLinearGradient(0, -hw, 0, hw);
+    g.addColorStop(0, 'rgba(255,255,255,0.07)'); g.addColorStop(0.3, 'rgba(0,0,0,0)'); g.addColorStop(0.45, 'rgba(0,0,0,0.28)');
+    g.addColorStop(0.55, 'rgba(0,0,0,0.28)'); g.addColorStop(0.72, 'rgba(255,255,255,0.03)'); g.addColorStop(1, 'rgba(0,0,0,0.22)');
+    c.fillStyle = g; lipPath(); c.fill();
     // the opening: a dark slit with a round eye at the button end
-    c.fillStyle = 'rgba(8,8,10,0.94)'; capsule(hw * 0.75, L - hw * 1.15, o); c.fill();
+    c.fillStyle = 'rgba(8,8,10,0.94)';
+    c.beginPath(); c.moveTo(hw * 0.75, -o); c.lineTo(L - hw * 1.15, -o * 0.8); c.lineTo(L - hw * 1.15, o * 0.8); c.lineTo(hw * 0.75, o); c.closePath(); c.fill();
     c.beginPath(); c.arc(hw * 0.75, 0, o * 1.6, 0, Math.PI * 2); c.fill();
-    c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = 0.6; c.beginPath(); c.moveTo(hw * 0.9, o + 0.4); c.lineTo(L - hw * 1.2, o + 0.4); c.stroke();
-    // the bar-tack across the far end
+    // the bar-tack across the far end: a little bundle of stitches
     const bx = L - hw * 0.55;
-    c.fillStyle = sh(0.7); c.beginPath(); c.roundRect(bx - hw * 0.3, -hw * 1.05, hw * 0.6, hw * 2.1, hw * 0.25); c.fill();
-    for (let yy = -hw * 0.95; yy < hw * 0.95; yy += step * 0.8) { c.lineWidth = lw * 0.8; c.strokeStyle = sh(1.12); c.beginPath(); c.moveTo(bx - hw * 0.26, yy); c.lineTo(bx + hw * 0.26, yy + 0.2); c.stroke(); }
+    c.fillStyle = sh(0.68); c.beginPath(); c.roundRect(bx - hw * 0.3, -hw * 1.05, hw * 0.6, hw * 2.1, hw * 0.25); c.fill();
+    for (let yy = -hw * 0.95; yy < hw * 0.95; yy += step * (0.7 + rnd() * 0.25)) {
+      c.lineWidth = lw * 0.8; c.strokeStyle = sh(0.95 + rnd() * 0.2); c.beginPath(); c.moveTo(bx - hw * 0.26, yy); c.lineTo(bx + hw * 0.26, yy + (rnd() - 0.3) * 0.8); c.stroke();
+    }
     c.restore();
   }
   // ---------- sleeve buttons: a flat, straight-on close-up of the cuff (owner, 17 Nov) ----------
@@ -1362,7 +1431,8 @@
     const ls = stepNote && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
     if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(stepNote)}</p>`);
     try {
-      const st = cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk));
+      await cuffRef();
+      const st = stackView(cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk)));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
         if (g && g.L && g.R && (pos === 'D' || pos === 'E')) state.zoom = zoomBox((g.L.x + g.R.x) / 2, (g.L.y + g.R.y) / 2 + 80, 1.6);   // both lapels
