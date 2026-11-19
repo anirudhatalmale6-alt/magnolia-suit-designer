@@ -250,9 +250,10 @@
       const c = state.opts[id]; if (c && codes[c] && views.includes(state.view)) miss.push([codes[c], [id]]);
     }
     const sizes = [];                              // choices that differ only in size: same picture, exact size on the order
-    for (const [id, codes] of Object.entries(SIZE_ONLY)) { const c = state.opts[id]; if (c && codes.includes(c)) sizes.push([((choiceOf(id) || {}).label || '').toLowerCase(), [id]]); }
+    const seen = id => (id === 'namecard' ? ['open'] : FRONTISH).includes(state.view);   // only where that part can be seen
+    for (const [id, codes] of Object.entries(SIZE_ONLY)) { const c = state.opts[id]; if (c && codes.includes(c) && seen(id)) sizes.push([((choiceOf(id) || {}).label || '').toLowerCase(), [id]]); }
     for (const id of ['lowerPocket', 'chestPocket', 'ticket']) {   // every pocket sized in cm: one picture per style, the size named
-      const c = state.opts[id], o = OPTS.find(x => x.id === id); if (!c || !o || c === o.default) continue;   // the standard size: no note
+      const c = state.opts[id], o = OPTS.find(x => x.id === id); if (!c || !o || c === o.default || !seen(id)) continue;   // the standard size: no note
       const lab = ((choiceOf(id) || {}).label || ''); if (/\d\s?cm/i.test(lab) && !sizes.some(x => x[1][0] === id)) sizes.push([lab.toLowerCase(), [id]]);
     }
     // each note part names the steps it is about, so the note under a step only says what concerns that step
@@ -1773,7 +1774,7 @@
       if (o.section !== sec) { sec = o.section; html += `<p class="sec-title">${esc(sec)}</p>`; }
       const list = o.show.map(code => o.choices.find(c => c.code === code)).filter(Boolean).map(c => ({ v: c.code, label: c.label + (optExtra(o.id, c.code) ? ` (+$${optExtra(o.id, c.code)})` : ''), img: c.img }));
       html += stepRow(`data-step="${o.id}"`, o.label, state.opts[o.id] || o.default, list, STYLE_HINT[o.id]);
-      if (o.id === 'lapelHoleStyle') html += '<div class="thread-row inline-thread" id="lapelThreadInline" hidden></div>';
+      if (o.id === 'lapel') html += '<div class="thread-row inline-thread" id="lapelThreadInline" hidden></div>';   // owner, 20 Nov: right after the lapel, before its width
     }
     $('#styleSteps').innerHTML = html;
     paintInlineThread();
@@ -1932,7 +1933,7 @@
     const tc = e.target.closest('#lapelThreadInline [data-c]');
     if (tc) {
       state.thread.lapel = tc.dataset.c || null; paintThreads(); showLapelThread(); render();
-      openNext(document.querySelector('[data-step="lapelHoleStyle"]'), '#styleSteps .step', $('[data-next=style]'));
+      openNext(document.querySelector('[data-step="lapel"]'), '#styleSteps .step', $('[data-next=style]'));
       return;
     }
     if (toggleStep(e)) return;
@@ -1944,7 +1945,8 @@
     st.querySelector('.step-thumb').innerHTML = c && c.img ? skImg(c.img) : '';
     closeStep(b);
     setOpt(id, b.dataset.v);
-    if (id === 'lapelHoleStyle') {                  // its thread colour right here, before moving on
+    if (id === 'lapelHoleStyle') paintInlineThread();   // 'None' hides the thread colour (no buttonhole)
+    if (id === 'lapel') {                           // the lapel buttonhole thread colour comes right after the lapel
       paintInlineThread(); const box = document.getElementById('lapelThreadInline');
       if (box && !box.hidden) { setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120); return; }
     }
@@ -2028,12 +2030,12 @@
     return `<div class="pal" data-t="${key}"><button type="button" class="match${!cur ? ' on' : ''}" data-c="">Match the cloth</button>` +
       THREADS.map(t => `<button type="button" data-c="${t.id}" title="${threadName(t.id)}${trimCode('threads', t.id) ? ' · ' + trimCode('threads', t.id) : ''}" style="background:${rgbCss(t.rgb)}" class="${t.id === cur ? 'on' : ''}"></button>`).join('') + '</div>';
   }
-  // the lapel buttonhole thread, offered right under the lapel buttonhole style (the same choice as in Trims)
+  // the lapel buttonhole thread colour: right after the lapel (its only place; it left Trims on 20 Nov)
   function paintInlineThread() {
     const box = document.getElementById('lapelThreadInline'); if (!box) return;
     const style = (choiceOf('lapelHoleStyle') || {}).code || 'A';
     box.hidden = style === 'A';                     // 'None': no buttonhole, so no thread to choose
-    box.innerHTML = `<b>Lapel buttonhole thread colour</b><p class="hint">The same choice as in Trims.</p>${palette(state.thread.lapel, 'lapel')}`;
+    box.innerHTML = `<b>Lapel buttonhole thread colour</b>${palette(state.thread.lapel, 'lapel')}`;
   }
   function paintThreads() {
     const n = sleeveHoles(), sel = Math.min(state.holeSel, n);
@@ -2044,7 +2046,6 @@
     paintInlineThread();
     $('#threadRows').innerHTML =
       `<div class="thread-row"><b>Button thread</b>${!state.button && state.thread.button ? '<p class="hint">Shown on a dark horn button until you choose your buttons above.</p>' : ''}${palette(state.thread.button, 'button')}</div>` +
-      `<div class="thread-row"><b>Lapel buttonhole</b>${palette(state.thread.lapel, 'lapel')}</div>` +
       (STAFF ? `<div class="thread-row adv"><b>Staff only: front buttonholes</b>${palette(state.thread.front, 'front')}</div>` +
       `<div class="thread-row adv"><b>Staff only: sleeve buttonholes</b><p class="hint">Pick a colour for all holes, or choose a hole first to give it its own colour.</p>${holes}${palette(cur, 'sleeve')}</div>` : '');
   }
