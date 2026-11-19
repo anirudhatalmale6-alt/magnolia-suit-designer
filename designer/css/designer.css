@@ -347,3 +347,17 @@ body.bk .jk-only, body.bk #suggBox, body.bk .staff-only.upload-box { display: no
 #cv.stale { opacity: .45; }
 .views button[hidden] { display: none; }
 @media (max-width: 600px) { .views button { padding: 7px 8px; } }   /* six tabs (with Cuff) fit a phone */
+/* 19 Nov: notes that must be seen */
+.next-hint.need { color: #7a4b00; background: #fff4dc; border-radius: 8px; padding: 6px 10px; font-size: 14px; margin-top: 8px; }
+.next-btn.wait { opacity: .55; }
+.zoom-hint.warn { color: #7a4b00; font-weight: 500; }
+.note-below { display: none; }
+@media (max-width: 900px) {
+  .angle-note { display: none !important; }              /* on phones the note goes under the picture, not over the jacket */
+  /* the note: a strip under the view tabs inside the (sticky) picture area, which grows to hold it */
+  .stage.has-note { height: calc(42vh + 52px); }
+  .stage.has-note .views { bottom: 82px; } .stage.has-note .zoom-hint { bottom: 60px; }
+  .note-below:not([hidden]) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; position: absolute; left: 8px; right: 8px; bottom: 4px;
+    margin: 0; padding: 5px 10px; border-radius: 8px; background: #fff4dc; color: #5a3d00; font-size: 11.5px; line-height: 1.3; }
+  .stage.has-note ~ .panel .step, .stage.has-note ~ .panel .next-bar { scroll-margin-top: calc(42vh + 62px); }
+}

@@ -206,8 +206,12 @@
       b.title = ok ? '' : 'No photo of this front from this angle yet'; });
     // the cuff close-up names itself in the view row; the angle tabs stay available to go back to the jacket
     const cuff = $('#views [data-view="cuff"]'); if (cuff) cuff.hidden = !state.cuffPanel;
+    const na = ['three4', 'side'].filter(v => !viewOk(v)).map(v => v === 'three4' ? 'Three-quarter' : 'Side');
+    state.viewNote = na.length ? `${na.join(' and ')}: no photo of this front yet (not shown)` : '';
     $$('#views button').forEach(b => b.classList.toggle('on', state.cuffPanel ? b.dataset.view === 'cuff' : b.dataset.view === state.view));
   }
+  const SIDE_WELT = new Set(['side_notch_sb1', 'side_notch_sb3', 'side_notch_sb3r2', 'side_notch_db', 'side_notch_db4', 'side_peak_sb1', 'side_peak_sb3',
+    'side_peak_sb3r2', 'side_peak_db4', 'side_shawl_sb1', 'side_shawl_sb', 'side_shawl_sb3', 'side_shawl_sb3r2', 'side_shawl_db4', 'side_shawl_db']);
   const FRONTISH = ['front', 'three4', 'side'];
   const APPROX = [
     ['chestPocket', FRONTISH, { 233: 'the tulip-shaped chest pocket', 234: 'two chest pockets with flaps', BE: 'the angled box-pleat chest pocket',
@@ -219,7 +223,8 @@
     ['shoulder', FRONTISH, { E: 'the shirt-head shoulder' }],
     ['vent', ['three4', 'side', 'open'], { D: 'the inner belt (shown in the Back view)', F: 'the belt (shown in the Back view)' }],
     ['front', ['front'], { 6: 'the 4 roll 3 front', 9: 'the 4-button double-breasted (1 to close)', 13: 'the 6-button double-breasted (3 to close)' }],
-    ['collarBack', ['back', 'front', 'three4', 'side'], { B: 'the collar turned back at the end' }],
+    ['front', FRONTISH, { Z998: 'your own buttons (shown with standard buttons)' }],
+    ['collarBack', ['front', 'three4', 'side'], { B: 'the collar turned back at the end' }],
     ['facing', ['open'], { A: 'this facing shape', C: 'the sword-shaped facing', DGG: 'this facing shape', E: 'this facing shape',
       G: 'the half-lining facing', G03: 'the unlined facing', US66: 'this facing shape' }]];
   const SIZE_ONLY = { lowerPocket: ['A', 'C', '11', '12', '22'], chestPocket: ['A', 'C', 'D', 'E', 'F', 'J'], ticket: ['G', 'H', 'I', 'J'], namecard: ['E', 'F'],
@@ -261,6 +266,7 @@
     if (state.view === 'back') {
       const v = state.opts.vent || 'C', turned = (state.opts.collarBack || 'A') === 'B';
       const name = v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : v === 'D' ? 'back_inner_belt' : v === 'F' ? 'back_fixed_belt' : turned ? 'back_collar' : 'back';
+      if (turned && name !== 'back_collar') miss.push(['the collar turned back at the end with this vent', ['collarBack', 'vent']]);   // that photo has side vents
       return { name, note: say() };
     }
     if (state.view === 'open') {                    // inside photos: lining style first, then the inside details staff chose
@@ -319,6 +325,10 @@
       if (Pw) { pk = Pw[2] + (own ? '+' + own[2] : '') + (sx ? '@' + sx : ''); best.p = Pw[0]; best.t = Pw[1]; }
     }
     if (want.pocket === 'jettab' && best.p === 'jet' && (state.view === 'front' || state.view === 'three4')) best.p = 'jettab';   // the tab is drawn on
+    // side views shot with a jetted pocket: the standard flap is drawn over the welt (build/side_welts.py), so the default
+    // pocket shows as the default pocket (owner, 19 Nov)
+    const sideFlap = state.view === 'side' && want.pocket === 'flap' && !want.ticket && best.p === 'jet' && SIDE_WELT.has(best.name);
+    if (sideFlap) best.p = 'flap';
     let tk = null;
     if (V && want.ticket && best.t !== want.ticket && best.p === want.pocket) {
       const T = V.patches.find(x => x[1] === want.ticket && x[0] === 'flap') || V.patches.find(x => x[1] === want.ticket);
@@ -332,9 +342,12 @@
     else if (!['BK', '20', 'D'].includes(state.opts.lapel || 'BK') && best.e.lap !== state.opts.lapel) miss.push(['this lapel shape', ['lapel']]);
     if (best.f !== want.front) miss.push([((choiceOf('front') || {}).label || 'this front').toLowerCase(), ['front']]);
     if (best.p !== want.pocket || best.t !== want.ticket) miss.push(['these pockets', ['lowerPocket', 'ticket']]);
-    if (ex.w && best.e.w !== ex.w) miss.push([`${ex.w} lapel`, ['lapelWidth']]);
+    if (ex.w && best.e.w !== ex.w) {                 // no narrow / wide photo from this angle: one note, naming the exact width
+      miss.push([`a ${cmW} cm (${ex.w}) lapel`, ['lapelWidth']]);
+      for (let k = sizes.length - 1; k >= 0; k--) if (sizes[k][1][0] === 'lapelWidth') sizes.splice(k, 1);
+    }
     if (ex.sh && best.e.sh !== ex.sh) miss.push(['this shoulder', ['shoulder']]);
-    return { name: best.name, pk, ck, lw, tk, note: say() };
+    return { name: best.name, pk, ck, lw, tk, sideFlap, note: say() };
   }
   async function loadView(name, pk, ck, lw, tk) {
     const lk = lw ? '~' + lw : '';
@@ -595,7 +608,7 @@
       O[p + 3] = 255;
     }
     if (st.LN) liningPass(st, O, 0, 0, 1, state.tile);
-    ctx.putImageData(out, 0, 0); drawHole(st, 0, 0, 1); drawLabel(st.name, 0, 0, 1); drawTabs(st, 0, 0, 1); drawCuffHoles(st, 0, 0, 1); drawLapelHoles(st, 0, 0, 1); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawCuffDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
+    ctx.putImageData(out, 0, 0); drawHole(st, 0, 0, 1); drawLabel(st.name, 0, 0, 1); drawTabs(st, 0, 0, 1); drawSideFlap(st, 0, 0, 1); drawCuffHoles(st, 0, 0, 1); drawLapelHoles(st, 0, 0, 1); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawCuffDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
   }
 
   // Zoomed view: redraw only the tapped area at ZOOM x the resolution, sampling the maps between pixels and a
@@ -638,7 +651,7 @@
       }
     }
     if (st.LN) liningPass(st, O, zx, zy, Z, tile);
-    ctx.putImageData(out, 0, 0); drawHole(st, zx, zy, Z); drawLabel(st.name, zx, zy, Z); drawTabs(st, zx, zy, Z); drawCuffHoles(st, zx, zy, Z); drawLapelHoles(st, zx, zy, Z);
+    ctx.putImageData(out, 0, 0); drawHole(st, zx, zy, Z); drawLabel(st.name, zx, zy, Z); drawTabs(st, zx, zy, Z); drawSideFlap(st, zx, zy, Z); drawCuffHoles(st, zx, zy, Z); drawLapelHoles(st, zx, zy, Z);
     ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z); drawCuffDiscs(st, zx, zy, Z); drawMonos(zx, zy, Z);
   }
 
@@ -684,6 +697,35 @@
     ctx.restore();
   }
 
+  // ---------- the standard flap on side photos shot with a jetted pocket ----------
+  function drawSideFlap(st, zx, zy, Z) {
+    if (!state.sideFlap || state.view !== 'side' || !st.meta.welt) return;
+    const [wx0, wx1, wy] = st.meta.welt, w = wx1 - wx0 + 6, h = 5.6 * PX_PER_CM * 1.12, top = wy - 6;
+    const X = (wx0 - 3 - zx) * Z, Y = (top - zy) * Z, Wd = w * Z, Hd = h * Z, r = 6 * Z;
+    const path = () => { ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(X + Wd, Y); ctx.lineTo(X + Wd - 1.5 * Z, Y + Hd - r); ctx.quadraticCurveTo(X + Wd - 1.5 * Z, Y + Hd, X + Wd - 1.5 * Z - r, Y + Hd);
+      ctx.lineTo(X + 1.5 * Z + r, Y + Hd); ctx.quadraticCurveTo(X + 1.5 * Z, Y + Hd, X + 1.5 * Z, Y + Hd - r); ctx.closePath(); };
+    ctx.save(); ctx.filter = `blur(${2.5 * Z}px)`; ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.translate(0, 2.5 * Z); path(); ctx.fill(); ctx.restore();   // its shadow
+    ctx.save(); path(); ctx.clip();
+    // the cloth itself (its repeat), lit like the cloth round the pocket: copying the picture from below brought the side
+    // seam along
+    let sh = 0, n = 0; for (let y = top + 10; y < top + h; y += 4) for (let x = wx0; x < wx1; x += 4) { const i = y * W + x; if (st.A[i] > 0.99) { sh += st.SH[i]; n++; } }
+    sh = n ? sh / n : 1;
+    const tk = (state.tile && state.tile.n) + '|' + sh.toFixed(2);
+    if (st.flapPat !== tk || !st.flapCanvas) {
+      const T = state.tile.T, N = state.tile.n, SL = shadeLut(state.tile), SK = sheenOf(state.tile), s0 = SL[Math.min(1024, (sh * 256) | 0)];
+      const c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d'), im = x.createImageData(N, N);
+      for (let i = 0; i < N * N; i++) for (let ch = 0; ch < 3; ch++) { let lin = T[i * 3 + ch] * s0 + SK[ch] * s0 * s0; if (lin > 2) lin = 2; im.data[i * 4 + ch] = TONE[(lin * OUTN) | 0]; im.data[i * 4 + 3] = 255; }
+      x.putImageData(im, 0, 0); st.flapCanvas = c; st.flapPat = tk;
+    }
+    const pat = ctx.createPattern(st.flapCanvas, 'repeat'); pat.setTransform(new DOMMatrix([Z, 0, 0, Z, -zx * Z, -zy * Z]));
+    ctx.fillStyle = pat; ctx.fillRect(X, Y, Wd, Hd);
+    const g = ctx.createLinearGradient(X, Y, X, Y + Hd); g.addColorStop(0, 'rgba(0,0,0,0.18)'); g.addColorStop(0.18, 'rgba(255,255,255,0.05)'); g.addColorStop(1, 'rgba(0,0,0,0.12)');
+    ctx.fillStyle = g; ctx.fillRect(X, Y, Wd, Hd); ctx.restore();
+    ctx.save(); path(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.1 * Z; ctx.stroke();
+    ctx.setLineDash([1.6 * Z, 1.4 * Z]); ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 0.7 * Z;   // edge stitching
+    ctx.beginPath(); ctx.moveTo(X + 3.5 * Z, Y + 3 * Z); ctx.lineTo(X + 3.5 * Z, Y + Hd - 4 * Z); ctx.lineTo(X + Wd - 4.5 * Z, Y + Hd - 4 * Z); ctx.lineTo(X + Wd - 4.5 * Z, Y + 3 * Z); ctx.stroke();
+    ctx.restore();
+  }
   // ---------- jetted pockets with a button tab (lower pocket code 2): a pointed tab of the cloth hangs from the jet ----------
   // Jet centres on the pocket photos (front: left, right; three-quarter: far, near), moved like the pockets themselves.
   const JET_AT = { front: [[287, 997], [725, 991]], three4: [[268, 992], [577, 987]] };
@@ -1414,23 +1456,38 @@
     }
   }
 
-  let ticket = 0, staleT = 0;
+  let ticket = 0, staleT = 0, painted = false;
+  // before the first full picture: the jacket photo as photographed (its colour layer, made opaque), drawn as soon as
+  // that one file arrives; the full picture replaces it
+  function firstPaint(name) {
+    Promise.all(['base', 'shade'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`))).then(([bi, si]) => {
+      if (painted) return;
+      const B = pixels(bi), S = pixels(si), d = ctx.createImageData(W, H), D = d.data;
+      for (let p = 0; p < D.length; p += 4) {          // the photo round the jacket; the jacket itself in its own light, a soft grey
+        const a = B[p + 3] / 255, g = S[p] * 0.62;
+        D[p] = B[p] * a + g * (1 - a); D[p + 1] = B[p + 1] * a + g * (1 - a); D[p + 2] = B[p + 2] * a + (g + 6) * (1 - a); D[p + 3] = 255;
+      }
+      if (!painted) ctx.putImageData(d, 0, 0);
+    }).catch(() => {});
+  }
   async function render() {
     if (!viewOk(state.view)) { state.view = 'front'; state.zoom = null; state.closeup = null; $$('#views button').forEach(x => x.classList.toggle('on', x.dataset.view === 'front')); }
     paintViews();
-    const my = ++ticket, m = mapName(); state.mapName = m.name;
+    const my = ++ticket, m = mapName(); state.mapName = m.name; state.sideFlap = !!m.sideFlap;
     busy.hidden = false; busy.textContent = 'Updating…';
     // the previous picture stays up while the new one loads: when that takes a moment it is faded, so it is never
     // mistaken for the new choice (owner, 17 Nov: buttons briefly seen on the hidden-button front)
-    clearTimeout(staleT); staleT = setTimeout(() => { if (my === ticket && !busy.hidden) cv.classList.add('stale'); }, 120);
+    clearTimeout(staleT); staleT = setTimeout(() => { if (my === ticket && !busy.hidden && painted) cv.classList.add('stale'); }, 120);   // not the first photo
     // a cloth shown from a photo of its swatch with an estimated scale says so on the picture (and on its card)
     const allNote = [m.note ? m.note.all : '', !state.custom && state.fabric && state.fabric.preview || ''].filter(Boolean).join(' ');
     $('#angleNote').hidden = !allNote; $('#angleNote').textContent = allNote;
+    $('#noteBelow').hidden = !allNote; $('#noteBelow').textContent = allNote; $('#stage').classList.toggle('has-note', !!allNote);   // phones: a strip under the view tabs (CSS)
     $$('.pic-note').forEach(e => e.remove());
     const stepNote = m.note && state.lastStep ? m.note.by(state.lastStep) : '';
     const ls = stepNote && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
     if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(stepNote)}</p>`);
     try {
+      if (!painted) firstPaint(m.name);               // the photo itself while its maps load (the first picture took seconds)
       await cuffRef();
       const st = stackView(cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk)));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
@@ -1455,6 +1512,7 @@
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
+        painted = true;
         if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy, state.zoom.z); else draw(st);
         if (state.diagram && state.view === 'front' && !state.zoom) drawConstruction(st, state.diagram);
         if (state.cuffPanel) drawCuffPanel();
@@ -1463,7 +1521,9 @@
         paintMini(); popMini();                       // the small copy shows exactly what the big picture shows, zoom included
         if (state.melton && state.view === 'back' && !state.zoom) { drawMelton(); paintMini(); }
         $('#stage').classList.toggle('zoom', !!state.zoom);
-        $('#zoomHint').textContent = state.cuffPanel ? 'Pick Front, Side or another view to see the whole jacket' : state.zoom ? 'Tap again to zoom out' : 'Tap the jacket to zoom into the cloth';
+        $('#zoomHint').textContent = state.cuffPanel ? 'Pick Front, Side or another view to see the whole jacket' : state.zoom ? 'Tap again to zoom out'
+          : state.viewNote || 'Tap the jacket to zoom into the cloth';   // the angles not shown are said right under the view tabs
+        $('#zoomHint').classList.toggle('warn', !state.cuffPanel && !state.zoom && !!state.viewNote);
         if (my === ticket) { busy.hidden = true; clearTimeout(staleT); cv.classList.remove('stale'); }
       }, 0));
     } catch (e) {
@@ -2237,8 +2297,10 @@
   function paintSteps() {
     $$('.tabs button').forEach(b => b.classList.toggle('locked', !STAFF && STEPS_ORDER.indexOf(b.dataset.tab) > state.reached));
     const fb = $('[data-next=fabric]');
-    fb.disabled = !state.fabricPicked && !STAFF;
-    fb.nextElementSibling.textContent = fb.disabled ? 'Choose a fabric first (tap one of the swatches).' : '';
+    const need = !state.fabricPicked && !STAFF;
+    fb.disabled = false; fb.classList.toggle('wait', need); fb.setAttribute('aria-disabled', need ? 'true' : 'false');   // tappable: a tap says why
+    fb.nextElementSibling.textContent = need ? 'Choose a fabric first: tap one of the swatches above.' : '';
+    fb.nextElementSibling.classList.toggle('need', need);
   }
   $$('.tabs button').forEach(b => b.onclick = () => {
     const i = STEPS_ORDER.indexOf(b.dataset.tab);
@@ -2253,6 +2315,7 @@
   $$('.next-btn').forEach(b => b.onclick = () => {
     const i = STEPS_ORDER.indexOf(b.dataset.next);
     if (b.disabled) return;
+    if (b.classList.contains('wait')) { toast('Choose a fabric first: tap one of the swatches.'); $('#grid').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     state.reached = Math.max(state.reached, i + 1); paintSteps(); showTab(STEPS_ORDER[i + 1]);
   });
   let toastT;
