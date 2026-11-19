@@ -355,7 +355,16 @@
       for (let k = sizes.length - 1; k >= 0; k--) if (sizes[k][1][0] === 'lapelWidth') sizes.splice(k, 1);
     }
     if (ex.sh && best.e.sh !== ex.sh) miss.push(['this shoulder', ['shoulder']]);
-    return { name: best.name, pk, ck, lw, tk, sideFlap, note: say() };
+    let sz = null;
+    if (DRAWN && SZ_REG[state.view]) {             // preview: the flap depth and chest welt height drawn to the chosen cm
+      const cmOf = id => { const r = /(\d+(?:\.\d+)?)\s?cm/i.exec((choiceOf(id) || {}).label || ''); return r ? +r[1] : 0; };
+      const fl = ['flap', 'slant', 'hacking'].includes(want.pocket) && best.p === want.pocket && cmOf('lowerPocket');
+      const cw = SZ_REG[state.view].c && chest === 'welt' && cmOf('chestPocket');   // straight welts (the curved welt: next)
+      sz = { f: fl ? Math.round(fl / SZ_BASE.f * 1000) / 1000 : 1, c: cw ? Math.round(cw / SZ_BASE.c * 1000) / 1000 : 1 };
+      for (let k = sizes.length - 1; k >= 0; k--) if ((fl && sizes[k][1][0] === 'lowerPocket') || (cw && sizes[k][1][0] === 'chestPocket')) sizes.splice(k, 1);
+      if (Math.abs(sz.f - 1) < 0.01 && Math.abs(sz.c - 1) < 0.01) sz = null;
+    }
+    return { name: best.name, pk, ck, lw, tk, sideFlap, sz, note: say() };
   }
   async function loadView(name, pk, ck, lw, tk) {
     const lk = lw ? '~' + lw : '';
@@ -539,6 +548,119 @@
       }
     }
     return { ...st, B, S, Wp, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined };   // a new picture: its own caches
+  }
+  // ---------- drawn sizes (preview only, ?drawn=1 in the link, 20 Nov): the lower pocket flap's depth and the chest
+  // welt's height are resized in the photo itself. The flap / welt is found as two parallel dark lines (its top seam and
+  // its bottom edge) in the photo's shading; rows between them are stretched or squeezed from the top seam down, the
+  // shadow under the edge moves with it, and when it gets shorter the cloth below closes up over a short band.
+  const DRAWN = new URLSearchParams(location.search).has('drawn');
+  const SZ_REG = { front: { f: [[180, 405], [615, 862]], c: [[560, 820]] }, three4: { f: [[245, 345], [474, 750]], c: [[400, 720]] }, side: { f: [[250, 480]] } };
+  const SZ_Y = { f: [900, 1250, 35, 120], c: [440, 700, 25, 60] };     // search rows, smallest / largest height (px)
+  const SZ_BASE = { f: 4.5, c: 2.5 };                                  // cm of the flap / chest welt in the photos
+  const edgeCache = new WeakMap();
+  function edgeMap(st) {                          // dark horizontal lines: mean of 15 rows minus mean of 3 rows (shade)
+    if (edgeCache.has(st)) return edgeCache.get(st);
+    const E = new Float32Array(W * H), col = new Float64Array(H + 1);
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < H; y++) col[y + 1] = col[y] + st.S[(y * W + x) * 4];
+      const m = (y, r) => { const lo = Math.max(0, y - r), hi = Math.min(H, y + r + 1); return (col[hi] - col[lo]) / (hi - lo); };
+      for (let y = 0; y < H; y++) E[y * W + x] = st.A[y * W + x] ? m(y, 7) - m(y, 1) : 0;
+    }
+    edgeCache.set(st, E); return E;
+  }
+  function szLines(E, xa, xb, ya, yb, wmin) {
+    const P = [];
+    for (let x = xa; x < xb; x += 2) for (let y = ya + 2; y < yb - 2; y++) {
+      const v = E[y * W + x]; if (v <= 5) continue;
+      if (v >= E[(y - 1) * W + x] && v >= E[(y + 1) * W + x] && v >= E[(y - 2) * W + x] && v >= E[(y + 2) * W + x]) P.push([x, y, v]);
+    }
+    const out = [];
+    for (let b = -0.4; b <= 0.4001; b += 0.02) {
+      const by = new Map();
+      for (const p of P) { const a = Math.round(p[1] - b * p[0]); for (const k of [a - 2, a - 1, a, a + 1, a + 2]) { if (!by.has(k)) by.set(k, []); by.get(k).push(p); } }
+      for (const [a0, ps] of by) {
+        if (ps.length < 20) continue;
+        const xs = ps.map(p => p[0]).sort((u, v) => u - v); let s0 = xs[0], pv = xs[0], best = [xs[0], xs[0]];
+        for (const x of xs.slice(1)) { if (x - pv > 8) { if (pv - s0 > best[1] - best[0]) best = [s0, pv]; s0 = x; } pv = x; }
+        if (pv - s0 > best[1] - best[0]) best = [s0, pv];
+        if (best[1] - best[0] < wmin) continue;
+        let sum = 0; for (const p of ps) if (p[0] >= best[0] && p[0] <= best[1] && Math.abs(p[1] - b * p[0] - a0) <= 2) sum += p[2];
+        out.push({ a: a0, b, x0: best[0], x1: best[1], s: sum });
+      }
+    }
+    out.sort((u, v) => v.s - u.s); const keep = [];
+    for (const l of out) {
+      const ym = l.a + l.b * (l.x0 + l.x1) / 2;
+      if (keep.some(k => Math.abs(ym - (k.a + k.b * (k.x0 + k.x1) / 2)) < 8 && Math.min(l.x1, k.x1) - Math.max(l.x0, k.x0) > 20)) continue;
+      keep.push(l); if (keep.length >= 12) break;
+    }
+    return keep;
+  }
+  function szFind(E, xa, xb, ya, yb, hmin, hmax, ext = 12) {   // the pair of lines (top seam, bottom edge) that bounds the flap / welt
+    const wmin = xb - xa < 120 ? 20 : 45, L = szLines(E, xa, xb, ya, yb, wmin); let best = null;
+    for (const u of L) for (const d of L) {
+      if (Math.abs(u.b - d.b) > 0.07) continue;
+      const x0 = Math.max(u.x0, d.x0), x1 = Math.min(u.x1, d.x1); if (x1 - x0 < wmin) continue;
+      const xm = (x0 + x1) / 2, gap = (d.a + d.b * xm) - (u.a + u.b * xm); if (gap < hmin || gap > hmax) continue;
+      const sc = Math.min(u.s, d.s) * (x1 - x0); if (!best || sc > best.sc) best = { sc, x0, x1, a: d.a, b: d.b, h: Math.round(gap) };
+    }
+    if (!best) return null;
+    const strong = x => { for (const yy of [best.a + best.b * x, best.a + best.b * x - best.h]) for (let d = -2; d <= 2; d++) { const y = Math.round(yy) + d; if (y > 0 && y < H && E[y * W + x] > 3) return true; } return false; };
+    const x0 = best.x0, x1 = best.x1;               // its full width (at most 12 px more each side: not into a sleeve or lapel edge)
+    for (let gap = 0, x = x0 - 1; x >= x0 - ext && gap <= 4; x--) { if (strong(x)) { best.x0 = x; gap = 0; } else gap++; }
+    for (let gap = 0, x = x1 + 1; x <= x1 + ext && gap <= 4; x++) { if (strong(x)) { best.x1 = x; gap = 0; } else gap++; }
+    return best;
+  }
+  const szMemo = new WeakMap();
+  function sizedView(st, view, sz) {
+    const key = JSON.stringify(sz); let memo = szMemo.get(st); if (!memo) szMemo.set(st, memo = new Map());
+    if (memo.has(key)) return memo.get(key);
+    const B = st.B.slice(), S = st.S.slice(), Wp = st.Wp.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
+    const put = (y, x, sy) => {                     // pixel (x, y) takes the map values at row sy of the same column
+      if (y < 0 || y >= H || x < 0 || x >= W) return;
+      const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3] || st.Wp[i * 4 + 2] === 2 || st.Wp[i * 4 + 2] === 3) return;   // lapels stay
+      sy = Math.max(0, Math.min(H - 1.001, sy)); const y0 = sy | 0, f = sy - y0, j0 = y0 * W + x, j1 = j0 + W, jn = f < 0.5 ? j0 : j1;
+      if (!st.A[jn] || st.Wp[jn * 4 + 2] === 2 || st.Wp[jn * 4 + 2] === 3) return;
+      const p = i * 4, p0 = j0 * 4, p1 = j1 * 4;
+      for (let c = 0; c < 4; c++) B[p + c] = st.B[jn * 4 + c];
+      S[p] = st.S[p0] * (1 - f) + st.S[p1] * f; S[p + 1] = S[p + 2] = S[p];
+      Wp[p] = st.Wp[p0] * (1 - f) + st.Wp[p1] * f; Wp[p + 1] = st.Wp[p0 + 1] * (1 - f) + st.Wp[p1 + 1] * f; Wp[p + 2] = st.Wp[jn * 4 + 2];
+      A[i] = st.A[jn]; uvAt(i, S, Wp, U, V, SH);
+    };
+    const E = edgeMap(st), found = [];
+    for (const kind of ['f', 'c']) {
+      const k = sz[kind]; if (!k || Math.abs(k - 1) < 0.01) continue;
+      const [ya, yb, hmin, hmax] = SZ_Y[kind];
+      for (const [xa, xb] of ((SZ_REG[view] || {})[kind] || [])) {
+        const g = szFind(E, xa, xb, ya, yb, hmin, hmax); if (!g) continue; found.push(kind);
+        const SHD = 10, BAND = 50, mg = k < 1 || kind === 'c' ? 1 : 3, xl = Math.max(8, g.x0 - mg), xr = Math.min(W - 9, g.x1 + mg), xc = Math.round((g.x0 + g.x1) / 2);
+        // a sleeve or lapel edge crossing the flap's end (three-quarter, side): measured in the plain cloth just below the
+        // flap, the first strong vertical edge either side of the middle ends the change there, so the edge never moves
+        // (a sharp step in brightness across it: a dart, a seam or a soft shadow does not count)
+        const ybm = g.a + g.b * xc, band = (x, y0, y1) => { let t = 0, n = 0;
+          for (let y = Math.round(y0); y <= Math.round(y1); y++) { const yy = Math.round(y + g.b * (x - xc)); if (yy < 1 || yy >= H - 1 || x < 9 || x > W - 10) continue;
+            t += (st.S[(yy * W + x + 1) * 4] + st.S[(yy * W + x + 2) * 4] - st.S[(yy * W + x - 1) * 4] - st.S[(yy * W + x - 2) * 4]) / 2; n++; }
+          return n ? Math.abs(t / n) : 0; };
+        const stepAt = x => Math.max(band(x, ybm + 14, ybm + 40), band(x, ybm - g.h * 0.7, ybm - g.h * 0.3));   // below it, and inside it
+        let xr2 = xr, xl2 = xl;
+        for (let x = xc; x <= xr; x++) if (stepAt(x) > 25) { let pk = x; for (let q = x; q <= x + 6; q++) if (stepAt(q) > stepAt(pk)) pk = q; xr2 = pk - 1; break; }
+        for (let x = xc; x >= xl; x--) if (stepAt(x) > 25) { let pk = x; for (let q = x; q >= x - 6; q--) if (stepAt(q) > stepAt(pk)) pk = q; xl2 = pk + 1; break; }
+        for (let x = xl2; x <= xr2; x++) {
+          const yb0 = g.a + g.b * x, yt = yb0 - g.h, nb = yt + g.h * k;
+          if (k > 1) {
+            for (let y = Math.round(nb + SHD); y >= Math.round(yt); y--) put(y, x, y <= nb ? yt + (y - yt) / k : yb0 + (y - nb));
+          } else {
+            const end = yb0 + SHD + BAND, gp = yb0 - nb;
+            for (let y = Math.round(yt); y <= Math.round(end); y++) {
+              const sy = y <= nb ? yt + (y - yt) / k : y <= nb + SHD ? yb0 + (y - nb) : y + gp * (1 - (y - nb - SHD) / (end - nb - SHD));
+              put(y, x, sy);
+            }
+          }
+        }
+      }
+    }
+    const out = { ...st, B, S, Wp, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, szFound: found };
+    memo.set(key, out); return out;
   }
   // Pocket styles: the pocket area of a notch photo with that pocket (shading + fold offsets) is blended into
   // this photo, moved to where this photo's own pocket sits. Buttons and the photo's outline stay its own.
@@ -1497,7 +1619,8 @@
     try {
       if (!painted) firstPaint(m.name);               // the photo itself while its maps load (the first picture took seconds)
       await cuffRef();
-      const st = stackView(cuffView(await loadView(m.name, m.pk, m.ck, m.lw, m.tk)));
+      let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk); if (m.sz) lv = sizedView(lv, state.view, m.sz);   // drawn sizes (preview)
+      const st = stackView(cuffView(lv));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
         if (g && g.L && g.R && (pos === 'D' || pos === 'E')) state.zoom = zoomBox((g.L.x + g.R.x) / 2, (g.L.y + g.R.y) / 2 + 80, 1.6);   // both lapels
