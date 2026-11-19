@@ -595,7 +595,7 @@
       O[p + 3] = 255;
     }
     if (st.LN) liningPass(st, O, 0, 0, 1, state.tile);
-    ctx.putImageData(out, 0, 0); drawHole(st, 0, 0, 1); drawLabel(st.name, 0, 0, 1); drawTabs(st, 0, 0, 1); drawCuffHoles(st, 0, 0, 1); drawLapelHoles(st, 0, 0, 1); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
+    ctx.putImageData(out, 0, 0); drawHole(st, 0, 0, 1); drawLabel(st.name, 0, 0, 1); drawTabs(st, 0, 0, 1); drawCuffHoles(st, 0, 0, 1); drawLapelHoles(st, 0, 0, 1); ctx.drawImage(overlayFor(st), 0, 0); drawDiscs(st, 0, 0, 1); drawCuffDiscs(st, 0, 0, 1); drawMonos(0, 0, 1);
   }
 
   // Zoomed view: redraw only the tapped area at ZOOM x the resolution, sampling the maps between pixels and a
@@ -639,7 +639,7 @@
     }
     if (st.LN) liningPass(st, O, zx, zy, Z, tile);
     ctx.putImageData(out, 0, 0); drawHole(st, zx, zy, Z); drawLabel(st.name, zx, zy, Z); drawTabs(st, zx, zy, Z); drawCuffHoles(st, zx, zy, Z); drawLapelHoles(st, zx, zy, Z);
-    ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z); drawMonos(zx, zy, Z);
+    ctx.drawImage(overlayFor(st), zx, zy, W / Z, H / Z, 0, 0, W, H); drawDiscs(st, zx, zy, Z); drawCuffDiscs(st, zx, zy, Z); drawMonos(zx, zy, Z);
   }
 
   // ---------- the lapel buttonhole on its close-up photo, in the chosen thread (matching thread: a shade lighter than the cloth) ----------
@@ -801,6 +801,41 @@
     if (ex > 0) { ex = -ex; ey = -ey; }                      // as in the photos: towards the vent, on the left of the buttons
     return (st.cuffs[key] = { ...st, A, B, S, OVP, SH, U, V, ov, ovCache: {}, cuffs: undefined, elbowPx: undefined, cuffAt: { centres, r, ex, ey, dx, dy } });
   }
+  // ---------- a worked buttonhole (owner, 19 Nov): a narrow dark opening between two thick stitched lips, a small
+  // round eye at the button end, a bar-tack across the far end. Local frame: along +x from the button (0) to the tack (L).
+  function workedButtonhole(c, x, y, ang, L, hw, rgb) {
+    const t = rgb.map(v => Math.round(v)), sh = k => `rgb(${t.map(v => Math.max(0, Math.min(255, Math.round(v * k))))})`;
+    const o = Math.max(0.9, hw * 0.24), step = Math.max(1.1, hw * 0.2), lw = Math.max(0.7, step * 0.62);
+    c.save(); c.translate(x, y); c.rotate(ang); c.lineCap = 'round';
+    const capsule = (x0, x1, r) => { c.beginPath(); c.moveTo(x0, -r); c.lineTo(x1, -r); c.arc(x1, 0, r, -Math.PI / 2, Math.PI / 2); c.lineTo(x0, r); c.arc(x0, 0, r, Math.PI / 2, Math.PI * 1.5); c.closePath(); };
+    // the hole sits a touch into the cloth: soft shadow round it
+    c.filter = `blur(${Math.max(0.8, hw * 0.25)}px)`; c.fillStyle = 'rgba(0,0,0,0.5)'; capsule(hw * 0.2, L - hw * 0.2, hw * 1.05); c.translate(0, hw * 0.18); c.fill(); c.translate(0, -hw * 0.18); c.filter = 'none';
+    // the lips: a cord of thread on each side
+    c.fillStyle = sh(0.78); capsule(hw * 0.2, L - hw * 0.2, hw); c.fill();
+    // purl stitches, each a tiny bead: lit side, shaded side
+    for (const sgn of [-1, 1]) for (let xx = hw * 0.75; xx < L - hw * 0.6; xx += step) {
+      c.lineWidth = lw; c.strokeStyle = sh(1.18); c.beginPath(); c.moveTo(xx, sgn * (o + 0.3)); c.lineTo(xx + step * 0.25, sgn * (hw - 0.4)); c.stroke();
+      c.lineWidth = lw * 0.55; c.strokeStyle = sh(0.5); c.beginPath(); c.moveTo(xx + step * 0.5, sgn * (o + 0.3)); c.lineTo(xx + step * 0.7, sgn * (hw - 0.4)); c.stroke();
+    }
+    for (let a = Math.PI * 0.55; a < Math.PI * 1.45; a += step / hw) {   // stitches fanned round the eye end
+      const cx = hw * 0.75; c.lineWidth = lw; c.strokeStyle = sh(1.15);
+      c.beginPath(); c.moveTo(cx + Math.cos(a) * o * 1.6, Math.sin(a) * o * 1.6); c.lineTo(cx + Math.cos(a) * (hw - 0.3), Math.sin(a) * (hw - 0.3)); c.stroke();
+    }
+    // the cord's roundness: light along the outer top, shade into the opening
+    let g = c.createLinearGradient(0, -hw, 0, hw);
+    g.addColorStop(0, 'rgba(255,255,255,0.20)'); g.addColorStop(0.32, 'rgba(0,0,0,0.0)'); g.addColorStop(0.46, 'rgba(0,0,0,0.35)');
+    g.addColorStop(0.54, 'rgba(0,0,0,0.35)'); g.addColorStop(0.68, 'rgba(255,255,255,0.08)'); g.addColorStop(1, 'rgba(0,0,0,0.30)');
+    c.fillStyle = g; capsule(hw * 0.2, L - hw * 0.2, hw); c.fill();
+    // the opening: a dark slit with a round eye at the button end
+    c.fillStyle = 'rgba(8,8,10,0.94)'; capsule(hw * 0.75, L - hw * 1.15, o); c.fill();
+    c.beginPath(); c.arc(hw * 0.75, 0, o * 1.6, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.10)'; c.lineWidth = 0.6; c.beginPath(); c.moveTo(hw * 0.9, o + 0.4); c.lineTo(L - hw * 1.2, o + 0.4); c.stroke();
+    // the bar-tack across the far end
+    const bx = L - hw * 0.55;
+    c.fillStyle = sh(0.7); c.beginPath(); c.roundRect(bx - hw * 0.3, -hw * 1.05, hw * 0.6, hw * 2.1, hw * 0.25); c.fill();
+    for (let yy = -hw * 0.95; yy < hw * 0.95; yy += step * 0.8) { c.lineWidth = lw * 0.8; c.strokeStyle = sh(1.12); c.beginPath(); c.moveTo(bx - hw * 0.26, yy); c.lineTo(bx + hw * 0.26, yy + 0.2); c.stroke(); }
+    c.restore();
+  }
   // ---------- sleeve buttons: a flat, straight-on close-up of the cuff (owner, 17 Nov) ----------
   // Shown while the customer chooses the sleeve buttons, their spacing, the buttonhole direction or the sleeve button /
   // hole thread: the back of the sleeve end seen square on, at real size, in the chosen cloth, buttons and threads.
@@ -831,25 +866,11 @@
     const d = 1.5 * S, pitch = o.kiss ? d * 0.9 : d * 1.5, cx = vent - 2.3 * S, R = d / 2;   // the holes run towards the vent and stop short of it
     const code = sleeveBtn() || CUFF_BTN, bi = btnImgs[code + '|' + (state.thread.button || '')];
     const ys = Array.from({ length: o.n }, (_, k) => hem - 3 * S - k * pitch);
-    const own = clothRGB().map(v => Math.min(255, Math.round(v * 1.3 + 14)));   // matching thread: the cloth's colour, its stitched ridge a touch lighter
-    if (o.holes) ys.forEach((cy, k) => {             // hand-worked buttonholes: purl stitches along both lips, a dark slit, bar-tacked end
+    const own = clothRGB().map(v => Math.min(255, Math.round(v * 1.12 + 8)));    // matching thread: the cloth's colour, a touch of sheen
+    if (o.holes) ys.forEach((cy, k) => {             // worked buttonholes: from the button towards the vent, in their thread
       const tc = (state.thread.sleeve[k] && (THREADS.find(x => x.id === state.thread.sleeve[k]) || {}).rgb) || own;
-      const a = o.slant ? -0.42 : 0, L = 1.75 * S, hw = 0.15 * S;
-      ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
-      // the worked lips: a raised band of thread, clearly lit on top and shaded below, outlined by its own shadow,
-      // with purl stitches that read at normal size
-      ctx.filter = 'blur(1.6px)'; ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.roundRect(-1, -hw + 1.5, L + 2, 2 * hw + 1.5, hw); ctx.fill();   // its shadow
-      ctx.filter = 'blur(0.7px)';
-      ctx.fillStyle = `rgb(${tc})`; ctx.beginPath(); ctx.roundRect(0, -hw, L, 2 * hw, hw); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.24)'; ctx.beginPath(); ctx.roundRect(1, -hw + 0.5, L - 2, hw * 0.75, hw * 0.4); ctx.fill();   // light on the upper lip
-      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(1, 1.2, L - 2, hw * 0.45);                                                // and on the lower
-      ctx.filter = 'none'; ctx.lineWidth = 1;
-      for (let x = 2.5; x < L - 3; x += 2.2) {
-        ctx.strokeStyle = 'rgba(0,0,0,0.38)'; ctx.beginPath(); ctx.moveTo(x, -hw + 1); ctx.lineTo(x + 0.8, -1.6); ctx.moveTo(x + 0.3, 1.6); ctx.lineTo(x + 1.1, hw - 1); ctx.stroke();
-        ctx.strokeStyle = `rgba(${tc.map(v => Math.min(255, v + 70))},0.45)`; ctx.beginPath(); ctx.moveTo(x + 1.1, -hw + 1.2); ctx.lineTo(x + 1.7, -2); ctx.stroke();
-      }
-      ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(3, 0); ctx.lineTo(L - 4, 0); ctx.stroke();   // the cut
-      ctx.restore();
+      const ang = o.slant ? -0.42 : 0, st = R * 0.85;  // the eye just clear of the button's rim; the tack short of the vent
+      workedButtonhole(ctx, cx + Math.cos(ang) * st, cy + Math.sin(ang) * st, ang, 2.0 * S - st, 0.17 * S, tc);
     });
     // shadows first (each button casts a soft shadow on the cloth, and on the button below when kissing)
     ys.forEach(cy => {
@@ -881,20 +902,33 @@
   }
   function drawCuffHoles(st, zx, zy, Z) {
     const c = st.cuffAt, o = cuffOpts(); if (!c || !o.holes || !c.centres.length) return;
-    const t = threadRGB('button');
     let { ex, ey } = c;
     if (o.slant) { const a = 0.45 * Math.sign(ex * c.dy - ey * c.dx || 1), cs = Math.cos(a), sn = Math.sin(a); [ex, ey] = [ex * cs - ey * sn, ex * sn + ey * cs]; }
-    ctx.save(); ctx.lineCap = 'round';
-    for (const [cx, cy] of c.centres) {                // a buttonhole: stitched edge (thread colour) round a dark slit
-      const x = (cx - zx) * Z, y = (cy - zy) * Z, l = c.r * 1.9 * Z, x2 = x + ex * l, y2 = y + ey * l;
-      ctx.strokeStyle = t ? `rgba(${t},0.95)` : 'rgba(0,0,0,0.3)'; ctx.lineWidth = Math.max(2.5, 2.6 * Z);
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
-      if (!t) { ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = Math.max(0.8, 0.9 * Z);   // matching thread: the stitched ridge catches the light
-        ctx.beginPath(); ctx.moveTo(x - 0.8 * Z, y - 1.1 * Z); ctx.lineTo(x2 - 0.8 * Z, y2 - 1.1 * Z); ctx.stroke(); }
-      ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = Math.max(0.8, 0.8 * Z);
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2 - ex * Z, y2 - ey * Z); ctx.stroke();
-    }
-    ctx.restore();
+    const ang = Math.atan2(ey, ex), own = clothRGB().map(v => Math.min(255, Math.round(v * 1.12 + 8)));
+    c.centres.forEach(([cx, cy], k) => {               // the same worked buttonhole as the cuff close-up, at this scale
+      const tc = (state.thread.sleeve[k] && (THREADS.find(x => x.id === state.thread.sleeve[k]) || {}).rgb) || threadRGB('button') || own;
+      const x = (cx - zx) * Z, y = (cy - zy) * Z, st0 = c.r * 0.85 * Z;
+      workedButtonhole(ctx, x + ex * st0, y + ey * st0, ang, c.r * 1.6 * Z, Math.max(1.5, c.r * 0.16 * Z), tc);
+    });
+  }
+  // the sleeve buttons on the side / three-quarter photos, when a button is chosen: that button's own photo, lit
+  // like the jacket (soft shadow, curved rim, gloss), over the photographed ones; kissing ones overlap as sewn
+  function drawCuffDiscs(st, zx, zy, Z) {
+    const c = st.cuffAt, code = sleeveBtn(); if (!c || !code || !c.centres.length) return;
+    const bi = btnImgs[code + '|' + (state.thread.button || '')]; if (!bi) return;
+    const R = c.r * 1.04 * Z;
+    c.centres.forEach(([cx, cy]) => { const x = (cx - zx) * Z, y = (cy - zy) * Z;
+      ctx.save(); ctx.filter = `blur(${Math.max(1, R * 0.12)}px)`; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(x + R * 0.1, y + R * 0.16, R, R * 0.96, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); });
+    [...c.centres].reverse().forEach(([cx, cy]) => {
+      const x = (cx - zx) * Z, y = (cy - zy) * Z;
+      ctx.save(); ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(bi, x - R, y - R, 2 * R, 2 * R);
+      const g = ctx.createRadialGradient(x - R * 0.35, y - R * 0.4, R * 0.1, x, y, R);
+      g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(0.6, 'rgba(0,0,0,0)'); g.addColorStop(0.88, 'rgba(0,0,0,0.2)'); g.addColorStop(1, 'rgba(0,0,0,0.55)');
+      ctx.fillStyle = g; ctx.fillRect(x - R, y - R, 2 * R, 2 * R);
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = Math.max(0.8, R * 0.09); ctx.beginPath(); ctx.arc(x, y, R * 0.84, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
+      ctx.restore();
+      ctx.save(); ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = Math.max(0.6, R * 0.05); ctx.beginPath(); ctx.arc(x, y, R - 0.4, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    });
   }
 
   // ---------- lapel buttonhole (front views) ----------
@@ -1252,8 +1286,11 @@
       const a = P[p + 3]; if (!a) continue;
       const b = body[i] ? fb : sb;
       if (!b) { O[p] = P[p]; O[p + 1] = P[p + 1]; O[p + 2] = P[p + 2]; O[p + 3] = a; continue; }
-      const L = (0.299 * P[p] + 0.587 * P[p + 1] + 0.114 * P[p + 2]) / Lo;
-      O[p] = Math.min(255, b.rgb[0] * L); O[p + 1] = Math.min(255, b.rgb[1] * L); O[p + 2] = Math.min(255, b.rgb[2] * L); O[p + 3] = a;
+      // the chosen button's colour on the photographed one, keeping part of the photo's own light and its highlights
+      // (a flat tint read as a drawn oval, owner 19 Nov)
+      const lum = 0.299 * P[p] + 0.587 * P[p + 1] + 0.114 * P[p + 2], L = lum / Lo, hi = Math.max(0, Math.min(1, (L - 1.35) / 0.8)) * 0.65;
+      for (let ch = 0; ch < 3; ch++) { const tint = Math.min(255, b.rgb[ch] * Math.pow(L, 1.25)); O[p + ch] = Math.min(255, (tint * 0.82 + P[p + ch] * 0.18) * (1 - hi) + 245 * hi); }
+      O[p + 3] = a;
     }
     x.putImageData(img, 0, 0);
     return (st.ovCache[key] = c);
@@ -1339,6 +1376,7 @@
         if (state.zoom) state.ztile = await loadTile(f, state.zoom.z * sc);
       }
       if (curBtn()) await loadBtn(curBtn());
+      if (sleeveBtn()) await loadBtn(sleeveBtn());
       const lo = st.LN && state.lining && LININGS.find(x => x.id === state.lining);
       if (lo) await (lo.kind === 'positional' ? loadPosTex(lo, st) : loadLinTex(lo, state.zoom ? state.zoom.z : 1));
       await monoReady();
@@ -1700,33 +1738,49 @@
   }
   function drawConstruction(st, kind) {
     const full = /full/i.test(kind), half = !full && /half/i.test(kind), CUT = 820;   // half canvas: chest and lapels, to about the waist
-    // the canvas's weight: the same area, a lighter canvas = finer, fainter hatching (and its name in the key)
+    // tonal washes over the cloth, so its weave still shows (owner, 19 Nov: no flat fills): the canvas a natural linen
+    // tone with a fine weave whose density shows the canvas's weight; the fused part a cool grey with a faint dot
     const weight = /ultra/i.test(kind) ? 'ultra' : /light/i.test(kind) ? 'light' : '';
-    // half canvas: dense cross-hatch; light: single diagonal hatch; ultra-thin: a sparse dot screen (and paler)
-    const canvasA = (x, y) => weight === 'ultra' ? ((x % 18 < 4 && y % 18 < 4) ? 0.75 : 0.1)
-      : weight === 'light' ? (((x + y) % 20) < 3 ? 0.62 : 0.2)
-      : ((((x + y) % 14) < 3 || ((x - y + 4096) % 14) < 3) ? 0.72 : 0.36);
+    const LINEN = [205, 192, 166], FUSED = [158, 168, 182];
+    const pitch = weight === 'ultra' ? 22 : weight === 'light' ? 15 : 10, wash = weight === 'ultra' ? 0.24 : weight === 'light' ? 0.32 : 0.4;
+    const canvasA = (x, y) => wash + ((((x + y) % pitch) === 0 || (!weight && ((x - y + 4096) % pitch) === 0)) ? 0.22 : 0);
+    const fusedA = (x, y) => 0.3 + ((x % 9 === 0 && y % 9 === 0) ? 0.25 : 0);
     const img = ctx.getImageData(0, 0, W, H), O = img.data;
     for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i++) {
       if (!st.A[i] || x < 175 || x > 850 || st.OVP[i * 4 + 3]) continue;       // front panels only (not the sleeves), never the buttons
-      const canvas = full || (half && y < CUT), c = canvas ? [26, 140, 145] : [214, 150, 40];
-      const a = st.A[i] * (canvas ? canvasA(x, y) : (((x + y) % 16) < 3 ? 0.7 : 0.32));
-      const p = i * 4; O[p] = O[p] * (1 - a) + c[0] * a; O[p + 1] = O[p + 1] * (1 - a) + c[1] * a; O[p + 2] = O[p + 2] * (1 - a) + c[2] * a;
+      const canvas = full || (half && y < CUT), c = canvas ? LINEN : FUSED;
+      const a = st.A[i] * (canvas ? canvasA(x, y) : fusedA(x, y)), p = i * 4;
+      for (let ch = 0; ch < 3; ch++) O[p + ch] = O[p + ch] * (1 - a) + c[ch] * a;
+      if (half && Math.abs(y - CUT) < 1.5 && x % 12 < 7) { O[p] = O[p + 1] = O[p + 2] = 235; }   // where the canvas ends
     }
     ctx.putImageData(img, 0, 0);
+    // the key: a quiet card, swatches drawn with the same washes
     const cn = weight === 'ultra' ? 'Ultra-thin canvas' : weight === 'light' ? 'Light canvas' : 'Canvas';
-    const scale = half ? `Canvas weight: ${weight === 'ultra' ? '\u25A0\u25A1\u25A1 ultra-thin' : weight === 'light' ? '\u25A0\u25A0\u25A1 light' : '\u25A0\u25A0\u25A0 standard'}` : '';
-    const rows = full ? [['Canvas (sewn in): whole front', [26, 140, 145]]]
-      : half ? [[`${cn} (sewn in): chest, lapels`, [26, 140, 145]], ['Fused (glued): below', [214, 150, 40]], [scale, null]] : [['Fused (glued): whole front', [214, 150, 40]]];
-    ctx.save(); ctx.font = '600 40px system-ui, sans-serif';
-    const bw = Math.min(W - 20, 40 + Math.max(...rows.map(r => ctx.measureText(r[0]).width)) + 70), bh = 28 + rows.length * 60;
-    const by0 = H - bh - 170;                      // above the view buttons that sit over the bottom of the picture
-    ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillRect((W - bw) / 2, by0, bw, bh);
-    rows.forEach(([t, c], k) => {
-      const y = by0 + 22 + k * 60;
-      if (c) { ctx.fillStyle = `rgb(${c})`; ctx.fillRect((W - bw) / 2 + 20, y, 44, 40); }
-      ctx.fillStyle = '#222'; ctx.fillText(t, (W - bw) / 2 + 80, y + 33);
+    const rows = full ? [['canvas', 'Canvas, sewn in: the whole front']]
+      : half ? [['canvas', `${cn}, sewn in: chest and lapels`], ['fused', 'Fused (glued): below the chest']] : [['fused', 'Fused (glued): the whole front']];
+    ctx.save();
+    ctx.font = '400 30px system-ui, sans-serif';
+    const tw = Math.max(...rows.map(r => ctx.measureText(r[1]).width), half ? 420 : 0), bw = Math.min(W - 40, tw + 150), bh = 92 + rows.length * 58 + (half ? 52 : 0);
+    const bx = (W - bw) / 2, by0 = H - bh - 170;
+    ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 4;
+    ctx.fillStyle = 'rgba(252,250,246,0.95)'; ctx.beginPath(); ctx.roundRect(bx, by0, bw, bh, 16); ctx.fill(); ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#2b2a28'; ctx.font = '400 38px Georgia, "Times New Roman", serif'; ctx.fillText('Construction', bx + 32, by0 + 56);
+    rows.forEach(([kd, t], k) => {
+      const y = by0 + 88 + k * 58, sx = bx + 32, c = kd === 'canvas' ? LINEN : FUSED;
+      ctx.fillStyle = `rgb(${c.map(v => Math.round(v * 0.82))})`; ctx.beginPath(); ctx.roundRect(sx, y, 56, 38, 8); ctx.fill();
+      ctx.save(); ctx.beginPath(); ctx.roundRect(sx, y, 56, 38, 8); ctx.clip(); ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
+      if (kd === 'canvas') for (let d = -40; d < 100; d += pitch * 0.8) { ctx.beginPath(); ctx.moveTo(sx + d, y + 38); ctx.lineTo(sx + d + 38, y); ctx.stroke(); if (!weight) { ctx.beginPath(); ctx.moveTo(sx + d, y); ctx.lineTo(sx + d + 38, y + 38); ctx.stroke(); } }
+      else { ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (let a = 4; a < 56; a += 7) for (let b = 4; b < 38; b += 7) ctx.fillRect(sx + a, y + b, 1.6, 1.6); }
+      ctx.restore();
+      ctx.fillStyle = '#3a3936'; ctx.font = '400 30px system-ui, sans-serif'; ctx.fillText(t, sx + 76, y + 28);
     });
+    if (half) {                                      // the canvas's weight: three bars
+      const y = by0 + 88 + rows.length * 58 + 10, n = weight === 'ultra' ? 1 : weight === 'light' ? 2 : 3;
+      ctx.fillStyle = '#6b665d'; ctx.font = '400 26px system-ui, sans-serif'; ctx.fillText('Canvas weight', bx + 32, y + 22);
+      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.roundRect(bx + 230 + k * 40, y + 4, 30, 20, 5);
+        if (k < n) { ctx.fillStyle = '#8c7b5a'; ctx.fill(); } else { ctx.strokeStyle = '#b9ae98'; ctx.lineWidth = 2; ctx.stroke(); } }
+      ctx.fillStyle = '#6b665d'; ctx.fillText(weight === 'ultra' ? 'ultra-thin' : weight === 'light' ? 'light' : 'standard', bx + 360, y + 22);
+    }
     ctx.restore();
   }
   const CUFF_STEPS = ['cuffButtons', 'kissing', 'sleeveHoleDir'];
