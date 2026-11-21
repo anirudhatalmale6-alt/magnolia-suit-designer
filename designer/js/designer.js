@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '55';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '56';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -344,7 +344,11 @@
     }
     const chest = chestLook(state.opts.chestPocket || 'B');
     if (chest !== 'welt') {
-      if (best.e.chest === chest) { /* the photo shows this chest pocket */ } else if (PKC[state.view]) ck = `chest_${chest}+chest_welt`; else miss.push(['this chest pocket', ['chestPocket']]);
+      // a chest pocket laid in from its own photo: front (every style) and, since 21 Nov, three-quarter (the styles with
+      // a three-quarter photo, on the photos whose welt was located: chest.json "names")
+      const C = PKC[state.view], pre = state.view === 'three4' ? 'chest3_' : 'chest_';
+      const layer = C && C.patches.some(p => p[0] === chest) && (!C.names || C.names.includes(best.name));
+      if (best.e.chest === chest) { /* the photo shows this chest pocket */ } else if (layer) ck = `${pre}${chest}+${pre}welt`; else miss.push(['this chest pocket', ['chestPocket']]);
     }
     if (best.l !== want.lapel) miss.push([`${want.lapel} lapel`, ['lapel', 'front']]);
     else if (!['BK', '20', 'D'].includes(state.opts.lapel || 'BK') && best.e.lap !== state.opts.lapel) miss.push(['this lapel shape', ['lapel']]);
