@@ -358,13 +358,23 @@
     let sz = null;
     if (DRAWN && SZ_REG[state.view]) {             // preview: the flap depth and chest welt height drawn to the chosen cm
       const cmOf = id => { const r = /(\d+(?:\.\d+)?)\s?cm/i.exec((choiceOf(id) || {}).label || ''); return r ? +r[1] : 0; };
-      const fl = ['flap', 'slant', 'hacking'].includes(want.pocket) && best.p === want.pocket && cmOf('lowerPocket');
-      const cw = SZ_REG[state.view].c && chest === 'welt' && cmOf('chestPocket');   // straight welts (the curved welt: next)
+      const noted = id => sizes.some(x => x[1][0] === id);   // only a size the customer changed (it has a size note)
+      const fl = noted('lowerPocket') && ['flap', 'slant', 'hacking'].includes(want.pocket) && best.p === want.pocket && cmOf('lowerPocket');
+      const cw = noted('chestPocket') && SZ_REG[state.view].c && chest === 'welt' && cmOf('chestPocket');   // straight welts (the curved welt: next)
       sz = { f: fl ? Math.round(fl / SZ_BASE.f * 1000) / 1000 : 1, c: cw ? Math.round(cw / SZ_BASE.c * 1000) / 1000 : 1 };
-      for (let k = sizes.length - 1; k >= 0; k--) if ((fl && sizes[k][1][0] === 'lowerPocket') || (cw && sizes[k][1][0] === 'chestPocket')) sizes.splice(k, 1);
-      if (Math.abs(sz.f - 1) < 0.01 && Math.abs(sz.c - 1) < 0.01) sz = null;
+      if (!fl && !cw) sz = null; else sz.cm = { f: fl, c: cw };
     }
-    return { name: best.name, pk, ck, lw, tk, sideFlap, sz, note: say() };
+    // the size note goes only once the picture really was resized (every flap / welt of this view found, 21 Nov): the
+    // render calls noteSz with what was done; the photo's flap / welt size is an assumption until the owner confirms it
+    const noteSz = done => {
+      const id = { f: 'lowerPocket', c: 'chestPocket' }, what = { f: 'flap', c: 'chest welt' };
+      for (const kind of ['f', 'c']) if (done[kind]) {
+        for (let k = sizes.length - 1; k >= 0; k--) if (sizes[k][1][0] === id[kind]) sizes.splice(k, 1);
+        info.push([`Preview: the ${what[kind]} is drawn at ${sz.cm[kind]} cm, measured from the ${what[kind]} in the photo taken as ${SZ_BASE[kind]} cm (an assumption until it is confirmed).`, [id[kind]]]);
+      }
+      return say();
+    };
+    return { name: best.name, pk, ck, lw, tk, sideFlap, sz, note: say(), noteSz };
   }
   async function loadView(name, pk, ck, lw, tk) {
     const lk = lw ? '~' + lw : '';
@@ -1609,17 +1619,26 @@
     // mistaken for the new choice (owner, 17 Nov: buttons briefly seen on the hidden-button front)
     clearTimeout(staleT); staleT = setTimeout(() => { if (my === ticket && !busy.hidden && painted) cv.classList.add('stale'); }, 120);   // not the first photo
     // a cloth shown from a photo of its swatch with an estimated scale says so on the picture (and on its card)
-    const allNote = [m.note ? m.note.all : '', !state.custom && state.fabric && state.fabric.preview || ''].filter(Boolean).join(' ');
-    $('#angleNote').hidden = !allNote; $('#angleNote').textContent = allNote;
-    $('#noteBelow').hidden = !allNote; $('#noteBelow').textContent = allNote; $('#stage').classList.toggle('has-note', !!allNote);   // phones: a strip under the view tabs (CSS)
-    $$('.pic-note').forEach(e => e.remove());
-    const stepNote = m.note && state.lastStep ? m.note.by(state.lastStep) : '';
-    const ls = stepNote && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
-    if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(stepNote)}</p>`);
+    const paintNote = note => {
+      const allNote = [note ? note.all : '', !state.custom && state.fabric && state.fabric.preview || ''].filter(Boolean).join(' ');
+      $('#angleNote').hidden = !allNote; $('#angleNote').textContent = allNote;
+      $('#noteBelow').hidden = !allNote; $('#noteBelow').textContent = allNote; $('#stage').classList.toggle('has-note', !!allNote);   // phones: a strip under the view tabs (CSS)
+      $$('.pic-note').forEach(e => e.remove());
+      const stepNote = note && state.lastStep ? note.by(state.lastStep) : '';
+      const ls = stepNote && document.querySelector(`#styleSteps [data-step="${state.lastStep}"]`);
+      if (ls) ls.insertAdjacentHTML('beforeend', `<p class="pic-note">${esc(stepNote)}</p>`);
+    };
+    paintNote(m.note);
     try {
       if (!painted) firstPaint(m.name);               // the photo itself while its maps load (the first picture took seconds)
       await cuffRef();
-      let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk); if (m.sz) lv = sizedView(lv, state.view, m.sz);   // drawn sizes (preview)
+      let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk);
+      if (m.sz) {                                     // drawn sizes (preview): the note changes only for what was really resized
+        lv = sizedView(lv, state.view, m.sz);
+        const need = k => m.sz[k] && Math.abs(m.sz[k] - 1) > 0.01 ? (SZ_REG[state.view][k] || []).length : 0, got = k => lv.szFound.filter(x => x === k).length;
+        const done = { f: !!m.sz.cm.f && got('f') >= need('f'), c: !!m.sz.cm.c && got('c') >= need('c') };
+        if (my === ticket && (done.f || done.c)) { m.note = m.noteSz(done); paintNote(m.note); }
+      }
       const st = stackView(cuffView(lv));
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
@@ -1725,12 +1744,15 @@
       ['Cloth', state.custom ? '' : `${f.composition || 'Composition to follow'}${f.weight ? `, ${f.weight} g` : ''}`, '']
     ];
     let sec = '';
+    const tn = k => state.thread[k] ? threadName(state.thread[k]) : 'Matching the cloth', tc = k => { const yz = trimCode('threads', state.thread[k]); return yz ? `${yz}${STAFF._mono && STAFF._mono.yz[yz] ? ' · ' + STAFF._mono.yz[yz] : ''}` : ''; };
     for (const o of OPTS) {
       const c = choiceOf(o.id) || {};
       const so = STAFF && STAFF._opts ? STAFF._opts[o.id] : null;
       const code = so ? `${so.names[c.code] || c.code}${so.group ? ` · ${so.group} ${c.code}` : ''}` : '', val = c.label;
       if (o.section !== sec) { sec = o.section; rows.push([`<b>${sec}</b>`, '', '', true]); }
       rows.push([o.label, val, code]);
+      // the lapel buttonhole thread right after the lapel, as on the Style step (owner, 21 Nov); none without a buttonhole
+      if (o.id === 'lapel' && ((choiceOf('lapelHoleStyle') || {}).code || 'A') !== 'A') rows.push(['Lapel buttonhole thread', tn('lapel'), tc('lapel')]);
     }
     const bt = btnByCode(state.button), sbt = btnByCode(sleeveBtn()), ln = state.lining;
     const bc = trimCode('buttons', bt && bt.id), sc = trimCode('buttons', sbt && sbt.id);
@@ -1747,8 +1769,7 @@
     if (!isBk()) rows.push(['Front buttons', bt ? `${MAT[bt.mat] || 'Button'}, No. ${parseInt(bt.id.slice(1), 10)}` : 'As pictured (to be chosen)', bc ? bc.code : '']);
     if (!isBk()) rows.push(['Sleeve buttons', state.sleeveSame ? 'Same as the front' : (sbt ? `${MAT[sbt.mat] || 'Button'}, No. ${parseInt(sbt.id.slice(1), 10)}` : 'As pictured'),
       sc ? (sc.sleeve || sc.code) : '']);
-    const tn = k => state.thread[k] ? threadName(state.thread[k]) : 'Matching the cloth', tc = k => { const yz = trimCode('threads', state.thread[k]); return yz ? `${yz}${STAFF._mono && STAFF._mono.yz[yz] ? ' · ' + STAFF._mono.yz[yz] : ''}` : ''; };
-    if (!isBk()) { rows.push(['Button thread', tn('button'), tc('button')]); rows.push(['Lapel buttonhole', tn('lapel'), tc('lapel')]); }
+    if (!isBk()) rows.push(['Button thread', tn('button'), tc('button')]);
     const n = sleeveHoles(), sl = state.thread.sleeve.slice(0, n);
     if (STAFF) rows.push(['Front buttonholes', tn('front'), tc('front')]);
     if (STAFF) rows.push(['Sleeve buttonholes', sl.some(Boolean) ? Array.from({ length: n }, (_, i) => `${i + 1}: ${sl[i] ? threadName(sl[i]) + (trimCode('threads', sl[i]) ? ` (${trimCode('threads', sl[i])})` : '') : 'match'}`).join(', ') : 'Matching the cloth', '']);
@@ -2084,7 +2105,8 @@
   }
 
   // show a part of the jacket close up (front view), e.g. the buttons right after choosing them
-  function zoomTo(x, y) {
+  function zoomTo(x, y) {                          // a lapel / stitching close-up or a diagram from another step must not stay on
+    state.closeup = null; state.zoomAt = null; state.diagram = null; state.cuffPanel = false;
     state.view = 'front'; $$('#views button').forEach(b => b.classList.toggle('on', b.dataset.view === 'front'));
     state.zoom = zoomBox(x, y);
   }
@@ -2413,8 +2435,8 @@
   // steps in order: a customer cannot open Style before choosing a fabric, Trims before Style, and so on (staff can jump)
   const STEPS_ORDER = ['fabric', 'style', 'trims', 'summary'];
   function showTab(name) {
-    const had = state.diagram || state.cuffPanel || state.zoom || state.zoomAt;
-    state.diagram = null; state.cuffPanel = false; state.zoom = null; state.zoomAt = null;          // a diagram / close-up belongs to its own step: redrawn without it
+    const had = state.diagram || state.cuffPanel || state.zoom || state.zoomAt || state.closeup;
+    state.diagram = null; state.cuffPanel = false; state.zoom = null; state.zoomAt = null; state.closeup = null;          // a diagram / close-up belongs to its own step: redrawn without it
     const ln = $('#lookNote'); if (ln) ln.hidden = true;
     $$('.tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === name));
     updMini();
