@@ -678,6 +678,33 @@
   const pkImgs = {};
   async function pkImg(f) { return pkImgs[f] || (pkImgs[f] = pixels(await loadImg(`maps/_pk/${f}.webp?v=${VER}`))); }
   // kind 'pk': lower pockets (left and right pocket move separately), 'pkc': the chest pocket
+  // the lapel's outer edge beside the chest pocket, per row (owner, 21 Nov: the lapel always sits above the chest pocket).
+  // Photos with marked lapels: the rightmost pixel of the wearer's left lapel (part 2), which follows the lapel width.
+  // Other photos: the lapel edge found as a straight diagonal dark line (RANSAC on line peaks), the rightmost such line.
+  function lapelEdge(st, x0, y0, w, h) {
+    const edge = new Map(); let marked = 0;
+    for (let y = Math.max(0, y0); y < Math.min(H, y0 + h); y++) {
+      let r = -1; for (let x = Math.max(0, x0 - 120); x < Math.min(W, x0 + w); x++) if (st.Wp[(y * W + x) * 4 + 2] === 2) r = x;
+      if (r >= 0) { edge.set(y, r); marked++; }
+    }
+    if (marked > h * 0.3) return y => { if (edge.has(y)) return edge.get(y); let best = null, bd = 1e9; for (const [yy, x] of edge) if (Math.abs(yy - y) < bd) { bd = Math.abs(yy - y); best = x; } return bd <= 40 ? best : null; };
+    const pts = [], xa = Math.max(8, x0 - 70), xb = Math.min(W - 9, x0 + Math.round(w * 0.6));
+    for (let y = Math.max(1, y0); y < Math.min(H - 1, y0 + h); y += 2) {
+      const row = new Float64Array(W + 1); for (let x = 0; x < W; x++) row[x + 1] = row[x] + st.S[(y * W + x) * 4];
+      const ev = x => (row[x + 8] - row[x - 7]) / 15 - (row[x + 2] - row[x - 1]) / 3;
+      for (let x = xa + 2; x < xb - 2; x++) { if (!st.A[y * W + x]) continue; const v = ev(x); if (v > 6 && v >= ev(x - 1) && v >= ev(x + 1)) pts.push([x, y]); }
+    }
+    let best = null;
+    for (let it = 0; it < 400 && pts.length > 20; it++) {
+      const p1 = pts[(it * 7919) % pts.length], p2 = pts[(it * 104729 + 13) % pts.length]; if (p1[1] === p2[1]) continue;
+      const b = (p2[0] - p1[0]) / (p2[1] - p1[1]); if (b > -0.25 || b < -1.6) continue;   // a diagonal: further left lower down
+      const a = p1[0] - b * p1[1]; let n = 0; for (const q of pts) if (Math.abs(q[0] - (a + b * q[1])) <= 2) n++;
+      if (n < Math.max(20, h / 8)) continue;
+      const xm = a + b * (y0 + h / 2);              // the rightmost good line is the lapel's outer edge (the roll line is further left)
+      if (!best || xm > best.xm + 6 || (Math.abs(xm - best.xm) <= 6 && n > best.n)) best = { a, b, n, xm };
+    }
+    return best ? y => best.a + best.b * y : null;
+  }
   async function patchView(st, pk, kind = 'pk') {
     const tkOnly = kind === 'tk'; if (tkOnly) kind = 'pk';      // only the ticket pocket: the rows above the lower pocket, on its side
     const v = (kind === 'pkc' ? PKC : PK)[state.view], [pkf, sxs] = pk.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
@@ -689,6 +716,7 @@
     const S = st.S.slice(), Wp = st.Wp.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
     // per patch pixel: target index, donor value, weight = new pocket area + this photo's own pocket area
     const n = pw * ph, dsx = new Int32Array(n), idx = new Int32Array(n).fill(-1), w = new Float32Array(n), sd = new Float32Array(n), st0 = new Float32Array(n);
+    const lapX = kind === 'pkc' ? lapelEdge(st, v.at[0] + tdx(0), v.at[1] + tdy, pw, ph) : null;   // the chest pocket stays beside the lapel
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
       const x = v.at[0] + tdx(px) + px, y = v.at[1] + tdy + py, k = py * pw + px;
       if (x < 0 || x >= W || y < 0 || y >= H) continue;
@@ -697,6 +725,7 @@
       let e = 1;                                        // fade out near the jacket outline (outlines differ per photo)
       for (let d = 4; d <= 28 && e > 0; d += 4) if (!st.A[i - d] || !st.A[i + d]) e = Math.min(e, (d - 4) / 24);
       if (kind === 'pk' && st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
+      if (lapX) { const xe = lapX(y); if (xe != null) { e = Math.min(e, Math.max(0, Math.min(1, (x - xe - 3) / 4))); if (e <= 0) continue; } }   // the lapel lies over it
       const qdy = py + Dp[3][1], qty = Tp ? py + Tp[3][1] : -1;   // each donor's pocket sits at its own offset
       const pxd = px - dxOf(px) + ddx(Dp, px), okd = pxd >= 0 && pxd < pw && qdy >= 0 && qdy < ph;
       const ptx = Tp ? px + ddx(Tp, px) : -1;
@@ -1318,9 +1347,9 @@
       const t = m.colour && THREADS.find(x => x.id === m.colour);
       const rgb = t ? t.rgb : matchThread();          // "Match the cloth": tone on tone
       const mm = parseFloat(((m.type === 'gallery' ? MONO.gHeights : MONO.heights).find(h => h.id === (m.type === 'gallery' ? m.gheight : m.height)) || {}).name) || (m.type === 'gallery' ? 20 : 10);
-      const [px, py] = monoXY(pos, state.mapName);
+      const [px, py, rot] = monoXY(pos, state.mapName, mm);
       const capPx = mm / 10 * PX_PER_CM * Z, x = (px - zx) * Z, y = (py - zy) * Z;
-      ctx.save(); ctx.translate(x, y); ctx.rotate(pos[3] * Math.PI / 180);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(rot * Math.PI / 180);
       const sw = MONO_SWATCH[m.pos];
       if (sw) {                                       // the monogram sits on a sewn-in swatch: the cloth, or brown / black / blue
         const c = sw === 'cloth' ? clothRGB() : sw, h = 8 * PX_PER_CM * Z * 0.62;   // 8 cm, seen at the inside's angle
@@ -1333,13 +1362,42 @@
       ctx.restore();
     }
   }
-  function monoXY(pos, name) {                    // inside positions follow the inner pockets of the photo shown (set on the notch photo)
-    let x = pos[1], y = pos[2];
+  // the chest pocket shown on the front (21 Nov): each style's outline on the reference photo [x0, x1, top, bottom]
+  // (build_chest.py / chest_variants.py) moved by the photo's own chest offset (buttons.json "pkc")
+  const CHEST_BOX = { welt: [660, 788, 521, 569], curved: [660, 788, 526, 575], trapezoid: [660, 788, 521, 569], jetted: [660, 788, 521, 569],
+    round: [628, 780, 508, 716], patchflap: [630, 795, 508, 716], barchetta: [648, 792, 508, 588], pleat: [628, 792, 508, 668], none: [660, 788, 521, 569] };
+  let monoSt = null;                               // the picture being drawn (its photo's offsets and lapel marks)
+  function chestBox(st) {
+    const look = chestLook(state.opts.chestPocket || 'B'), b = CHEST_BOX[look] || CHEST_BOX.welt, o = (st && st.meta && st.meta.pkc) || [0, 0];
+    let [x0, x1, t, bt] = [b[0] + o[0], b[1] + o[0], b[2] + o[1], b[3] + o[1]];
+    if (look === 'welt' && state.szC && state.szC !== 1) bt = t + (bt - t) * state.szC;   // the drawn welt height (preview)
+    return { look, x0, x1, t, b: bt };
+  }
+  function foldLine(st, pid) {                      // a lapel's fold line from its marks: the inner edge, about half way down
+    const ys = [], xs = [];
+    for (let y = 150; y < 1100; y += 3) { let a = -1, z = -1; for (let x = 150; x < 880; x++) if (st.Wp[(y * W + x) * 4 + 2] === pid) { if (a < 0) a = x; z = x; } if (a >= 0) { ys.push(y); xs.push(pid === 2 ? a : z); } }
+    if (ys.length < 12) return null;
+    const i = Math.floor(ys.length * 0.55), i0 = Math.floor(ys.length * 0.35), i1 = Math.floor(ys.length * 0.75);
+    let ang = Math.atan2(ys[i1] - ys[i0], xs[i1] - xs[i0]) * 180 / Math.PI; if (ang > 90) ang -= 180; if (ang < -90) ang += 180;
+    return [xs[i] + (pid === 2 ? 5 : -5), ys[i], ang];
+  }
+  function monoXY(pos, name, mm = 10) {            // inside positions follow the inner pockets of the photo shown (set on the notch photo)
+    let x = pos[1], y = pos[2], rot = pos[3];
     if (pos[0] === 'open' && name && name !== 'open_notch') {
       const side = x > 512 ? 1 : 0, a = INNER_PK.open_notch[side], b = (INNER_PK[name] || INNER_PK._)[side];
       x += b[0] - a[0]; y += b[1] - a[1];
     }
-    return [x, y];
+    const id = Object.keys(MONO_POS).find(k => MONO_POS[k] === pos), st = monoSt;
+    if (pos[0] === 'front' && st && state.view === 'front') {   // front: from the pocket / lapel actually shown (21 Nov)
+      const cap = mm / 10 * PX_PER_CM, c = chestBox(st), cx = (c.x0 + c.x1) / 2;
+      if (id === 'P01') { x = cx; y = c.t - PX_PER_CM - cap / 2; }               // 1 cm above the pocket's top edge
+      else if (id === 'P08') { x = cx; y = c.b + 2 * PX_PER_CM + cap / 2; }      // 2 cm below its bottom edge
+      else if (id === 'P03') { x = cx; y = (c.t + c.b) / 2; }                     // on the pocket
+      else if (id === 'P02') { const w = CHEST_BOX.welt, o = st.meta.pkc || [0, 0]; x = (w[0] + w[1]) / 2 + o[0]; y = (w[2] + w[3]) / 2 + o[1]; }   // mid chest, where a pocket would be
+      else if (id === 'P19' || id === 'P20') { const f = foldLine(st, id === 'P19' ? 2 : 3); if (f) [x, y, rot] = f; else { const o = st.meta.pkc || [0, 0]; x += o[0]; y += o[1]; } }
+      else if (id === 'P05') { const o = st.meta.pkc || [0, 0]; x += o[0]; y += o[1]; }   // the photo's own offset
+    }
+    return [x, y, rot];
   }
   function showMono() {                            // after a monogram choice: go to its position, close up
     const m = cm(), pos = m && MONO_POS[m.pos]; state.melton = !!pos && pos[0] === 'melton';
@@ -1632,14 +1690,15 @@
     try {
       if (!painted) firstPaint(m.name);               // the photo itself while its maps load (the first picture took seconds)
       await cuffRef();
-      let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk);
+      let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk); state.szC = 1;
       if (m.sz) {                                     // drawn sizes (preview): the note changes only for what was really resized
         lv = sizedView(lv, state.view, m.sz);
         const need = k => m.sz[k] && Math.abs(m.sz[k] - 1) > 0.01 ? (SZ_REG[state.view][k] || []).length : 0, got = k => lv.szFound.filter(x => x === k).length;
         const done = { f: !!m.sz.cm.f && got('f') >= need('f'), c: !!m.sz.cm.c && got('c') >= need('c') };
+        state.szC = done.c ? m.sz.c : 1;
         if (my === ticket && (done.f || done.c)) { m.note = m.noteSz(done); paintNote(m.note); }
       }
-      const st = stackView(cuffView(lv));
+      const st = stackView(cuffView(lv)); monoSt = st;
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
         if (g && g.L && g.R && (pos === 'D' || pos === 'E')) state.zoom = zoomBox((g.L.x + g.R.x) / 2, (g.L.y + g.R.y) / 2 + 80, 1.6);   // both lapels
