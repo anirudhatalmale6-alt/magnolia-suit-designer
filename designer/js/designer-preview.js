@@ -43,8 +43,8 @@
   const PV_ICONS = [0, 1].map(d => '<span class="pv-i" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.3"/><path d="M9.8 9.8 14 14"/></svg>' +
     (d ? '<svg viewBox="0 0 16 16"><path class="f" d="M5 3.2v9.6L12.6 8z"/></svg>' : '') + '</span>');   // phones: magnifier = close-up, play = draped video
   // the "from" prices on the start screens and the summary: change them here only (owner's figures: in person $445,
-  // online $395, bekeshe $450 with the belt included)
-  const START_PRICE = { inperson: 445, online: 395, bekeshe: 450 };
+  // online $375 (was $395 until 22 Nov), bekeshe $450 with the belt included)
+  const START_PRICE = { inperson: 445, online: 375, bekeshe: 450 };   // online 395 -> 375 (owner, 22 Nov)
   let compact = false;                             // phones: the sticky picture in its smaller size (stageCompact)
   let PREV = {};                                   // fabric code -> its preview files (previews.json)
   const PVB = window.MAGNOLIA_PREVIEW_BASE || 'previews/';   // where the preview files are served (set in index.html)
