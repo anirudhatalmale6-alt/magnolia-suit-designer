@@ -364,9 +364,11 @@
       const cmOf = id => { const r = /(\d+(?:\.\d+)?)\s?cm/i.exec((choiceOf(id) || {}).label || ''); return r ? +r[1] : 0; };
       const noted = id => sizes.some(x => x[1][0] === id);   // only a size the customer changed (it has a size note)
       const fl = noted('lowerPocket') && ['flap', 'slant', 'hacking'].includes(want.pocket) && best.p === want.pocket && cmOf('lowerPocket');
-      const cw = noted('chestPocket') && SZ_REG[state.view].c && chest === 'welt' && cmOf('chestPocket');   // straight welts (the curved welt: next)
+      const curvedPatch = chest === 'curved' && ck && SZ_CURVE[ck.split('+')[0]];   // the curved welt: stretched in its own patch (22 Nov)
+      const cw = noted('chestPocket') && SZ_REG[state.view].c && (chest === 'welt' || curvedPatch) && cmOf('chestPocket');
       sz = { f: fl ? Math.round(fl / SZ_BASE.f * 1000) / 1000 : 1, c: cw ? Math.round(cw / SZ_BASE.c * 1000) / 1000 : 1 };
       if (!fl && !cw) sz = null; else sz.cm = { f: fl, c: cw };
+      if (sz && curvedPatch && Math.abs(sz.c - 1) > 0.01) { ck += '*' + sz.c; sz.curved = true; }
     }
     // the size note goes only once the picture really was resized (every flap / welt of this view found, 21 Nov): the
     // render calls noteSz with what was done; the photo's flap / welt size is an assumption until the owner confirms it
@@ -568,9 +570,15 @@
   // its bottom edge) in the photo's shading; rows between them are stretched or squeezed from the top seam down, the
   // shadow under the edge moves with it, and when it gets shorter the cloth below closes up over a short band.
   const DRAWN = new URLSearchParams(location.search).has('drawn');
-  const SZ_REG = { front: { f: [[180, 405], [615, 862]], c: [[560, 820]] }, three4: { f: [[474, 750], [215, 312, 'far']], c: [[400, 720]] }, side: { f: [[250, 480]] } };
+  const SZ_REG = { front: { f: [[180, 405], [615, 862]], c: [[560, 820]] }, three4: { f: [[474, 750], [215, 312, 'far']], c: [[400, 720]] }, side: { f: [[250, 480]], c: [[280, 440]] } };
   const SZ_Y = { f: [900, 1250, 35, 120], c: [440, 700, 25, 60] };     // search rows, smallest / largest height (px)
   const SZ_BASE = { f: 4.5, c: 2.5 };                                  // cm of the flap / chest welt in the photos
+  // the curved welt's top seam and bottom edge in its patch photo (y = c0 x^2 + c1 x + c2, patch pixels, from x0 to x1)
+  const SZ_CURVE = { chest_curved: { x: [80, 232], t: [-0.0023, 0.60174, 21.71884], b: [-0.0018, 0.40306, 87.67855] },
+    chest3_curved: { x: [55, 215], t: [-0.00214, 0.45421, 57.05473], b: [-0.00207, 0.44351, 103.67097] } };
+  // the chest welt on the side photos: short, half under the lapel and with a light top edge, so it is measured once per
+  // photo (bottom edge y = a + b * x from x0 to x1, height h px; 22 Nov) instead of searched for
+  const SZ_FIX = { side: { c: { side: [297, 367, 625, -0.26, 43], side_peak_sb: [326, 420, 661, -0.26, 46], side_shawl_sb: [368, 438, 672, -0.28, 39], side_notch_sb1: [328, 420, 680, -0.28, 37], side_notch_sb3: [318, 420, 664, -0.3, 36], side_peak_sb1: [334, 438, 674, -0.28, 37], side_notch_db: [318, 438, 661, -0.28, 38], side_peak_db: [326, 426, 641, -0.22, 42], side_shawl_db: [370, 438, 638, -0.14, 38] } } };
   const edgeCache = new WeakMap();
   function edgeMap(st) {                          // dark horizontal lines: mean of 15 rows minus mean of 3 rows (shade)
     if (edgeCache.has(st)) return edgeCache.get(st);
@@ -582,11 +590,11 @@
     }
     edgeCache.set(st, E); return E;
   }
-  function szLines(E, xa, xb, ya, yb, wmin, minPts = 20) {
+  function szLines(E, xa, xb, ya, yb, wmin, minPts = 20, sgn = 1) {   // sgn -1: light lines
     const P = [];
     for (let x = xa; x < xb; x += 2) for (let y = ya + 2; y < yb - 2; y++) {
-      const v = E[y * W + x]; if (v <= 5) continue;
-      if (v >= E[(y - 1) * W + x] && v >= E[(y + 1) * W + x] && v >= E[(y - 2) * W + x] && v >= E[(y + 2) * W + x]) P.push([x, y, v]);
+      const v = sgn * E[y * W + x]; if (v <= 5) continue;
+      if (v >= sgn * E[(y - 1) * W + x] && v >= sgn * E[(y + 1) * W + x] && v >= sgn * E[(y - 2) * W + x] && v >= sgn * E[(y + 2) * W + x]) P.push([x, y, v]);
     }
     const out = [];
     for (let b = -0.4; b <= 0.4001; b += 0.02) {
@@ -610,9 +618,10 @@
     }
     return keep;
   }
-  function szFind(E, xa, xb, ya, yb, hmin, hmax, ext = 12) {   // the pair of lines (top seam, bottom edge) that bounds the flap / welt
-    const wmin = xb - xa < 120 ? 20 : 45, L = szLines(E, xa, xb, ya, yb, wmin); let best = null;
-    for (const u of L) for (const d of L) {
+  function szFind(E, xa, xb, ya, yb, hmin, hmax, ext = 12, light = false) {   // the pair of lines (top seam, bottom edge) that bounds the flap / welt
+    // light: the top may also be a light line (a welt's lit top edge, 22 Nov: three-quarter peak lapel)
+    const wmin = xb - xa < 120 ? 20 : 45, L = szLines(E, xa, xb, ya, yb, wmin), Lt = light ? szLines(E, xa, xb, ya, yb, wmin, 20, -1) : []; let best = null;
+    for (const u of [...L, ...Lt]) for (const d of L) {
       if (Math.abs(u.b - d.b) > 0.07) continue;
       const x0 = Math.max(u.x0, d.x0), x1 = Math.min(u.x1, d.x1); if (x1 - x0 < wmin) continue;
       const xm = (x0 + x1) / 2, gap = (d.a + d.b * xm) - (u.a + u.b * xm); if (gap < hmin || gap > hmax) continue;
@@ -632,8 +641,8 @@
     const l = L.find(u => u.x1 - u.x0 >= 10); return l ? { sc: 0, x0: l.x0, x1: l.x1, a: l.a, b: l.b, h: near.h } : null;
   }
   const szMemo = new WeakMap();
-  function sizedView(st, view, sz) {
-    const key = JSON.stringify(sz); let memo = szMemo.get(st); if (!memo) szMemo.set(st, memo = new Map());
+  function sizedView(st, view, sz, name) {
+    const key = JSON.stringify(sz) + name; let memo = szMemo.get(st); if (!memo) szMemo.set(st, memo = new Map());
     if (memo.has(key)) return memo.get(key);
     const B = st.B.slice(), S = st.S.slice(), Wp = st.Wp.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
     let clipR = null, clipL = null;                 // a sleeve's edge beside the flap: nothing past it changes
@@ -655,7 +664,9 @@
       const [ya, yb, hmin, hmax] = SZ_Y[kind];
       let near = null;
       for (const [xa, xb, far] of ((SZ_REG[view] || {})[kind] || [])) {
-        const g = szFind(E, xa, xb, ya, yb, hmin, hmax) || (far && near && szEdge(E, xa, xb, near)); if (!g) continue; found.push(kind);
+        const fx = ((SZ_FIX[view] || {})[kind] || {})[name];
+        const g = fx ? { x0: fx[0], x1: fx[1], a: fx[2], b: fx[3], h: fx[4] } : szFind(E, xa, xb, ya, yb, hmin, hmax) || (far && near && szEdge(E, xa, xb, near)) || (kind === 'c' && szFind(E, xa, xb, ya, yb, hmin, hmax, 12, true));
+        if (!g) continue; found.push(kind);
         if (!far) near = g;
         const SHD = 10, BAND = 50, mg = kk < 1 || kind === 'c' ? 1 : 3, xl = Math.max(8, g.x0 - mg), xr = Math.min(W - 9, g.x1 + mg), xc = Math.round((g.x0 + g.x1) / 2);
         // a sleeve or lapel edge crossing the flap's end (three-quarter, side): measured in the plain cloth just below the
@@ -675,7 +686,7 @@
         } else {
           // the flap's end in deep shadow (by a sleeve): its edge line fades out gradually; the change runs on while the line
           // is still there (up to 30 px), so no stub of the old flap is left in the shadow
-          const lineE = x => { let m = 0; const y = Math.round(g.a + g.b * x); for (let d = -3; d <= 3; d++) if (y + d > 0 && y + d < H) m = Math.max(m, E[(y + d) * W + x]); return m; };
+          const lineE = x => { let m = 0; const y = Math.round(g.a + g.b * x); for (let d = -5; d <= 5; d++) if (y + d > 0 && y + d < H) m = Math.max(m, E[(y + d) * W + x]); return m; };
           // a step across the flap close to its own end is the flap's end edge (it moves with the flap); further in, it is
           // something crossing the flap (it stays). The far flap on three-quarter ends on its left at the jacket's front edge: that stays
           let stopR = false, stopL = false;
@@ -686,7 +697,7 @@
           if (!stopR) xr2 = Math.min(W - 10, xr + 30);
           for (let x = xc; x >= xl - 30 && x > 9; x--) {
             if (stepAt(x) > 25) { let pk = x; for (let q = x; q >= x - 8; q--) if (stepAt(q) > stepAt(pk)) pk = q; xl2 = !far && Math.abs(pk - g.x0) <= 10 ? pk - 4 : pk + 1; stopL = true; break; }
-            if (x < xl && lineE(x) < 2) { xl2 = x + 1; stopL = true; break; }
+            if (x < xl && lineE(x) < 1.5) { xl2 = x + 1; stopL = true; break; }
           }
           if (!stopL) xl2 = Math.max(9, xl - 30);
           // a sleeve edge crossing just below the flap's end (side): its line is measured below the flap, row by row, and
@@ -707,8 +718,11 @@
           for (let x = xc; x <= xr2; x++) if (below(x) > 25) { clipR = sleeveLine(x - 8, xr2 + 8); break; }
           for (let x = xc; x >= xl2; x--) if (below(x) > 25) { clipL = sleeveLine(xl2 - 8, x + 8); break; }
         }
-        const k = kk;
+        // a chest welt cut by the lapel's edge: its last 8 columns ease back to the photo's own line, so the welt's bottom
+        // edge has no step beside the lapel (only a few px change on a welt, so it reads as the edge, not a slant)
+        const cutL = kind === 'c' && view !== 'front' && xl2 > xl, cutR = kind === 'c' && view !== 'front' && xr2 < xr;
         for (let x = xl2; x <= xr2; x++) {
+          const ease = Math.min(cutL ? Math.min(1, (x - xl2 + 1) / 8) : 1, cutR ? Math.min(1, (xr2 - x + 1) / 8) : 1), k = 1 + (kk - 1) * ease;
           const yb0 = g.a + g.b * x, yt = yb0 - g.h, nb = yt + g.h * k;
           if (k > 1) {
             for (let y = Math.round(nb + SHD); y >= Math.round(yt); y--) put(y, x, y <= nb ? yt + (y - yt) / k : yb0 + (y - nb));
@@ -760,7 +774,13 @@
   }
   async function patchView(st, pk, kind = 'pk') {
     const tkOnly = kind === 'tk'; if (tkOnly) kind = 'pk';      // only the ticket pocket: the rows above the lower pocket, on its side
-    const v = (kind === 'pkc' ? PKC : PK)[state.view], [pkf, sxs] = pk.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
+    const [pk0, kzs] = pk.split('*'), kz = +kzs || 1;                  // '*k': the curved welt drawn k times as deep (drawn sizes)
+    const v = (kind === 'pkc' ? PKC : PK)[state.view], [pkf, sxs] = pk0.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
+    const cv = kz !== 1 && SZ_CURVE[dn], poly = (c, x) => (c[0] * x + c[1]) * x + c[2];
+    const mapY = (qy, xd) => {                         // donor row shown at row qy: the welt stretched from its top seam down
+      if (!cv) return qy; const x = Math.max(cv.x[0], Math.min(cv.x[1], xd)), yt = poly(cv.t, x), yb = poly(cv.b, x), nb = yt + (yb - yt) * kz;
+      return qy <= yt ? qy : qy <= nb ? yt + (qy - yt) / kz : qy - (nb - yb);
+    };
     const off = st.meta[kind] || [0, 0, 0], tdy = off[1], tdx = px => px < split ? off[0] : (off[2] ?? off[0]);
     const sx = +sxs || 0, split = kind === 'pkc' ? 1e9 : state.view === 'front' ? pw / 2 : 209;   // left / right pocket (three-quarter: far / near)
     const dxOf = px => !sx ? 0 : px < split ? (state.view === 'front' ? -sx : 0) : sx;
@@ -768,7 +788,7 @@
     const ddx = (P, px) => px < split ? P[3][0] : (P[3][2] ?? P[3][0]);
     const S = st.S.slice(), Wp = st.Wp.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
     // per patch pixel: target index, donor value, weight = new pocket area + this photo's own pocket area
-    const n = pw * ph, dsx = new Int32Array(n), idx = new Int32Array(n).fill(-1), w = new Float32Array(n), sd = new Float32Array(n), st0 = new Float32Array(n);
+    const n = pw * ph, qys = new Int32Array(n), dsx = new Int32Array(n), idx = new Int32Array(n).fill(-1), w = new Float32Array(n), sd = new Float32Array(n), st0 = new Float32Array(n);
     const lapX = kind === 'pkc' ? lapelEdge(st, v.at[0] + tdx(0), v.at[1] + tdy, pw, ph) : null;   // the chest pocket stays beside the lapel
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
       const x = v.at[0] + tdx(px) + px, y = v.at[1] + tdy + py, k = py * pw + px;
@@ -779,8 +799,9 @@
       for (let d = 4; d <= 28 && e > 0; d += 4) if (!st.A[i - d] || !st.A[i + d]) e = Math.min(e, (d - 4) / 24);
       if (kind === 'pk' && st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
       if (lapX) { const xe = lapX(y); if (xe != null) { e = Math.min(e, Math.max(0, Math.min(1, (x - xe - 3) / 4))); if (e <= 0) continue; } }   // the lapel lies over it
-      const qdy = py + Dp[3][1], qty = Tp ? py + Tp[3][1] : -1;   // each donor's pocket sits at its own offset
-      const pxd = px - dxOf(px) + ddx(Dp, px), okd = pxd >= 0 && pxd < pw && qdy >= 0 && qdy < ph;
+      const qty = Tp ? py + Tp[3][1] : -1;           // each donor's pocket sits at its own offset
+      const pxd = px - dxOf(px) + ddx(Dp, px), qdy = Math.round(mapY(py + Dp[3][1], pxd)), okd = pxd >= 0 && pxd < pw && qdy >= 0 && qdy < ph;
+      qys[k] = qdy;
       const ptx = Tp ? px + ddx(Tp, px) : -1;
       dsx[k] = pxd;
       const a = okd ? D[((qdy + ph) * pw + pxd) * 4] / 255 : 0;   // weight: bottom half of the image
@@ -796,7 +817,7 @@
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
       const k = py * pw + px, i = idx[k]; if (i < 0 || w[k] <= 0) continue;
       const p = i * 4, ww = w[k];
-      const qdy = py + Dp[3][1], q = qdy >= 0 && qdy < ph && dsx[k] >= 0 && dsx[k] < pw ? (qdy * pw + dsx[k]) * 4 : -1;
+      const qdy = qys[k], q = qdy >= 0 && qdy < ph && dsx[k] >= 0 && dsx[k] < pw ? (qdy * pw + dsx[k]) * 4 : -1;
       S[p] = Math.min(255, st0[k] * (1 - ww) + sd[k] * g * ww);
       if (q >= 0) { Wp[p] = Wp[p] * (1 - ww) + D[q + 1] * ww; Wp[p + 1] = Wp[p + 1] * (1 - ww) + D[q + 2] * ww; }
       uvAt(i, S, Wp, U, V, SH);
@@ -1745,10 +1766,10 @@
       await cuffRef();
       let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk); state.szC = 1; state.szF = 1;
       if (m.sz) {                                     // drawn sizes (preview): the note changes only for what was really resized
-        lv = sizedView(lv, state.view, m.sideFlap ? { ...m.sz, f: 1 } : m.sz);   // a drawn side flap is not in the photo
+        lv = sizedView(lv, state.view, { ...m.sz, f: m.sideFlap ? 1 : m.sz.f, c: m.sz.curved ? 1 : m.sz.c }, m.name);   // a drawn side flap is not in the photo; the curved welt is stretched in its patch
         const need = k => m.sz[k] && Math.abs(m.sz[k] - 1) > 0.01 ? (SZ_REG[state.view][k] || []).length : 0, got = k => lv.szFound.filter(x => x === k).length;
         // the flap drawn on side photos shot with a jetted pocket: it is drawn at the chosen depth (no photo flap to find)
-        const done = { f: !!m.sz.cm.f && (m.sideFlap || got('f') >= need('f')), c: !!m.sz.cm.c && got('c') >= need('c') };
+        const done = { f: !!m.sz.cm.f && (m.sideFlap || got('f') >= need('f')), c: !!m.sz.cm.c && (m.sz.curved || got('c') >= need('c')) };
         state.szC = done.c ? m.sz.c : 1; state.szF = m.sideFlap && done.f ? m.sz.f : 1;
         if (my === ticket && (done.f || done.c)) { m.note = m.noteSz(done); paintNote(m.note); }
       }
