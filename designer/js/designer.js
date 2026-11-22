@@ -662,6 +662,10 @@
     if (tb) bot = Math.min(bot, Math.round(tb[1] - tb[2] - 14));
     if (bot - top < 60) return none;
     const hgt = bot - top, ease = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t), M = 6, BAND = 90;
+    // no row moves out further than the plain lapel does (its width in the middle third): a peak or notch point, wider
+    // than the lapel, keeps its shape and moves out with the edge instead of being drawn out into a long wing (owner, 22 Nov)
+    const mid = use.filter(y => y >= top + hgt * 0.35 && y <= top + hgt * 0.65).map(y => outer.get(y) - foldAt(y) + 1).sort((p, q) => p - q);
+    const wref = mid.length ? mid[mid.length >> 1] : 1e9, scRow = (s, w) => 1 + (s - 1) * Math.min(1, wref / w);
     const B = st.B.slice(), S = st.S.slice(), Wp = st.Wp.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
     const put = (y, x, sx, sy = y) => {             // pixel (x, y) takes the map values at (sx, sy)
       if (x < 0 || x >= W) return;
@@ -688,23 +692,67 @@
       typical.set(y, best);
     }
     const plainRow = y => typical.has(y) ? typical.get(y) : y;
+    // the lapel's point (peak or notch, three-quarter), from its tip down to the notch: its upper edge is found as the first
+    // dark line left of its lower edge. There the notch stays, the tip moves out as far as the lapel edge does, and the
+    // point's upper edge turns between them (stretching each row from the far-away fold flattened the point; owner, 22 Nov)
+    const dPt = (sc0 - 1) * wref, gl = new Map(); let yg = -1, yN = -1, ptTop = top;
+    if (view === 'three4' && Math.abs(sc0 - 1) > 0.01) {
+      // the upper edge is shallow, so it is followed column by column from the tip leftwards (a dark horizontal line in each
+      // column, each within a few rows of the last, going down) until it turns at the notch
+      const evV = (y, x) => { let a = 0, b = 0; for (let k = -7; k <= 7; k++) a += st.S[((y + k) * W + x) * 4]; for (let k = -1; k <= 1; k++) b += st.S[((y + k) * W + x) * 4]; return a / 15 - b / 3; };
+      const ue = []; let py = top - 3, miss = 0;
+      for (let x = outer.get(top) - 4; x > outer.get(top) - 220 && x > 10; x--) {
+        const first = ue.length < 4;                  // near the tip the edge starts a few rows above the tracked top
+        let best = -1, bv = 10; for (let y = py - (first ? 4 : 1); y <= py + (first ? 4 : 2); y++) { if (y < 8 || y > H - 9) continue; const v = evV(y, x); if (v > bv) { bv = v; best = y; } }
+        if (best < 0) { if (++miss > 3) break; continue; }
+        miss = 0; ue.push([x, best]); py = best;
+        // the notch: the collar's steep notch edge comes down onto the point's upper edge here (a dark near-vertical line in
+        // most of the 18 rows above); past it the line is the gorge seam, not the point
+        let up = 0; for (let r = 3; r <= 20; r++) { const yy = best - r; let hit = false; for (let xx = x - 3; xx <= x + 3 && !hit; xx++) { const v = ev(yy, xx); hit = v > 15 && v >= ev(yy, xx - 1) && v >= ev(yy, xx + 1); } if (hit) up++; }
+        if (ue.length > 10 && up >= 12 && yN < 0) yN = best;   // past it the line is the gorge seam: followed on as the lapel's left edge
+      }
+      if (ue.length > 15 && ue[ue.length - 1][1] - top >= 8) {
+        yg = ue[ue.length - 1][1];
+        // above the tracked top, up to the tip: the lower edge continued along its own slope
+        const yA = Math.min(...ue.map(p => p[1])), k0 = (outer.get(Math.min(top + 10, bot)) - outer.get(top)) / Math.min(10, bot - top);
+        for (let y = yA; y < top; y++) outer.set(y, Math.round(outer.get(top) - k0 * (top - y)));
+        for (let y = yA; y <= yg; y++) { let gx = null; for (const [x, yy] of ue) if (yy <= y) gx = x; if (gx != null && outer.has(y) && outer.get(y) - gx > 2) gl.set(y, gx); }
+        ptTop = yA;
+      }
+    }
+    const e0 = yg > 0 ? ptTop : top, eT = yg > 0 ? 0.015 : easeTop;   // with a point: the rows below it carry its full shift on
+    const tAt = y => Math.min(ease((y - e0) / (hgt * eT)), ease((bot - y) / (hgt * 0.18)));
     // the lapel's area after the change (its edge band included): what lies under it (a chest welt drawn at another size,
     // a chest pocket laid in) is not drawn there, so nothing shows through the lapel (owner, 22 Nov)
     const lapM = new Uint8Array(W * H);
+    for (const y of [...gl.keys()].filter(y => y < top)) for (let x = gl.get(y); x <= Math.min(W - 1, Math.round(outer.get(y) + dPt + 2)); x++) lapM[y * W + x] = 1;
     for (const y of rows) {
       if (y < run[0]) continue;
-      const tt = y < top || y > bot ? 0 : Math.min(ease((y - top) / (hgt * easeTop)), ease((bot - y) / (hgt * 0.18)));
-      const xf = foldAt(y), xo = outer.get(y), xe = Math.round(xf + (xo - xf + 1) * (1 + (sc0 - 1) * tt) - 1 + 2);
+      if (gl.has(y)) { for (let x = gl.get(y); x <= Math.min(W - 1, Math.round(outer.get(y) + dPt + 2)); x++) lapM[y * W + x] = 1; continue; }
+      const tt = y < top || y > bot ? 0 : tAt(y);
+      const xf = foldAt(y), xo = outer.get(y), xe = Math.round(xf + (xo - xf + 1) * scRow(1 + (sc0 - 1) * tt, xo - xf + 1) - 1 + 2);
       for (let x = Math.max(0, Math.ceil(xf)); x <= Math.min(W - 1, xe); x++) lapM[y * W + x] = 1;
     }
-    for (let y = top; y <= bot; y++) {
+    for (let y = ptTop; y <= bot; y++) {
       if (!outer.has(y)) continue;
-      const tt = Math.min(ease((y - top) / (hgt * easeTop)), ease((bot - y) / (hgt * 0.18))), sc = 1 + (sc0 - 1) * tt;
+      if (gl.has(y)) {                                // the point: [g - C, g + su] <- [g - C, g] (beside it), [g + su, xo + d] <- [g, xo]
+        const C = 24, d = dPt, nb = yN > 0 ? yN : yg, su = y < nb ? d * (nb - y) / Math.max(1, nb - ptTop) : 0, g = gl.get(y), xo = outer.get(y);
+        for (let x = Math.round(xo + d + M); x >= g - C; x--) {
+          if (x > xo + d) { const yr = plainRow(y); put(y, x, outer.get(yr) + (x - xo - d), yr); continue; }
+          put(y, x, x >= g + su ? g + (x - g - su) * (xo - g) / Math.max(1, xo + d - g - su) : g - C + (x - (g - C)) * C / (C + su));
+        }
+        continue;
+      }
+      const tt = tAt(y), xf = foldAt(y), xo = outer.get(y), w = xo - xf + 1;
+      const sc = scRow(1 + (sc0 - 1) * tt, w);
       if (Math.abs(sc - 1) < 0.01) continue;
-      const xf = foldAt(y), xo = outer.get(y), w = xo - xf + 1, xn = xf + w * sc - 1, end = Math.round(Math.max(xn, xo) + M + (sc < 1 ? BAND : 0));
+      const xn = xf + w * sc - 1, end = Math.round(Math.max(xn, xo) + M + (sc < 1 ? BAND : 0));
+      // just below the notch the point's mapping (from the notch) hands over to this one (from the fold) over 25 rows,
+      // so the notch's line is not drawn twice
+      const bl = yg > 0 && y > yg && y <= yg + 25 ? 1 - (y - yg) / 25 : 0, g0 = bl ? gl.get(yg) : 0;
       for (let x = end; x >= Math.ceil(xf); x--) {
         let sx;
-        if (x <= xn) sx = xf + (x - xf) / sc;
+        if (x <= xn) { sx = xf + (x - xf) / sc; if (bl && x >= g0 && xn > g0) sx = sx * (1 - bl) + (g0 + (x - g0) * (xo - g0) / (xn - g0)) * bl; }
         else if (x <= xn + M) { const yr = plainRow(y); put(y, x, outer.get(yr) + (x - xn), yr); continue; }
         else if (sc < 1) sx = xo + M + (x - xn - M) * BAND / (end - xn - M);
         else continue;
@@ -712,7 +760,7 @@
       }
     }
     return { ...st, B, S, Wp, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, lwDone: true, lapM,
-      lwGeo: { top, bot, rows: use.map(y => [y, Math.round(foldAt(y)), outer.get(y)]) } };   // (tests read it)
+      lwGeo: { top, bot, yg, gl: [...gl.entries()], rows: use.map(y => [y, Math.round(foldAt(y)), outer.get(y)]) } };   // (tests read it)
   }
   // ---------- drawn sizes (preview only, ?drawn=1 in the link, 20 Nov): the lower pocket flap's depth and the chest
   // welt's height are resized in the photo itself. The flap / welt is found as two parallel dark lines (its top seam and
@@ -1093,9 +1141,46 @@
     ctx.restore();
   }
 
+  // ---------- preview (?drawn=1, 22 Nov): a real flap on side photos shot with a jetted pocket ----------
+  // The drawn flap below looked fake (owner). The flap of the side peak photo (same shoot, a flap pocket) is laid in over
+  // the jetted pocket instead, in this photo's own light, stretched to the pocket's width and to the chosen flap depth;
+  // its right end goes under the sleeve as in the photo. Pockets measured per photo (jet lines' ends, 22 Nov).
+  const SIDE_FLAP = { donor: 'side_peak_sb', x0: 340, x1: 436, seam: 957, bottom: 1045, b: -0.05 };
+  const SIDE_FLAP_AT = { side_notch_db: [347, 463, 971], side_notch_db4: [366, 466, 978], side_notch_sb1: [319, 459, 1000], side_notch_sb3: [324, 454, 978], side_notch_sb3r2: [317, 461, 972], side_peak_db4: [361, 465, 969], side_peak_sb1: [314, 460, 983], side_peak_sb3: [324, 458, 973], side_peak_sb3r2: [329, 465, 970], side_shawl_db: [342, 476, 946], side_shawl_db4: [356, 466, 951], side_shawl_sb: [329, 465, 968], side_shawl_sb1: [332, 466, 968], side_shawl_sb3: [327, 463, 968], side_shawl_sb3r2: [335, 469, 960] };
+  const satMemo = new WeakMap();
+  function clothSat(st) {                         // summed-area tables of shade x cloth and of cloth (for local light)
+    if (satMemo.has(st)) return satMemo.get(st);
+    const sS = new Float64Array((W + 1) * (H + 1)), sA = new Float64Array((W + 1) * (H + 1));
+    for (let y = 0; y < H; y++) { let rs = 0, ra = 0; for (let x = 0; x < W; x++) { const i = y * W + x, a = st.A[i] > 0.5 ? 1 : 0; rs += st.S[i * 4] * a; ra += a;
+      const j = (y + 1) * (W + 1) + x + 1; sS[j] = sS[j - W - 1] + rs; sA[j] = sA[j - W - 1] + ra; } }
+    const out = { sS, sA }; satMemo.set(st, out); return out;
+  }
+  const localLight = (t, x, y, r) => { const x0 = Math.max(0, x - r), x1 = Math.min(W, x + r + 1), y0 = Math.max(0, y - r), y1 = Math.min(H, y + r + 1);
+    const q = (T) => T[y1 * (W + 1) + x1] - T[y0 * (W + 1) + x1] - T[y1 * (W + 1) + x0] + T[y0 * (W + 1) + x0]; const a = q(t.sA); return a > 0 ? q(t.sS) / a : 0; };
+  const flapMemo = new WeakMap();
+  async function sideFlapView(st, name, k) {
+    const at = SIDE_FLAP_AT[name]; if (!at) return st;
+    let memo = flapMemo.get(st); if (!memo) flapMemo.set(st, memo = new Map()); if (memo.has(k)) return memo.get(k);
+    const d = await loadView(SIDE_FLAP.donor), D = SIDE_FLAP, [tx0, tx1, ty] = at, depth = D.bottom - D.seam;
+    const sx = (D.x1 - D.x0) / (tx1 - tx0), xm = (D.x0 + D.x1) / 2, top = ty - 16, bot = Math.round(ty + depth * k + 14), xa = tx0 - 8, xb = tx1;
+    const tL = clothSat(st), dL = clothSat(d);
+    const S = st.S.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
+    for (let y = top; y < bot; y++) for (let x = xa; x < xb; x++) {
+      const i = y * W + x; if (st.A[i] < 0.5 || st.OVP[i * 4 + 3]) continue;
+      const r = y - ty, dxx = D.x0 + (x - tx0) * sx, dy0 = D.seam + D.b * (dxx - xm);
+      const dyy = r < 0 ? dy0 + r : r <= depth * k ? dy0 + r / k : dy0 + depth + (r - depth * k);
+      const xi = Math.round(dxx), yi = Math.round(dyy), j = yi * W + xi; if (xi < 0 || xi >= W || yi < 0 || yi >= H || d.A[j] < 0.5) continue;
+      const wgt = Math.min(1, (x - xa) / 6, (xb - x) / 6, (y - top) / 6, (bot - y) / 6); if (wgt <= 0) continue;   // ends at the flap (not into the sleeve's shadow)
+      const v = d.S[j * 4] * (localLight(tL, x, y, 14) / Math.max(1, localLight(dL, xi, yi, 14)));
+      S[i * 4] = Math.min(255, st.S[i * 4] * (1 - wgt) + v * wgt); S[i * 4 + 1] = S[i * 4 + 2] = S[i * 4];
+      uvAt(i, S, st.Wp, U, V, SH);
+    }
+    const out = { ...st, S, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, sideFlapDone: true };
+    memo.set(k, out); return out;
+  }
   // ---------- the standard flap on side photos shot with a jetted pocket ----------
   function drawSideFlap(st, zx, zy, Z) {
-    if (!state.sideFlap || state.view !== 'side' || !st.meta.welt) return;
+    if (!state.sideFlap || state.view !== 'side' || !st.meta.welt || st.sideFlapDone) return;   // (preview: the real flap is in the picture)
     const [wx0, wx1, wy] = st.meta.welt, w = wx1 - wx0 + 6, h = 5.6 * PX_PER_CM * 1.12 * (state.szF || 1), top = wy - 6;   // drawn sizes: its depth too
     const X = (wx0 - 3 - zx) * Z, Y = (top - zy) * Z, Wd = w * Z, Hd = h * Z, r = 6 * Z;
     const path = () => { ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(X + Wd, Y); ctx.lineTo(X + Wd - 1.5 * Z, Y + Hd - r); ctx.quadraticCurveTo(X + Wd - 1.5 * Z, Y + Hd, X + Wd - 1.5 * Z - r, Y + Hd);
@@ -1918,6 +2003,7 @@
       if (!painted) firstPaint(m.name);               // the photo itself while its maps load (the first picture took seconds)
       await cuffRef();
       let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk); state.szC = 1; state.szF = 1;
+      if (DRAWN && m.sideFlap) lv = await sideFlapView(lv, m.name, m.sz && m.sz.cm && m.sz.cm.f ? m.sz.f : 1);   // preview: a real flap
       if (m.sz) {                                     // drawn sizes (preview): the note changes only for what was really resized
         lv = sizedView(lv, state.view, { ...m.sz, f: m.sideFlap ? 1 : m.sz.f, c: m.sz.curved ? 1 : m.sz.c }, m.name);   // a drawn side flap is not in the photo; the curved welt is stretched in its patch
         const need = k => m.sz[k] && Math.abs(m.sz[k] - 1) > 0.01 ? (SZ_REG[state.view][k] || []).length : 0, got = k => lv.szFound.filter(x => x === k).length;
