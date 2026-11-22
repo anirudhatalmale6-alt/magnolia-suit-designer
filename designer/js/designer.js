@@ -678,13 +678,25 @@
     // corner of the chest pocket), that row's band differs from its neighbours' and the nearest plain row's band is used
     const band = new Map();
     for (let y = top; y <= bot; y++) if (outer.has(y)) { const xo = outer.get(y), v = []; for (let k = 1; k <= M; k++) v.push(st.S[(y * W + Math.min(W - 1, xo + k)) * 4]); band.set(y, v); }
-    const bandRow = new Map();
-    for (const [y, v] of band) {
-      const nb = []; for (let d = -25; d <= 25; d++) if (d && band.has(y + d)) nb.push(band.get(y + d));
-      const odd = nb.length > 6 && v.some((t, k) => { const col = nb.map(r => r[k]).sort((p, q) => p - q); return Math.abs(t - col[col.length >> 1]) > 8; });
-      if (!odd) bandRow.set(y, y);
+    // each row's band comes from the most typical row within 40 rows (closest to their median band), so a feature touching
+    // the old edge on a few rows (the chest welt's corner) never travels out to the new edge
+    const typical = new Map();
+    for (const y of band.keys()) {
+      const nb = []; for (let d = -40; d <= 40; d++) if (band.has(y + d)) nb.push(y + d);
+      const med = band.get(y).map((_, k) => { const c = nb.map(r => band.get(r)[k]).sort((p, q) => p - q); return c[c.length >> 1]; });
+      let best = y, bd = 1e9; for (const r of nb) { const v = band.get(r); let dd = 0; for (let k = 0; k < M; k++) dd += Math.abs(v[k] - med[k]); dd += Math.abs(r - y) * 0.05; if (dd < bd) { bd = dd; best = r; } }
+      typical.set(y, best);
     }
-    const plainRow = y => { if (bandRow.has(y)) return y; for (let d = 1; d <= 30; d++) { if (bandRow.has(y - d)) return y - d; if (bandRow.has(y + d)) return y + d; } return y; };
+    const plainRow = y => typical.has(y) ? typical.get(y) : y;
+    // the lapel's area after the change (its edge band included): what lies under it (a chest welt drawn at another size,
+    // a chest pocket laid in) is not drawn there, so nothing shows through the lapel (owner, 22 Nov)
+    const lapM = new Uint8Array(W * H);
+    for (const y of rows) {
+      if (y < run[0]) continue;
+      const tt = y < top || y > bot ? 0 : Math.min(ease((y - top) / (hgt * easeTop)), ease((bot - y) / (hgt * 0.18)));
+      const xf = foldAt(y), xo = outer.get(y), xe = Math.round(xf + (xo - xf + 1) * (1 + (sc0 - 1) * tt) - 1 + 2);
+      for (let x = Math.max(0, Math.ceil(xf)); x <= Math.min(W - 1, xe); x++) lapM[y * W + x] = 1;
+    }
     for (let y = top; y <= bot; y++) {
       if (!outer.has(y)) continue;
       const tt = Math.min(ease((y - top) / (hgt * easeTop)), ease((bot - y) / (hgt * 0.18))), sc = 1 + (sc0 - 1) * tt;
@@ -699,7 +711,7 @@
         put(y, x, sx);
       }
     }
-    return { ...st, B, S, Wp, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, lwDone: true,
+    return { ...st, B, S, Wp, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, lwDone: true, lapM,
       lwGeo: { top, bot, rows: use.map(y => [y, Math.round(foldAt(y)), outer.get(y)]) } };   // (tests read it)
   }
   // ---------- drawn sizes (preview only, ?drawn=1 in the link, 20 Nov): the lower pocket flap's depth and the chest
@@ -755,9 +767,9 @@
     }
     return keep;
   }
-  function szFind(E, xa, xb, ya, yb, hmin, hmax, ext = 12, light = false) {   // the pair of lines (top seam, bottom edge) that bounds the flap / welt
+  function szFind(E, xa, xb, ya, yb, hmin, hmax, ext = 12, light = false, wmin0 = 0) {   // the pair of lines (top seam, bottom edge) that bounds the flap / welt
     // light: the top may also be a light line (a welt's lit top edge, 22 Nov: three-quarter peak lapel)
-    const wmin = xb - xa < 120 ? 20 : 45, L = szLines(E, xa, xb, ya, yb, wmin), Lt = light ? szLines(E, xa, xb, ya, yb, wmin, 20, -1) : []; let best = null;
+    const wmin = wmin0 || (xb - xa < 120 ? 20 : 45), L = szLines(E, xa, xb, ya, yb, wmin), Lt = light ? szLines(E, xa, xb, ya, yb, wmin, 20, -1) : []; let best = null;
     for (const u of [...L, ...Lt]) for (const d of L) {
       if (Math.abs(u.b - d.b) > 0.07) continue;
       const x0 = Math.max(u.x0, d.x0), x1 = Math.min(u.x1, d.x1); if (x1 - x0 < wmin) continue;
@@ -786,9 +798,11 @@
     const put = (y, x, sy) => {                     // pixel (x, y) takes the map values at row sy of the same column
       if (y < 0 || y >= H || x < 0 || x >= W) return;
       if ((clipR && x > clipR(y) - 1) || (clipL && x < clipL(y) + 1)) return;
+      if (st.lapM && st.lapM[y * W + x]) return;     // under a widened lapel (three-quarter): the lapel stays
       const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3] || st.Wp[i * 4 + 2] === 2 || st.Wp[i * 4 + 2] === 3) return;   // lapels stay
       sy = Math.max(0, Math.min(H - 1.001, sy)); const y0 = sy | 0, f = sy - y0, j0 = y0 * W + x, j1 = j0 + W, jn = f < 0.5 ? j0 : j1;
       if (!st.A[jn] || st.Wp[jn * 4 + 2] === 2 || st.Wp[jn * 4 + 2] === 3) return;
+      if (st.lapM && (st.lapM[j0] || st.lapM[j1])) return;   // nor pulled out from under it
       const p = i * 4, p0 = j0 * 4, p1 = j1 * 4;
       for (let c = 0; c < 4; c++) B[p + c] = st.B[jn * 4 + c];
       S[p] = st.S[p0] * (1 - f) + st.S[p1] * f; S[p + 1] = S[p + 2] = S[p];
@@ -802,7 +816,8 @@
       let near = null;
       for (const [xa, xb, far] of ((SZ_REG[view] || {})[kind] || [])) {
         const fx = ((SZ_FIX[view] || {})[kind] || {})[name];
-        const g = fx ? { x0: fx[0], x1: fx[1], a: fx[2], b: fx[3], h: fx[4] } : szFind(E, xa, xb, ya, yb, hmin, hmax) || (far && near && szEdge(E, xa, xb, near)) || (kind === 'c' && szFind(E, xa, xb, ya, yb, hmin, hmax, 12, true));
+        const g = fx ? { x0: fx[0], x1: fx[1], a: fx[2], b: fx[3], h: fx[4] } : szFind(E, xa, xb, ya, yb, hmin, hmax) || (far && near && szEdge(E, xa, xb, near)) || (kind === 'c' && szFind(E, xa, xb, ya, yb, hmin, hmax, 12, true))
+          || (kind === 'c' && st.lapM && szFind(E, xa, xb, ya, yb, hmin, hmax, 12, true, 25));   // a wide lapel leaves less of the welt in view
         if (!g) continue; found.push(kind);
         if (!far) near = g;
         const SHD = 10, BAND = 50, mg = kk < 1 || kind === 'c' ? 1 : 3, xl = Math.max(8, g.x0 - mg), xr = Math.min(W - 9, g.x1 + mg), xc = Math.round((g.x0 + g.x1) / 2);
@@ -932,6 +947,7 @@
       if (x < 0 || x >= W || y < 0 || y >= H) continue;
       if (tkOnly && (px >= split || py >= 110)) continue;
       const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3]) continue;   // only on cloth, never over a button
+      if (kind === 'pkc' && st.lapM && st.lapM[i]) continue;   // a widened lapel lies over the chest pocket (three-quarter)
       let e = 1;                                        // fade out near the jacket outline (outlines differ per photo)
       for (let d = 4; d <= 28 && e > 0; d += 4) if (!st.A[i - d] || !st.A[i + d]) e = Math.min(e, (d - 4) / 24);
       if (kind === 'pk' && st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
