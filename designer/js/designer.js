@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '56';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '57';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -361,7 +361,11 @@
       miss.push([`a ${cmW} cm (${ex.w}) lapel`, ['lapelWidth']]);
       for (let k = sizes.length - 1; k >= 0; k--) if (sizes[k][1][0] === 'lapelWidth') sizes.splice(k, 1);
     }
-    if (ex.sh && best.e.sh !== ex.sh) miss.push(['this shoulder', ['shoulder']]);
+    let shv = '';                                     // preview: the shoulder laid in on any jacket (maps/_sh, 22 Nov)
+    if (ex.sh && best.e.sh !== ex.sh) {
+      const sp = DRAWN && ((SHX[state.view] || {})[best.name] || {})[ex.sh];
+      if (sp) shv = ex.sh; else miss.push(['this shoulder', ['shoulder']]);
+    }
     let sz = null;
     if (DRAWN && SZ_REG[state.view]) {             // preview: the flap depth and chest welt height drawn to the chosen cm
       const cmOf = id => { const r = /(\d+(?:\.\d+)?)\s?cm/i.exec((choiceOf(id) || {}).label || ''); return r ? +r[1] : 0; };
@@ -387,7 +391,7 @@
       }
       return say();
     };
-    return { name: best.name, pk, ck, lw, tk, sideFlap, sz, note: say(), noteSz };
+    return { name: best.name, shv, pk, ck, lw, tk, sideFlap, sz, note: say(), noteSz };
   }
   async function loadView(name, pk, ck, lw, tk) {
     const lk = lw ? '~' + lw : '';
@@ -396,6 +400,7 @@
     if (pk) return views[name + lk + '|' + pk] || (views[name + lk + '|' + pk] = await patchView(await loadView(name, null, null, lw), pk));
     if (lw) return views[name + lk] || (views[name + lk] = name.startsWith('front') ? widthView(await loadView(name), lw) : lapel3View(await loadView(name), lw, name.startsWith('side') ? 'side' : 'three4'));
     if (views[name]) return views[name];
+    if (name.includes('#')) { const [n0, sty] = name.split('#'); return (views[name] = await shoulderView(await loadView(n0), n0, sty)); }
     const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
     const B = pixels(base), S = pixels(shade), Wp = Float32Array.from(pixels(warp)), OVP = pixels(ov);   // Wp in floats: smoothed offsets keep their fractions
     smoothWarp(Wp, B);
@@ -766,7 +771,9 @@
   // welt's height are resized in the photo itself. The flap / welt is found as two parallel dark lines (its top seam and
   // its bottom edge) in the photo's shading; rows between them are stretched or squeezed from the top seam down, the
   // shadow under the edge moves with it, and when it gets shorter the cloth below closes up over a short band.
-  const DRAWN = new URLSearchParams(location.search).has('drawn');
+  // the preview page (designer/preview.html sets MAGNOLIA_PREVIEW) has everything still on review switched on: drawn
+  // sizes and shoulder layering (owner, 22 Nov: on the preview link without ?drawn=1; nothing on the live designer yet)
+  const DRAWN = new URLSearchParams(location.search).has('drawn') || window.MAGNOLIA_PREVIEW === true;
   const SZ_REG = { front: { f: [[180, 405], [615, 862]], c: [[560, 820]] }, three4: { f: [[474, 750], [215, 312, 'far']], c: [[400, 720]] }, side: { f: [[250, 480]], c: [[280, 440]] } };
   const SZ_Y = { f: [900, 1250, 35, 120], c: [440, 700, 25, 60] };     // search rows, smallest / largest height (px)
   const SZ_BASE = { f: 4.5, c: 2.5 };                                  // cm of the flap / chest welt in the photos
@@ -941,7 +948,25 @@
   }
   // Pocket styles: the pocket area of a notch photo with that pocket (shading + fold offsets) is blended into
   // this photo, moved to where this photo's own pocket sits. Buttons and the photo's outline stay its own.
-  let PK = {}, PKC = {};
+  let PK = {}, PKC = {}, SHX = {};
+  // the shoulder of another style laid onto a photo (preview): a patch of its shading (RGB) and cloth outline (alpha),
+  // made by build_shoulder_patches.py with the method of the approved shoulder sheets; offset per photo in maps/_sh/index.json
+  async function shoulderView(st, name, sty) {
+    const vw = name.startsWith('three4') ? 'three4' : name.startsWith('side') ? 'side' : 'front', e = ((SHX[vw] || {})[name] || {})[sty];
+    if (!e) return st;
+    const [file, x0, y0] = e, img = await loadImg(`maps/_sh/${file}.webp?v=${VER}`), P = pixels(img), pw = img.width, ph = img.height;
+    const B = st.B.slice(), S = st.S.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
+    const bg = [st.B[(5 * W + 5) * 4], st.B[(5 * W + 5) * 4 + 1], st.B[(5 * W + 5) * 4 + 2]];   // the clean backdrop colour
+    for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
+      const x = x0 + px, y = y0 + py; if (x < 0 || x >= W || y < 0 || y >= H) continue;
+      const i = y * W + x, p = i * 4, q = (py * pw + px) * 4, cl = P[q + 3] > 127, was = st.A[i] > 0.5;
+      if (st.OVP[p + 3]) continue;                     // never over a button
+      if (cl && !was) { A[i] = 1; B[p + 3] = 0; S[p] = S[p + 1] = S[p + 2] = P[q]; uvAt(i, S, st.Wp, U, V, SH); }
+      else if (!cl && was) { A[i] = 0; B[p] = bg[0]; B[p + 1] = bg[1]; B[p + 2] = bg[2]; B[p + 3] = 255; }
+      else if (cl && Math.abs(P[q] - st.S[p]) > 3) { S[p] = S[p + 1] = S[p + 2] = P[q]; uvAt(i, S, st.Wp, U, V, SH); }
+    }
+    return { ...st, B, S, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, shv: sty };
+  }
   const pkImgs = {};
   async function pkImg(f) { return pkImgs[f] || (pkImgs[f] = pixels(await loadImg(`maps/_pk/${f}.webp?v=${VER}`))); }
   // kind 'pk': lower pockets (left and right pocket move separately), 'pkc': the chest pocket
@@ -2002,7 +2027,7 @@
     try {
       if (!painted) firstPaint(m.name);               // the photo itself while its maps load (the first picture took seconds)
       await cuffRef();
-      let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk); state.szC = 1; state.szF = 1;
+      let lv = await loadView(m.shv ? m.name + '#' + m.shv : m.name, m.pk, m.ck, m.lw, m.tk); state.szC = 1; state.szF = 1;
       if (DRAWN && m.sideFlap) lv = await sideFlapView(lv, m.name, m.sz && m.sz.cm && m.sz.cm.f ? m.sz.f : 1);   // preview: a real flap
       if (m.sz) {                                     // drawn sizes (preview): the note changes only for what was really resized
         lv = sizedView(lv, state.view, { ...m.sz, f: m.sideFlap ? 1 : m.sz.f, c: m.sz.curved ? 1 : m.sz.c }, m.name);   // a drawn side flap is not in the photo; the curved welt is stretched in its patch
@@ -3030,6 +3055,7 @@
       const get = async n => (await fetch(`${n}?v=${VER}`)).json();
       try { PK = await get('maps/_pk/index.json'); } catch (e) { PK = {}; }
       try { PKC = await get('maps/_pk/chest.json'); } catch (e) { PKC = {}; }
+      if (DRAWN) try { SHX = await get('maps/_sh/index.json'); } catch (e) { SHX = {}; }
       try { BKF = await get('bk_fabrics.json'); } catch (e) { BKF = []; }
       [FABRICS, OPTS, BUTTONS, SLEEVES, LININGS, THREADS, CONTRAST, MONO] = await Promise.all(['fabrics.json', 'options.json', 'buttons.json', 'sleeve_buttons.json', 'linings.json', 'threads.json', 'contrast.json', 'monogram.json'].map(get));
       try { SUGG = await get('suggestions.json'); } catch (e) { SUGG = null; }
