@@ -295,7 +295,10 @@
       return { name: 'side_elbow', note: say() };
     }
     const F = s.front, ex = extrasWanted(), exW = ex.w;
-    if (state.view === 'front') ex.w = '';          // first look for the photo as if the width were standard
+    // preview (?drawn=1): the lapel width drawn on three-quarter too. Side: not yet (its lapel edge runs into the chest
+    // pocket and kinks there when widened; lapel3View handles side photos once that is solved)
+    const drawW = DRAWN && state.view === 'three4';
+    if (state.view === 'front' || drawW) ex.w = '';   // first look for the photo as if the width were standard
     const want = { lapel: s.lapel, front: s.db ? ({ 8: 'db21', 9: 'db4', 11: 'db4', 10: 'db61' }[F] || 'db') : F === '26' ? '27' : F,
       pocket: pocketLook(state.opts.lowerPocket || 'B'), ticket: ticketLook(state.opts.ticket || 'D') };
     if (F === '6') want.front = '4';                // 4 roll 3: four buttons, the top one on the lapel roll
@@ -316,9 +319,9 @@
     if (state.view === 'front') {
       if (LAPEL_IDS.has(best.name)) { if (Math.abs(cmW - LAPEL_CM) > 0.2) lw = Math.round(cmW / LAPEL_CM * 100) / 100; }
       else if (exW) { ex.w = exW; best = pickPhoto(); }   // no marked lapels on this photo: the narrow / wide photo
-    }
+    } else if (drawW && Math.abs(cmW - LAPEL_CM) > 0.2) lw = Math.round(cmW / LAPEL_CM * 100) / 100;
     // the lapel drawn at its exact width only on the marked front photos; elsewhere a narrow / standard / wide photo
-    if (!lw && Math.abs(cmW - LAPEL_CM) > 0.2 && state.opts.lapelWidth) sizes.push([`${cmW} cm lapel width`, ['lapelWidth']]);
+    if ((!lw || drawW) && Math.abs(cmW - LAPEL_CM) > 0.2 && state.opts.lapelWidth) sizes.push([`${cmW} cm lapel width`, ['lapelWidth']]);   // drawn (preview): goes once really drawn
     // pockets the photo does not have: laid in from a pocket photo (closest style where this angle has none)
     let pk = null, ck = null;
     const V = PK[state.view], has = (p, t) => V && V.patches.some(x => x[0] === p && (t === undefined || x[1] === t));
@@ -378,6 +381,10 @@
         for (let k = sizes.length - 1; k >= 0; k--) if (sizes[k][1][0] === id[kind]) sizes.splice(k, 1);
         info.push([`Preview: the ${what[kind]} is drawn at ${sz.cm[kind]} cm, measured from the ${what[kind]} in the photo taken as ${SZ_BASE[kind]} cm (an assumption until it is confirmed).`, [id[kind]]]);
       }
+      if (done.w) {                                  // the lapel width drawn on three-quarter / side (preview)
+        for (let k = sizes.length - 1; k >= 0; k--) if (sizes[k][1][0] === 'lapelWidth') sizes.splice(k, 1);
+        info.push([`Preview: the lapel is drawn at ${cmW} cm (the near lapel; the far one, seen edge-on, keeps the photo's width).`, ['lapelWidth']]);
+      }
       return say();
     };
     return { name: best.name, pk, ck, lw, tk, sideFlap, sz, note: say(), noteSz };
@@ -387,7 +394,7 @@
     if (ck) return views[name + lk + '|' + pk + '|' + tk + '|' + ck] || (views[name + lk + '|' + pk + '|' + tk + '|' + ck] = await patchView(await loadView(name, pk, null, lw, tk), ck, 'pkc'));
     if (tk) return views[name + lk + '|' + pk + '|tk' + tk] || (views[name + lk + '|' + pk + '|tk' + tk] = await patchView(await loadView(name, pk, null, lw), tk, 'tk'));
     if (pk) return views[name + lk + '|' + pk] || (views[name + lk + '|' + pk] = await patchView(await loadView(name, null, null, lw), pk));
-    if (lw) return views[name + lk] || (views[name + lk] = widthView(await loadView(name), lw));
+    if (lw) return views[name + lk] || (views[name + lk] = name.startsWith('front') ? widthView(await loadView(name), lw) : lapel3View(await loadView(name), lw, name.startsWith('side') ? 'side' : 'three4'));
     if (views[name]) return views[name];
     const [base, shade, warp, ov] = await Promise.all(['base', 'shade', 'warp', 'overlay_photo'].map(n => loadImg(`maps/${name}/${n}.webp?v=${VER}`)));
     const B = pixels(base), S = pixels(shade), Wp = Float32Array.from(pixels(warp)), OVP = pixels(ov);   // Wp in floats: smoothed offsets keep their fractions
@@ -564,6 +571,136 @@
       }
     }
     return { ...st, B, S, Wp, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined };   // a new picture: its own caches
+  }
+  // ---------- lapel width on three-quarter and side (preview only, ?drawn=1, 22 Nov). These photos have no marked lapels,
+  // so the near lapel is found in the photo: its outer edge as a dark diagonal line (RANSAC on line peaks), followed row by
+  // row (so a curved shawl edge and the notch go along), and its fold as the V opening left of it (three-quarter) or the
+  // jacket's front outline (side); below the V the fold continues straight down to the roll point. Each row is then
+  // widened from the fold out, as on the front. The far lapel (seen edge-on on three-quarter) keeps the photo's width.
+  const L3_BOX = { three4: [380, 720, 280, 820], side: [200, 480, 250, 820] };
+  const lap3Memo = new WeakMap();
+  function lapel3View(st, sc0, view) {
+    const box = L3_BOX[view], none = { ...st, lwDone: false };
+    if (!box) return none;
+    const rowSum = y => { const r = new Float64Array(W + 1); for (let x = 0; x < W; x++) r[x + 1] = r[x] + st.S[(y * W + x) * 4]; return r; };
+    const sums = new Map(), rs = y => sums.get(y) || (sums.set(y, rowSum(y)), sums.get(y));
+    const ev = (y, x) => { const r = rs(y); return (r[x + 8] - r[x - 7]) / 15 - (r[x + 2] - r[x - 1]) / 3; };
+    const [xa, xb, y0, y1] = box, pts = [];
+    for (let y = y0; y < y1; y += 2) for (let x = xa + 8; x < xb - 8; x++) {
+      if (!st.A[y * W + x]) continue; const v = ev(y, x); if (v > 6 && v >= ev(y, x - 1) && v >= ev(y, x + 1)) pts.push([x, y]);
+    }
+    let line = null;
+    for (let it = 0; it < 600 && pts.length > 20; it++) {
+      const p1 = pts[(it * 7919) % pts.length], p2 = pts[(it * 104729 + 13) % pts.length]; if (p1[1] === p2[1]) continue;
+      const b = (p2[0] - p1[0]) / (p2[1] - p1[1]); if (b > -0.25 || b < -1.6) continue;
+      const a = p1[0] - b * p1[1]; let n = 0, ya = 1e9, yb = -1;
+      for (const q of pts) if (Math.abs(q[0] - (a + b * q[1])) <= 2) { n++; ya = Math.min(ya, q[1]); yb = Math.max(yb, q[1]); }
+      if (n < Math.max(20, (y1 - y0) / 8)) continue;
+      const xm = a + b * (y0 + y1) / 2;
+      if (!line || xm > line.xm + 6 || (Math.abs(xm - line.xm) <= 6 && n > line.n)) line = { a, b, n, xm, ya, yb };
+    }
+    if (!line) return none;
+    const snap = (y, xc, r) => { let bv = 4, bx = -1; for (let x = xc - r; x <= xc + r; x++) if (x > 8 && x < W - 9 && st.A[y * W + x]) { const v = ev(y, x); if (v > bv) { bv = v; bx = x; } } return bx; };
+    let outer = new Map();
+    for (let ym = Math.round(line.ya); ym < line.yb; ym += 12) {
+      const x = snap(ym, Math.round(line.a + line.b * ym), 6); if (x < 0) continue;
+      const tr = new Map([[ym, x]]);
+      for (const step of [-1, 1]) {                  // up to 6 rows without a line are bridged along the line's slope; going
+        let px = x, miss = 0;                         // down the edge only moves left (it does not follow round a button)
+        for (let y = ym + step; y > 0 && y < H; y += step) {
+          let nx = snap(y, Math.round(px), 3);
+          if (nx >= 0 && step === 1 && nx > px + 1) nx = -1;
+          if (nx < 0) { if (++miss > 6) break; px += line.b * step; continue; }
+          miss = 0; tr.set(y, nx); px = nx;
+        }
+      }
+      if (tr.size > outer.size) outer = tr;
+    }
+    {                                                 // rows caught on a nearby line (the corner of the chest pocket): each row is
+      const ys = [...outer.keys()].sort((p, q) => p - q), xs = ys.map(y => outer.get(y)), fixd = [];   // checked against a curve
+      const fit2 = (pts) => {                         // least squares x = c0 + c1 t + c2 t^2 (t = y - y_i), solved by Cramer's rule
+        let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, b0 = 0, b1 = 0, b2 = 0;
+        for (const [t, x] of pts) { const t2 = t * t; s0++; s1 += t; s2 += t2; s3 += t2 * t; s4 += t2 * t2; b0 += x; b1 += x * t; b2 += x * t2; }
+        const det = (a, b, c, d, e, f, g, h, i) => a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+        const D = det(s0, s1, s2, s1, s2, s3, s2, s3, s4); if (Math.abs(D) < 1e-9) return null;
+        return [det(b0, s1, s2, b1, s2, s3, b2, s3, s4) / D, det(s0, b0, s2, s1, b1, s3, s2, b2, s4) / D, det(s0, s1, b0, s1, s2, b1, s2, s3, b2) / D];
+      };
+      for (let i = 0; i < ys.length; i++) {          // through its 71 neighbours (fitted twice, the second time without the rows
+        const lo = Math.max(0, i - 35), hi = Math.min(ys.length, i + 36);   // off the first fit), so a short jog is left out
+        let pts = []; for (let j = lo; j < hi; j++) pts.push([ys[j] - ys[i], xs[j]]);
+        let c = fit2(pts);
+        if (c) { pts = pts.filter(([t, x]) => Math.abs(x - (c[0] + c[1] * t + c[2] * t * t)) <= 2.5); c = pts.length > 10 ? fit2(pts) || c : c; }
+        fixd.push(c && Math.abs(xs[i] - c[0]) > 2.5 ? Math.round(c[0]) : xs[i]);
+      }
+      ys.forEach((y, i) => outer.set(y, fixd[i]));
+      for (let i = 1; i < ys.length; i++) for (let y = ys[i - 1] + 1; y < ys[i]; y++)   // rows bridged over a gap: in between
+        outer.set(y, Math.round(fixd[i - 1] + (fixd[i] - fixd[i - 1]) * (y - ys[i - 1]) / (ys[i] - ys[i - 1])));
+    }
+    const rows = [...outer.keys()].sort((p, q) => p - q), raw = new Map();
+    for (const y of rows) { let x = outer.get(y) - 3; while (x > 0 && st.A[y * W + x]) x--; raw.set(y, x + 1); }
+    let run = [], cur = [];
+    for (const y of rows) {
+      const ok = outer.get(y) - raw.get(y) <= 260, last = cur[cur.length - 1];
+      if (cur.length && (y - last > 1 || Math.abs(raw.get(y) - raw.get(last)) > 8 || !ok)) { if (cur.length > run.length) run = cur; cur = []; }
+      if (ok) cur.push(y);
+    }
+    if (cur.length > run.length) run = cur;
+    if (run.length < 60) return none;
+    const fit = run.filter(y => y > run[run.length - 1] - 100), n = fit.length;       // the fold continued below the V: a straight line
+    const my = fit.reduce((t, y) => t + y, 0) / n, mx = fit.reduce((t, y) => t + raw.get(y), 0) / n;
+    let sxy = 0, syy = 0; for (const y of fit) { sxy += (y - my) * (raw.get(y) - mx); syy += (y - my) ** 2; }
+    const fm = syy ? sxy / syy : 0, foldAt = y => run.length && y <= run[run.length - 1] && raw.has(y) && y >= run[0] ? raw.get(y) : mx + fm * (y - my);
+    let use = rows.filter(y => y >= run[0]), easeTop = 0.08;
+    if (view === 'side') {                           // side: from where the edge runs straight (below the notch), eased in slowly
+      const t0 = use.find(y => Math.abs(outer.get(y) - (line.a + line.b * y)) <= 3); if (t0 == null) return none;
+      use = use.filter(y => y >= t0); easeTop = 0.3;
+    }
+    if (use.length < 60) return none;
+    const top = use[0]; let bot = use[use.length - 1];
+    for (const y of use) if (outer.get(y) - foldAt(y) < 6) { bot = y; break; }
+    const tb = ((st.meta && st.meta.body) || []).filter(b => b[1] > top).sort((p, q) => p[1] - q[1])[0];   // ends above the top button
+    if (tb) bot = Math.min(bot, Math.round(tb[1] - tb[2] - 14));
+    if (bot - top < 60) return none;
+    const hgt = bot - top, ease = t => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t), M = 6, BAND = 90;
+    const B = st.B.slice(), S = st.S.slice(), Wp = st.Wp.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
+    const put = (y, x, sx, sy = y) => {             // pixel (x, y) takes the map values at (sx, sy)
+      if (x < 0 || x >= W) return;
+      const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3]) return;
+      sx = Math.max(0, Math.min(W - 1.001, sx)); const x0 = sx | 0, f = sx - x0, j0 = sy * W + x0, j1 = j0 + 1, jn = f < 0.5 ? j0 : j1;
+      if (!st.A[jn]) return;
+      const p = i * 4, p0 = j0 * 4, p1 = j1 * 4;
+      for (let c = 0; c < 4; c++) B[p + c] = st.B[jn * 4 + c];
+      S[p] = st.S[p0] * (1 - f) + st.S[p1] * f; S[p + 1] = S[p + 2] = S[p];
+      Wp[p] = st.Wp[p0] * (1 - f) + st.Wp[p1] * f; Wp[p + 1] = st.Wp[p0 + 1] * (1 - f) + st.Wp[p1 + 1] * f; Wp[p + 2] = st.Wp[jn * 4 + 2];
+      A[i] = st.A[jn]; uvAt(i, S, Wp, U, V, SH);
+    };
+    // the band just outside the edge (its shadow) is copied out to the new edge; where something touches the edge there (the
+    // corner of the chest pocket), that row's band differs from its neighbours' and the nearest plain row's band is used
+    const band = new Map();
+    for (let y = top; y <= bot; y++) if (outer.has(y)) { const xo = outer.get(y), v = []; for (let k = 1; k <= M; k++) v.push(st.S[(y * W + Math.min(W - 1, xo + k)) * 4]); band.set(y, v); }
+    const bandRow = new Map();
+    for (const [y, v] of band) {
+      const nb = []; for (let d = -25; d <= 25; d++) if (d && band.has(y + d)) nb.push(band.get(y + d));
+      const odd = nb.length > 6 && v.some((t, k) => { const col = nb.map(r => r[k]).sort((p, q) => p - q); return Math.abs(t - col[col.length >> 1]) > 8; });
+      if (!odd) bandRow.set(y, y);
+    }
+    const plainRow = y => { if (bandRow.has(y)) return y; for (let d = 1; d <= 30; d++) { if (bandRow.has(y - d)) return y - d; if (bandRow.has(y + d)) return y + d; } return y; };
+    for (let y = top; y <= bot; y++) {
+      if (!outer.has(y)) continue;
+      const tt = Math.min(ease((y - top) / (hgt * easeTop)), ease((bot - y) / (hgt * 0.18))), sc = 1 + (sc0 - 1) * tt;
+      if (Math.abs(sc - 1) < 0.01) continue;
+      const xf = foldAt(y), xo = outer.get(y), w = xo - xf + 1, xn = xf + w * sc - 1, end = Math.round(Math.max(xn, xo) + M + (sc < 1 ? BAND : 0));
+      for (let x = end; x >= Math.ceil(xf); x--) {
+        let sx;
+        if (x <= xn) sx = xf + (x - xf) / sc;
+        else if (x <= xn + M) { const yr = plainRow(y); put(y, x, outer.get(yr) + (x - xn), yr); continue; }
+        else if (sc < 1) sx = xo + M + (x - xn - M) * BAND / (end - xn - M);
+        else continue;
+        put(y, x, sx);
+      }
+    }
+    return { ...st, B, S, Wp, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, lwDone: true,
+      lwGeo: { top, bot, rows: use.map(y => [y, Math.round(foldAt(y)), outer.get(y)]) } };   // (tests read it)
   }
   // ---------- drawn sizes (preview only, ?drawn=1 in the link, 20 Nov): the lower pocket flap's depth and the chest
   // welt's height are resized in the photo itself. The flap / welt is found as two parallel dark lines (its top seam and
@@ -1773,6 +1910,7 @@
         state.szC = done.c ? m.sz.c : 1; state.szF = m.sideFlap && done.f ? m.sz.f : 1;
         if (my === ticket && (done.f || done.c)) { m.note = m.noteSz(done); paintNote(m.note); }
       }
+      if (m.lw && state.view !== 'front' && lv.lwDone && my === ticket) { m.note = m.noteSz({ w: true }); paintNote(m.note); }
       const st = stackView(cuffView(lv)); monoSt = st;
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
