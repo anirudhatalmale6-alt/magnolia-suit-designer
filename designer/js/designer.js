@@ -568,7 +568,7 @@
   // its bottom edge) in the photo's shading; rows between them are stretched or squeezed from the top seam down, the
   // shadow under the edge moves with it, and when it gets shorter the cloth below closes up over a short band.
   const DRAWN = new URLSearchParams(location.search).has('drawn');
-  const SZ_REG = { front: { f: [[180, 405], [615, 862]], c: [[560, 820]] }, three4: { f: [[245, 345], [474, 750]], c: [[400, 720]] }, side: { f: [[250, 480]] } };
+  const SZ_REG = { front: { f: [[180, 405], [615, 862]], c: [[560, 820]] }, three4: { f: [[474, 750], [215, 312, 'far']], c: [[400, 720]] }, side: { f: [[250, 480]] } };
   const SZ_Y = { f: [900, 1250, 35, 120], c: [440, 700, 25, 60] };     // search rows, smallest / largest height (px)
   const SZ_BASE = { f: 4.5, c: 2.5 };                                  // cm of the flap / chest welt in the photos
   const edgeCache = new WeakMap();
@@ -582,7 +582,7 @@
     }
     edgeCache.set(st, E); return E;
   }
-  function szLines(E, xa, xb, ya, yb, wmin) {
+  function szLines(E, xa, xb, ya, yb, wmin, minPts = 20) {
     const P = [];
     for (let x = xa; x < xb; x += 2) for (let y = ya + 2; y < yb - 2; y++) {
       const v = E[y * W + x]; if (v <= 5) continue;
@@ -593,7 +593,7 @@
       const by = new Map();
       for (const p of P) { const a = Math.round(p[1] - b * p[0]); for (const k of [a - 2, a - 1, a, a + 1, a + 2]) { if (!by.has(k)) by.set(k, []); by.get(k).push(p); } }
       for (const [a0, ps] of by) {
-        if (ps.length < 20) continue;
+        if (ps.length < minPts) continue;
         const xs = ps.map(p => p[0]).sort((u, v) => u - v); let s0 = xs[0], pv = xs[0], best = [xs[0], xs[0]];
         for (const x of xs.slice(1)) { if (x - pv > 8) { if (pv - s0 > best[1] - best[0]) best = [s0, pv]; s0 = x; } pv = x; }
         if (pv - s0 > best[1] - best[0]) best = [s0, pv];
@@ -625,13 +625,21 @@
     for (let gap = 0, x = x1 + 1; x <= x1 + ext && gap <= 4; x++) { if (strong(x)) { best.x1 = x; gap = 0; } else gap++; }
     return best;
   }
+  // the far flap on three-quarter is seen almost edge-on: often only its bottom edge shows as a line. Then the flap is
+  // taken as that edge with the near flap's height above it (the two flaps are the same size, at the same height)
+  function szEdge(E, xa, xb, near) {
+    const ym = near.a + near.b * (near.x0 + near.x1) / 2, L = szLines(E, xa, xb, Math.round(ym - 70), Math.round(ym + 25), 10, 6);
+    const l = L.find(u => u.x1 - u.x0 >= 10); return l ? { sc: 0, x0: l.x0, x1: l.x1, a: l.a, b: l.b, h: near.h } : null;
+  }
   const szMemo = new WeakMap();
   function sizedView(st, view, sz) {
     const key = JSON.stringify(sz); let memo = szMemo.get(st); if (!memo) szMemo.set(st, memo = new Map());
     if (memo.has(key)) return memo.get(key);
     const B = st.B.slice(), S = st.S.slice(), Wp = st.Wp.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
+    let clipR = null, clipL = null;                 // a sleeve's edge beside the flap: nothing past it changes
     const put = (y, x, sy) => {                     // pixel (x, y) takes the map values at row sy of the same column
       if (y < 0 || y >= H || x < 0 || x >= W) return;
+      if ((clipR && x > clipR(y) - 1) || (clipL && x < clipL(y) + 1)) return;
       const i = y * W + x; if (!st.A[i] || st.OVP[i * 4 + 3] || st.Wp[i * 4 + 2] === 2 || st.Wp[i * 4 + 2] === 3) return;   // lapels stay
       sy = Math.max(0, Math.min(H - 1.001, sy)); const y0 = sy | 0, f = sy - y0, j0 = y0 * W + x, j1 = j0 + W, jn = f < 0.5 ? j0 : j1;
       if (!st.A[jn] || st.Wp[jn * 4 + 2] === 2 || st.Wp[jn * 4 + 2] === 3) return;
@@ -643,11 +651,13 @@
     };
     const E = edgeMap(st), found = [];
     for (const kind of ['f', 'c']) {
-      const k = sz[kind]; if (!k || Math.abs(k - 1) < 0.01) continue;
+      const kk = sz[kind]; if (!kk || Math.abs(kk - 1) < 0.01) continue;
       const [ya, yb, hmin, hmax] = SZ_Y[kind];
-      for (const [xa, xb] of ((SZ_REG[view] || {})[kind] || [])) {
-        const g = szFind(E, xa, xb, ya, yb, hmin, hmax); if (!g) continue; found.push(kind);
-        const SHD = 10, BAND = 50, mg = k < 1 || kind === 'c' ? 1 : 3, xl = Math.max(8, g.x0 - mg), xr = Math.min(W - 9, g.x1 + mg), xc = Math.round((g.x0 + g.x1) / 2);
+      let near = null;
+      for (const [xa, xb, far] of ((SZ_REG[view] || {})[kind] || [])) {
+        const g = szFind(E, xa, xb, ya, yb, hmin, hmax) || (far && near && szEdge(E, xa, xb, near)); if (!g) continue; found.push(kind);
+        if (!far) near = g;
+        const SHD = 10, BAND = 50, mg = kk < 1 || kind === 'c' ? 1 : 3, xl = Math.max(8, g.x0 - mg), xr = Math.min(W - 9, g.x1 + mg), xc = Math.round((g.x0 + g.x1) / 2);
         // a sleeve or lapel edge crossing the flap's end (three-quarter, side): measured in the plain cloth just below the
         // flap, the first strong vertical edge either side of the middle ends the change there, so the edge never moves
         // (a sharp step in brightness across it: a dart, a seam or a soft shadow does not count)
@@ -655,10 +665,49 @@
           for (let y = Math.round(y0); y <= Math.round(y1); y++) { const yy = Math.round(y + g.b * (x - xc)); if (yy < 1 || yy >= H - 1 || x < 9 || x > W - 10) continue;
             t += (st.S[(yy * W + x + 1) * 4] + st.S[(yy * W + x + 2) * 4] - st.S[(yy * W + x - 1) * 4] - st.S[(yy * W + x - 2) * 4]) / 2; n++; }
           return n ? Math.abs(t / n) : 0; };
-        const stepAt = x => Math.max(band(x, ybm + 14, ybm + 40), band(x, ybm - g.h * 0.7, ybm - g.h * 0.3));   // below it, and inside it
-        let xr2 = xr, xl2 = xl;
-        for (let x = xc; x <= xr; x++) if (stepAt(x) > 25) { let pk = x; for (let q = x; q <= x + 6; q++) if (stepAt(q) > stepAt(pk)) pk = q; xr2 = pk - 1; break; }
-        for (let x = xc; x >= xl; x--) if (stepAt(x) > 25) { let pk = x; for (let q = x; q >= x - 6; q--) if (stepAt(q) > stepAt(pk)) pk = q; xl2 = pk + 1; break; }
+        const stepAt = x => band(x, ybm - g.h * 0.7, ybm - g.h * 0.3);   // across the flap itself (22 Nov: not below it, where the
+        // flap's own pocket shadow made a step a few px before its end and left a stub of the old flap)
+        let xr2 = xr, xl2 = xl; clipR = clipL = null;
+        if (view === 'front') {                        // front: nothing crosses the flap; it wraps round past the side seam to the
+          const inside = x => { const y = Math.round(g.a + g.b * x); return x > 8 && x < W - 9 && y > 0 && y < H && st.A[y * W + x]; };
+          while (xr2 < xr + 30 && inside(xr2 + 1)) xr2++;   // jacket's outline, so the change runs on to the outline (no corner at the seam)
+          while (xl2 > xl - 30 && inside(xl2 - 1)) xl2--;
+        } else {
+          // the flap's end in deep shadow (by a sleeve): its edge line fades out gradually; the change runs on while the line
+          // is still there (up to 30 px), so no stub of the old flap is left in the shadow
+          const lineE = x => { let m = 0; const y = Math.round(g.a + g.b * x); for (let d = -3; d <= 3; d++) if (y + d > 0 && y + d < H) m = Math.max(m, E[(y + d) * W + x]); return m; };
+          // a step across the flap close to its own end is the flap's end edge (it moves with the flap); further in, it is
+          // something crossing the flap (it stays). The far flap on three-quarter ends on its left at the jacket's front edge: that stays
+          let stopR = false, stopL = false;
+          for (let x = xc; x <= xr + 30 && x < W - 10; x++) {
+            if (stepAt(x) > 25) { let pk = x; for (let q = x; q <= x + 8; q++) if (stepAt(q) > stepAt(pk)) pk = q; xr2 = Math.abs(pk - g.x1) <= 10 ? pk + 4 : pk - 1; stopR = true; break; }
+            if (x > xr && lineE(x) < 2) { xr2 = x - 1; stopR = true; break; }
+          }
+          if (!stopR) xr2 = Math.min(W - 10, xr + 30);
+          for (let x = xc; x >= xl - 30 && x > 9; x--) {
+            if (stepAt(x) > 25) { let pk = x; for (let q = x; q >= x - 8; q--) if (stepAt(q) > stepAt(pk)) pk = q; xl2 = !far && Math.abs(pk - g.x0) <= 10 ? pk - 4 : pk + 1; stopL = true; break; }
+            if (x < xl && lineE(x) < 2) { xl2 = x + 1; stopL = true; break; }
+          }
+          if (!stopL) xl2 = Math.max(9, xl - 30);
+          // a sleeve edge crossing just below the flap's end (side): its line is measured below the flap, row by row, and
+          // nothing on the sleeve's side of it changes (the flap goes under the sleeve; the sleeve's outline stays whole)
+          const below = x => band(x, ybm + 14, ybm + 40), hstep = (x, y) => Math.abs(st.S[(y * W + x + 1) * 4] + st.S[(y * W + x + 2) * 4] - st.S[(y * W + x - 1) * 4] - st.S[(y * W + x - 2) * 4]) / 2;
+          const sleeveLine = (xa2, xb2) => {
+            const pts = [];
+            for (let y = Math.round(ybm + 6); y <= Math.round(ybm + 60) && y < H - 1; y += 2) {
+              let bx = -1, bv = 25; for (let x = Math.max(10, xa2); x <= Math.min(W - 11, xb2); x++) { const v = hstep(x, y); if (v > bv) { bv = v; bx = x; } }
+              if (bx >= 0) pts.push([y, bx]);
+            }
+            if (pts.length < 10) return null;
+            const n = pts.length, my = pts.reduce((t, p) => t + p[0], 0) / n, mx = pts.reduce((t, p) => t + p[1], 0) / n;
+            let sxy = 0, syy = 0; for (const [y, x] of pts) { sxy += (y - my) * (x - mx); syy += (y - my) ** 2; }
+            const m = sxy / syy, c = mx - m * my, res = pts.reduce((t, [y, x]) => t + Math.abs(x - (c + m * y)), 0) / n;
+            return res < 3 ? y => c + m * y : null;
+          };
+          for (let x = xc; x <= xr2; x++) if (below(x) > 25) { clipR = sleeveLine(x - 8, xr2 + 8); break; }
+          for (let x = xc; x >= xl2; x--) if (below(x) > 25) { clipL = sleeveLine(xl2 - 8, x + 8); break; }
+        }
+        const k = kk;
         for (let x = xl2; x <= xr2; x++) {
           const yb0 = g.a + g.b * x, yt = yb0 - g.h, nb = yt + g.h * k;
           if (k > 1) {
@@ -873,7 +922,7 @@
   // ---------- the standard flap on side photos shot with a jetted pocket ----------
   function drawSideFlap(st, zx, zy, Z) {
     if (!state.sideFlap || state.view !== 'side' || !st.meta.welt) return;
-    const [wx0, wx1, wy] = st.meta.welt, w = wx1 - wx0 + 6, h = 5.6 * PX_PER_CM * 1.12, top = wy - 6;
+    const [wx0, wx1, wy] = st.meta.welt, w = wx1 - wx0 + 6, h = 5.6 * PX_PER_CM * 1.12 * (state.szF || 1), top = wy - 6;   // drawn sizes: its depth too
     const X = (wx0 - 3 - zx) * Z, Y = (top - zy) * Z, Wd = w * Z, Hd = h * Z, r = 6 * Z;
     const path = () => { ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(X + Wd, Y); ctx.lineTo(X + Wd - 1.5 * Z, Y + Hd - r); ctx.quadraticCurveTo(X + Wd - 1.5 * Z, Y + Hd, X + Wd - 1.5 * Z - r, Y + Hd);
       ctx.lineTo(X + 1.5 * Z + r, Y + Hd); ctx.quadraticCurveTo(X + 1.5 * Z, Y + Hd, X + 1.5 * Z, Y + Hd - r); ctx.closePath(); };
@@ -1694,12 +1743,13 @@
     try {
       if (!painted) firstPaint(m.name);               // the photo itself while its maps load (the first picture took seconds)
       await cuffRef();
-      let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk); state.szC = 1;
+      let lv = await loadView(m.name, m.pk, m.ck, m.lw, m.tk); state.szC = 1; state.szF = 1;
       if (m.sz) {                                     // drawn sizes (preview): the note changes only for what was really resized
-        lv = sizedView(lv, state.view, m.sz);
+        lv = sizedView(lv, state.view, m.sideFlap ? { ...m.sz, f: 1 } : m.sz);   // a drawn side flap is not in the photo
         const need = k => m.sz[k] && Math.abs(m.sz[k] - 1) > 0.01 ? (SZ_REG[state.view][k] || []).length : 0, got = k => lv.szFound.filter(x => x === k).length;
-        const done = { f: !!m.sz.cm.f && got('f') >= need('f'), c: !!m.sz.cm.c && got('c') >= need('c') };
-        state.szC = done.c ? m.sz.c : 1;
+        // the flap drawn on side photos shot with a jetted pocket: it is drawn at the chosen depth (no photo flap to find)
+        const done = { f: !!m.sz.cm.f && (m.sideFlap || got('f') >= need('f')), c: !!m.sz.cm.c && got('c') >= need('c') };
+        state.szC = done.c ? m.sz.c : 1; state.szF = m.sideFlap && done.f ? m.sz.f : 1;
         if (my === ticket && (done.f || done.c)) { m.note = m.noteSz(done); paintNote(m.note); }
       }
       const st = stackView(cuffView(lv)); monoSt = st;
