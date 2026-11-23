@@ -383,11 +383,11 @@
       const id = { f: 'lowerPocket', c: 'chestPocket' }, what = { f: 'flap', c: 'chest welt' };
       for (const kind of ['f', 'c']) if (done[kind]) {
         for (let k = sizes.length - 1; k >= 0; k--) if (sizes[k][1][0] === id[kind]) sizes.splice(k, 1);
-        info.push([`Preview: the ${what[kind]} is drawn at ${sz.cm[kind]} cm, measured from the ${what[kind]} in the photo taken as ${SZ_BASE[kind]} cm (an assumption until it is confirmed).`, [id[kind]]]);
+        info.push([`The ${what[kind]} is drawn at ${sz.cm[kind]} cm, measured from the ${what[kind]} in the photo taken as ${SZ_BASE[kind]} cm (an assumption until it is confirmed).`, [id[kind]]]);
       }
       if (done.w) {                                  // the lapel width drawn on three-quarter / side (preview)
         for (let k = sizes.length - 1; k >= 0; k--) if (sizes[k][1][0] === 'lapelWidth') sizes.splice(k, 1);
-        info.push([`Preview: the lapel is drawn at ${cmW} cm (the near lapel; the far one, seen edge-on, keeps the photo's width).`, ['lapelWidth']]);
+        info.push([`The lapel is drawn at ${cmW} cm (the near lapel; the far one, seen edge-on, keeps the photo's width).`, ['lapelWidth']]);
       }
       return say();
     };
