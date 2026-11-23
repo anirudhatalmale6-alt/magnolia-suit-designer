@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '57';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '58';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -275,7 +275,10 @@
       const v = state.opts.vent || 'C', turned = (state.opts.collarBack || 'A') === 'B';
       const name = v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : v === 'D' ? 'back_inner_belt' : v === 'F' ? 'back_fixed_belt' : turned ? 'back_collar' : 'back';
       if (turned && name !== 'back_collar') miss.push(['the collar turned back at the end with this vent', ['collarBack', 'vent']]);   // that photo has side vents
-      return { name, note: say() };
+      // the shoulder from the owner's Back reference photos (23 Nov), laid onto every Back jacket (maps/_sh, view 'back')
+      const bsh = { A: 'natural', C: 'rollino', D: 'neapolitan', E: 'shirthead' }[state.opts.shoulder || 'B'] || '';
+      const shv = bsh && DRAWN && ((SHX.back || {})[name] || {})[bsh] ? bsh : '';
+      return { name, shv, note: say() };
     }
     if (state.view === 'open') {                    // inside photos: lining style first, then the inside details staff chose
       const ls = state.opts.liningStyle || 'A';
@@ -954,7 +957,7 @@
   // the shoulder of another style laid onto a photo (preview): a patch of its shading (RGB) and cloth outline (alpha),
   // made by build_shoulder_patches.py with the method of the approved shoulder sheets; offset per photo in maps/_sh/index.json
   async function shoulderView(st, name, sty) {
-    const vw = name.startsWith('three4') ? 'three4' : name.startsWith('side') ? 'side' : 'front', e = ((SHX[vw] || {})[name] || {})[sty];
+    const vw = name.startsWith('three4') ? 'three4' : name.startsWith('side') ? 'side' : name.startsWith('back') ? 'back' : 'front', e = ((SHX[vw] || {})[name] || {})[sty];
     if (!e) return st;
     const [file, x0, y0] = e, img = await loadImg(`maps/_sh/${file}.webp?v=${VER}`), P = pixels(img), pw = img.width, ph = img.height;
     const B = st.B.slice(), S = st.S.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
