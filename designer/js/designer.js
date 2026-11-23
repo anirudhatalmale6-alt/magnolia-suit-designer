@@ -43,8 +43,8 @@
   const PV_ICONS = [0, 1].map(d => '<span class="pv-i" aria-hidden="true"><svg viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.3"/><path d="M9.8 9.8 14 14"/></svg>' +
     (d ? '<svg viewBox="0 0 16 16"><path class="f" d="M5 3.2v9.6L12.6 8z"/></svg>' : '') + '</span>');   // phones: magnifier = close-up, play = draped video
   // the "from" prices on the start screens and the summary: change them here only (owner's figures: in person $445,
-  // online $395, bekeshe $450 with the belt included)
-  const START_PRICE = { inperson: 445, online: 395, bekeshe: 450 };
+  // online $375 (was $395 until 22 Nov), bekeshe $450 with the belt included)
+  const START_PRICE = { inperson: 445, online: 375, bekeshe: 450 };   // online 395 -> 375 (owner, 22 Nov)
   let compact = false;                             // phones: the sticky picture in its smaller size (stageCompact)
   let PREV = {};                                   // fabric code -> its preview files (previews.json)
   const PVB = window.MAGNOLIA_PREVIEW_BASE || 'previews/';   // where the preview files are served (set in index.html)
@@ -773,7 +773,9 @@
   // shadow under the edge moves with it, and when it gets shorter the cloth below closes up over a short band.
   // the preview page (designer/preview.html sets MAGNOLIA_PREVIEW) has everything still on review switched on: drawn
   // sizes and shoulder layering (owner, 22 Nov: on the preview link without ?drawn=1; nothing on the live designer yet)
-  const DRAWN = new URLSearchParams(location.search).has('drawn') || window.MAGNOLIA_PREVIEW === true;
+  // live since 23 Nov (owner approved v91): drawn sizes and shoulder layering are on for everyone; ?drawn=0 switches them
+  // off (tests compare with and without)
+  const DRAWN = new URLSearchParams(location.search).get('drawn') !== '0';
   const SZ_REG = { front: { f: [[180, 405], [615, 862]], c: [[560, 820]] }, three4: { f: [[474, 750], [215, 312, 'far']], c: [[400, 720]] }, side: { f: [[250, 480]], c: [[280, 440]] } };
   const SZ_Y = { f: [900, 1250, 35, 120], c: [440, 700, 25, 60] };     // search rows, smallest / largest height (px)
   const SZ_BASE = { f: 4.5, c: 2.5 };                                  // cm of the flap / chest welt in the photos
@@ -846,7 +848,7 @@
   }
   const szMemo = new WeakMap();
   function sizedView(st, view, sz, name) {
-    const key = JSON.stringify(sz) + name; let memo = szMemo.get(st); if (!memo) szMemo.set(st, memo = new Map());
+    const key = JSON.stringify(sz) + name + view; let memo = szMemo.get(st); if (!memo) szMemo.set(st, memo = new Map());
     if (memo.has(key)) return memo.get(key);
     const B = st.B.slice(), S = st.S.slice(), Wp = st.Wp.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
     let clipR = null, clipL = null;                 // a sleeve's edge beside the flap: nothing past it changes
@@ -997,18 +999,22 @@
     }
     return best ? y => best.a + best.b * y : null;
   }
+  // the view a loaded photo belongs to, from its name: the loading of a picture never reads state.view, which a quick tap
+  // can change while it loads (owner, 22 Nov: quick taps froze the picture; the pocket table of the new view was used on
+  // the old view's photo)
+  const viewOfSt = st => { const n = (st && st.name) || ''; return n.startsWith('three4') ? 'three4' : n.startsWith('side') ? 'side' : n.startsWith('back') ? 'back' : n.startsWith('open') ? 'open' : 'front'; };
   async function patchView(st, pk, kind = 'pk') {
     const tkOnly = kind === 'tk'; if (tkOnly) kind = 'pk';      // only the ticket pocket: the rows above the lower pocket, on its side
     const [pk0, kzs] = pk.split('*'), kz = +kzs || 1;                  // '*k': the curved welt drawn k times as deep (drawn sizes)
-    const v = (kind === 'pkc' ? PKC : PK)[state.view], [pkf, sxs] = pk0.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
+    const view = viewOfSt(st), v = (kind === 'pkc' ? PKC : PK)[view], [pkf, sxs] = pk0.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
     const cv = kz !== 1 && SZ_CURVE[dn], poly = (c, x) => (c[0] * x + c[1]) * x + c[2];
     const mapY = (qy, xd) => {                         // donor row shown at row qy: the welt stretched from its top seam down
       if (!cv) return qy; const x = Math.max(cv.x[0], Math.min(cv.x[1], xd)), yt = poly(cv.t, x), yb = poly(cv.b, x), nb = yt + (yb - yt) * kz;
       return qy <= yt ? qy : qy <= nb ? yt + (qy - yt) / kz : qy - (nb - yb);
     };
     const off = st.meta[kind] || [0, 0, 0], tdy = off[1], tdx = px => px < split ? off[0] : (off[2] ?? off[0]);
-    const sx = +sxs || 0, split = kind === 'pkc' ? 1e9 : state.view === 'front' ? pw / 2 : 209;   // left / right pocket (three-quarter: far / near)
-    const dxOf = px => !sx ? 0 : px < split ? (state.view === 'front' ? -sx : 0) : sx;
+    const sx = +sxs || 0, split = kind === 'pkc' ? 1e9 : view === 'front' ? pw / 2 : 209;   // left / right pocket (three-quarter: far / near)
+    const dxOf = px => !sx ? 0 : px < split ? (view === 'front' ? -sx : 0) : sx;
     const Dp = v.patches.find(x => x[2] === dn), D = await pkImg(dn), Tp = tn && v.patches.find(x => x[2] === tn), T = Tp && await pkImg(tn);
     const ddx = (P, px) => px < split ? P[3][0] : (P[3][2] ?? P[3][0]);
     const S = st.S.slice(), Wp = st.Wp.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
@@ -1562,10 +1568,13 @@
       const outer = pid === 2 ? x1 : x0, w = x1 - x0;               // about 40 % in from the lapel's outer edge
       return { x: outer + (pid === 2 ? -1 : 1) * w * 0.4, y, w };
     };
+    // (kept only when this photo belongs to the view on screen: a quick tap between loading and drawing must not leave a
+    // wrong answer stored on the photo)
+    const keep = g => (viewOfSt(st) === state.view ? (st.lapelGeo = g) : g);
     if (st.meta.lapelL && state.view === 'front') {   // the photo already shows a lapel buttonhole: draw over it
-      const [x, y] = st.meta.lapelL; return (st.lapelGeo = { L: { x, y, w: 60 }, R: { x: 1024 - x, y, w: 60 } });
+      const [x, y] = st.meta.lapelL; return keep({ L: { x, y, w: 60 }, R: { x: 1024 - x, y, w: 60 } });
     }
-    return (st.lapelGeo = state.view === 'front' ? { L: at(2), R: at(3) } : null);   // L = the wearer's left lapel
+    return keep(state.view === 'front' ? { L: at(2), R: at(3) } : null);   // L = the wearer's left lapel
   }
   function lapelHoles(st) {
     const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; if (!g || pos === 'Z') return [];
@@ -2005,10 +2014,17 @@
       if (!painted) ctx.putImageData(d, 0, 0);
     }).catch(() => {});
   }
+  // a picture that fails is drawn again once by itself before the error shows (only the newest choice counts)
+  let retried = false;
+  function failed(my, e) {
+    if (my !== ticket) return;                      // an older choice failed after a newer one started: the newer one draws
+    if (!retried) { retried = true; setTimeout(render, 80); return; }
+    retried = false; busy.hidden = false; busy.textContent = 'Could not load the preview. Please refresh the page.';
+  }
   async function render() {
     if (!viewOk(state.view)) { state.view = 'front'; state.zoom = null; state.closeup = null; $$('#views button').forEach(x => x.classList.toggle('on', x.dataset.view === 'front')); }
     paintViews();
-    const my = ++ticket, m = mapName(); state.mapName = m.name; state.sideFlap = !!m.sideFlap;
+    const my = ++ticket, m = mapName(), view = state.view, retry = e => failed(my, e); state.mapName = m.name; state.sideFlap = !!m.sideFlap;
     busy.hidden = false; busy.textContent = 'Updating…';
     // the previous picture stays up while the new one loads: when that takes a moment it is faded, so it is never
     // mistaken for the new choice (owner, 17 Nov: buttons briefly seen on the hidden-button front)
@@ -2030,14 +2046,14 @@
       let lv = await loadView(m.shv ? m.name + '#' + m.shv : m.name, m.pk, m.ck, m.lw, m.tk); state.szC = 1; state.szF = 1;
       if (DRAWN && m.sideFlap) lv = await sideFlapView(lv, m.name, m.sz && m.sz.cm && m.sz.cm.f ? m.sz.f : 1);   // preview: a real flap
       if (m.sz) {                                     // drawn sizes (preview): the note changes only for what was really resized
-        lv = sizedView(lv, state.view, { ...m.sz, f: m.sideFlap ? 1 : m.sz.f, c: m.sz.curved ? 1 : m.sz.c }, m.name);   // a drawn side flap is not in the photo; the curved welt is stretched in its patch
-        const need = k => m.sz[k] && Math.abs(m.sz[k] - 1) > 0.01 ? (SZ_REG[state.view][k] || []).length : 0, got = k => lv.szFound.filter(x => x === k).length;
+        lv = sizedView(lv, view, { ...m.sz, f: m.sideFlap ? 1 : m.sz.f, c: m.sz.curved ? 1 : m.sz.c }, m.name);   // a drawn side flap is not in the photo; the curved welt is stretched in its patch
+        const need = k => m.sz[k] && Math.abs(m.sz[k] - 1) > 0.01 ? (SZ_REG[view][k] || []).length : 0, got = k => lv.szFound.filter(x => x === k).length;
         // the flap drawn on side photos shot with a jetted pocket: it is drawn at the chosen depth (no photo flap to find)
         const done = { f: !!m.sz.cm.f && (m.sideFlap || got('f') >= need('f')), c: !!m.sz.cm.c && (m.sz.curved || got('c') >= need('c')) };
         state.szC = done.c ? m.sz.c : 1; state.szF = m.sideFlap && done.f ? m.sz.f : 1;
         if (my === ticket && (done.f || done.c)) { m.note = m.noteSz(done); paintNote(m.note); }
       }
-      if (m.lw && state.view !== 'front' && lv.lwDone && my === ticket) { m.note = m.noteSz({ w: true }); paintNote(m.note); }
+      if (m.lw && view !== 'front' && lv.lwDone && my === ticket) { m.note = m.noteSz({ w: true }); paintNote(m.note); }
       const st = stackView(cuffView(lv)); monoSt = st;
       if (state.zoomAt === 'lapelhole') {             // the hole's place depends on the photo: zoom once it is loaded
         const g = lapelGeo(st), pos = state.opts.lapelHole || 'A'; state.zoomAt = null;
@@ -2061,6 +2077,8 @@
       if (my !== ticket) return;                    // a newer choice arrived while loading
       if (state.zoom) busy.textContent = 'Zooming in…';
       requestAnimationFrame(() => setTimeout(() => {
+        if (my !== ticket) return;                    // a newer choice arrived since: it draws
+        try {
         painted = true;
         if (state.zoom) drawZoom(st, state.custom ? state.ctile : state.ztile, state.zoom.zx, state.zoom.zy, state.zoom.z); else draw(st);
         if (state.diagram && state.view === 'front' && !state.zoom) drawConstruction(st, state.diagram);
@@ -2073,11 +2091,10 @@
         $('#zoomHint').textContent = state.cuffPanel ? 'Pick Front, Side or another view to see the whole jacket' : state.zoom ? 'Tap again to zoom out'
           : state.viewNote || 'Tap the jacket to zoom into the cloth';   // the angles not shown are said right under the view tabs
         $('#zoomHint').classList.toggle('warn', !state.cuffPanel && !state.zoom && !!state.viewNote);
-        if (my === ticket) { busy.hidden = true; clearTimeout(staleT); cv.classList.remove('stale'); }
+        if (my === ticket) { busy.hidden = true; clearTimeout(staleT); cv.classList.remove('stale'); retried = false; }
+        } catch (e) { retry(e); }
       }, 0));
-    } catch (e) {
-      busy.textContent = 'Could not load the preview. Please refresh the page.';
-    }
+    } catch (e) { retry(e); }
     paintChosen(); paintSummary();
   }
 

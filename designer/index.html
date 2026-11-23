@@ -12,7 +12,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '89';
+    var V = '92';
     try {
       fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && location.search.indexOf('v=' + j.v) < 0) location.replace(location.pathname + '?v=' + j.v);
@@ -21,7 +21,7 @@
   })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Archivo+Black&family=Arimo&family=Caveat&family=Crimson+Text&family=Cormorant+Garamond:ital,wght@1,600&family=Kalam&family=Merienda:wght@500&family=Fondamento&family=Marck+Script&family=Great+Vibes&family=Bangers&family=Poiret+One&family=UnifrakturMaguntia&family=Yesteryear&family=Tinos&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer.css?v=89">
+<link rel="stylesheet" href="css/designer.css?v=92">
 </head>
 <body>
 <header class="topbar">
@@ -66,7 +66,7 @@
     </ol>
     <div class="w-prices">
       <div><b>In person</b><span>Full suit from <strong data-start="inperson">$445</strong></span></div>
-      <div><b>Online</b><span>Full suit from <strong data-start="online">$395</strong></span></div>
+      <div><b>Online</b><span>Full suit from <strong data-start="online">$375</strong></span></div>
     </div>
     <div class="w-actions"><button type="button" class="primary w-big" data-go="mode">Start designing &rsaquo;</button><button type="button" class="ghost dark" data-go="home">Back</button></div>
     <h3 class="w-h3">Contact us</h3>
@@ -84,7 +84,7 @@
     <h2>How would you like to design?</h2>
     <div class="w-cards">
       <button type="button" class="w-card" data-mode="inperson"><b>In person</b><span>By appointment only. Design with us and have your measurements taken in person.</span><em>Full suit from <span data-start="inperson">$445</span></em></button>
-      <button type="button" class="w-card" data-mode="online"><b>Online</b><span>Design and order from home.</span><em>Full suit from <span data-start="online">$395</span></em></button>
+      <button type="button" class="w-card" data-mode="online"><b>Online</b><span>Design and order from home.</span><em>Full suit from <span data-start="online">$375</span></em></button>
     </div>
     <div class="w-locs" id="wLocs" hidden>
       <p class="w-q">Which shop? <span class="w-appt-inline">By appointment only</span></p>
@@ -287,6 +287,6 @@
 </div>
 <script>window.MAGNOLIA_PREVIEW_BASE = 'https://anirudhatalmale6-alt.github.io/magnolia-fabric-previews/';  /* the fabric preview files (own site) */</script>
 <script src="../demo-guide.js?v=4"></script>
-<script src="js/designer.js?v=89"></script>
+<script src="js/designer.js?v=92"></script>
 </body>
 </html>

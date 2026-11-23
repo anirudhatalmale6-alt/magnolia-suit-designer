@@ -773,7 +773,9 @@
   // shadow under the edge moves with it, and when it gets shorter the cloth below closes up over a short band.
   // the preview page (designer/preview.html sets MAGNOLIA_PREVIEW) has everything still on review switched on: drawn
   // sizes and shoulder layering (owner, 22 Nov: on the preview link without ?drawn=1; nothing on the live designer yet)
-  const DRAWN = new URLSearchParams(location.search).has('drawn') || window.MAGNOLIA_PREVIEW === true;
+  // live since 23 Nov (owner approved v91): drawn sizes and shoulder layering are on for everyone; ?drawn=0 switches them
+  // off (tests compare with and without)
+  const DRAWN = new URLSearchParams(location.search).get('drawn') !== '0';
   const SZ_REG = { front: { f: [[180, 405], [615, 862]], c: [[560, 820]] }, three4: { f: [[474, 750], [215, 312, 'far']], c: [[400, 720]] }, side: { f: [[250, 480]], c: [[280, 440]] } };
   const SZ_Y = { f: [900, 1250, 35, 120], c: [440, 700, 25, 60] };     // search rows, smallest / largest height (px)
   const SZ_BASE = { f: 4.5, c: 2.5 };                                  // cm of the flap / chest welt in the photos
