@@ -970,6 +970,15 @@
       else if (!cl && was) { A[i] = 0; B[p] = bg[0]; B[p + 1] = bg[1]; B[p + 2] = bg[2]; B[p + 3] = 255; }
       else if (cl && Math.abs(P[q] - st.S[p]) > 3) { S[p] = S[p + 1] = S[p + 2] = P[q]; uvAt(i, S, st.Wp, U, V, SH); }
     }
+    // the photo's own soft outline where its cloth was taken away: the pixels just outside it (a grey hairline above a
+    // lowered shoulder, owner check 24 Nov) become the plain backdrop too
+    for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
+      const x = x0 + px, y = y0 + py; if (x < 4 || x >= W - 4 || y < 4 || y >= H - 4) continue;
+      const i = y * W + x, p = i * 4; if (A[i] > 0.5 || st.A[i] > 0.5 || st.OVP[p + 3]) continue;
+      let near = false;
+      for (let dy = -4; dy <= 4 && !near; dy++) for (let dx = -4; dx <= 4 && !near; dx++) { const j = i + dy * W + dx; near = st.A[j] > 0.5 && A[j] < 0.5; }
+      if (near) { B[p] = bg[0]; B[p + 1] = bg[1]; B[p + 2] = bg[2]; B[p + 3] = 255; }
+    }
     return { ...st, B, S, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, shv: sty };
   }
   const pkImgs = {};

@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '57';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '58';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -275,7 +275,10 @@
       const v = state.opts.vent || 'C', turned = (state.opts.collarBack || 'A') === 'B';
       const name = v === 'A' ? 'back_none' : v === 'B' ? 'back_centre' : v === 'D' ? 'back_inner_belt' : v === 'F' ? 'back_fixed_belt' : turned ? 'back_collar' : 'back';
       if (turned && name !== 'back_collar') miss.push(['the collar turned back at the end with this vent', ['collarBack', 'vent']]);   // that photo has side vents
-      return { name, note: say() };
+      // the shoulder from the owner's Back reference photos (23 Nov), laid onto every Back jacket (maps/_sh, view 'back')
+      const bsh = { A: 'natural', C: 'rollino', D: 'neapolitan', E: 'shirthead' }[state.opts.shoulder || 'B'] || '';
+      const shv = bsh && DRAWN && ((SHX.back || {})[name] || {})[bsh] ? bsh : '';
+      return { name, shv, note: say() };
     }
     if (state.view === 'open') {                    // inside photos: lining style first, then the inside details staff chose
       const ls = state.opts.liningStyle || 'A';
@@ -954,7 +957,7 @@
   // the shoulder of another style laid onto a photo (preview): a patch of its shading (RGB) and cloth outline (alpha),
   // made by build_shoulder_patches.py with the method of the approved shoulder sheets; offset per photo in maps/_sh/index.json
   async function shoulderView(st, name, sty) {
-    const vw = name.startsWith('three4') ? 'three4' : name.startsWith('side') ? 'side' : 'front', e = ((SHX[vw] || {})[name] || {})[sty];
+    const vw = name.startsWith('three4') ? 'three4' : name.startsWith('side') ? 'side' : name.startsWith('back') ? 'back' : 'front', e = ((SHX[vw] || {})[name] || {})[sty];
     if (!e) return st;
     const [file, x0, y0] = e, img = await loadImg(`maps/_sh/${file}.webp?v=${VER}`), P = pixels(img), pw = img.width, ph = img.height;
     const B = st.B.slice(), S = st.S.slice(), A = st.A.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
@@ -966,6 +969,15 @@
       if (cl && !was) { A[i] = 1; B[p + 3] = 0; S[p] = S[p + 1] = S[p + 2] = P[q]; uvAt(i, S, st.Wp, U, V, SH); }
       else if (!cl && was) { A[i] = 0; B[p] = bg[0]; B[p + 1] = bg[1]; B[p + 2] = bg[2]; B[p + 3] = 255; }
       else if (cl && Math.abs(P[q] - st.S[p]) > 3) { S[p] = S[p + 1] = S[p + 2] = P[q]; uvAt(i, S, st.Wp, U, V, SH); }
+    }
+    // the photo's own soft outline where its cloth was taken away: the pixels just outside it (a grey hairline above a
+    // lowered shoulder, owner check 24 Nov) become the plain backdrop too
+    for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
+      const x = x0 + px, y = y0 + py; if (x < 4 || x >= W - 4 || y < 4 || y >= H - 4) continue;
+      const i = y * W + x, p = i * 4; if (A[i] > 0.5 || st.A[i] > 0.5 || st.OVP[p + 3]) continue;
+      let near = false;
+      for (let dy = -4; dy <= 4 && !near; dy++) for (let dx = -4; dx <= 4 && !near; dx++) { const j = i + dy * W + dx; near = st.A[j] > 0.5 && A[j] < 0.5; }
+      if (near) { B[p] = bg[0]; B[p + 1] = bg[1]; B[p + 2] = bg[2]; B[p + 3] = 255; }
     }
     return { ...st, B, S, A, U, V, SH, ovCache: {}, lapelGeo: undefined, cuffs: undefined, linBox: undefined, elbowPx: undefined, holeCache: undefined, shv: sty };
   }
