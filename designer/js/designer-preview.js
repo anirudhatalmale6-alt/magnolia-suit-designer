@@ -2836,11 +2836,12 @@
     store.set('mb_flow', JSON.stringify({ mode: state.mode, location: state.location, build: state.build }));
     applyBuild(); paintProgress(); paintSummary(); render(); placeWa();
   }
+  const keepMode = () => store.set('mb_flow', JSON.stringify({ mode: state.mode, location: state.location, build: '' }));
   $('#welcome').onclick = e => {
     const go = e.target.closest('[data-go]'); if (go) return showWelcome(go.dataset.go);
     const m = e.target.closest('[data-mode]');
-    if (m) { state.mode = m.dataset.mode; if (state.mode === 'online') { state.location = ''; return showWelcome('build'); } return showWelcome('mode'); }
-    const l = e.target.closest('[data-loc]'); if (l) { state.location = l.dataset.loc; return showWelcome('build'); }
+    if (m) { state.mode = m.dataset.mode; if (state.mode === 'online') { state.location = ''; keepMode(); return showWelcome('build'); } return showWelcome('mode'); }
+    const l = e.target.closest('[data-loc]'); if (l) { state.location = l.dataset.loc; keepMode(); return showWelcome('build'); }
     const b = e.target.closest('[data-build]'); if (b && !b.disabled) { state.build = b.dataset.build; startDesigner(); }
   };
   $('#howBtn').onclick = () => showWelcome('how');
@@ -3100,10 +3101,16 @@
     let flow = null; try { flow = JSON.parse(store.get('mb_flow') || 'null'); } catch (e) { flow = null; }
     // the connected demo's start page opens the designer at "What are we building?" with the journey already chosen
     const qs = new URLSearchParams(location.search), jr = qs.get('journey'), jl = qs.get('loc');
+    // In person / Online is asked once (owner, 24 Nov): the choice is kept (with the journey in the link, or stored when
+    // it is made), so a reload or a version update never asks it again and a design in progress carries on. With nothing
+    // chosen yet the designer opens on "How would you like to design?".
+    const loc = jr === 'inperson' ? jl : '';
     if (jr === 'online' || (jr === 'inperson' && LOCS[jl])) {
-      store.set('mb_flow', ''); state.mode = jr; state.location = jr === 'inperson' ? jl : '';
-      history.replaceState(null, '', location.pathname); showWelcome('build');
-    } else if (flow && flow.build) { Object.assign(state, flow); startDesigner(); } else showWelcome('home');
+      if (flow && flow.build && flow.mode === jr && (flow.location || '') === loc) { Object.assign(state, flow); startDesigner(); }
+      else { state.mode = jr; state.location = loc; keepMode(); showWelcome('build'); }
+    } else if (flow && flow.build) { Object.assign(state, flow); startDesigner(); }
+    else if (flow && (flow.mode === 'online' || (flow.mode === 'inperson' && LOCS[flow.location]))) { state.mode = flow.mode; state.location = flow.location; showWelcome('build'); }
+    else showWelcome('mode');
     const pw = store.get('mb_staff');
     if (pw) { try { staffOn(await unlock(pw), pw); } catch (e) { store.set('mb_staff', ''); } }
   })();
