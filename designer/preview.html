@@ -12,7 +12,7 @@
 <script>
   /* Phones keep an old copy of this page; if a newer version is published, reload it once. */
   (function () {
-    var V = '96';
+    var V = '97';
     try {
       fetch('preview-version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
         if (j.v !== V && new URLSearchParams(location.search).get('v') !== j.v) {   /* keeps the rest of the query (?journey=online) */
@@ -23,7 +23,7 @@
   })();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Archivo+Black&family=Arimo&family=Caveat&family=Crimson+Text&family=Cormorant+Garamond:ital,wght@1,600&family=Kalam&family=Merienda:wght@500&family=Fondamento&family=Marck+Script&family=Great+Vibes&family=Bangers&family=Poiret+One&family=UnifrakturMaguntia&family=Yesteryear&family=Tinos&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/designer-preview.css?v=96">
+<link rel="stylesheet" href="css/designer-preview.css?v=97">
 </head>
 <body>
 <header class="topbar">
@@ -290,6 +290,6 @@
 <script>window.MAGNOLIA_PREVIEW_BASE = 'https://anirudhatalmale6-alt.github.io/magnolia-fabric-previews/';  /* the fabric preview files (own site) */</script>
 <script src="../demo-guide.js?v=4"></script>
 <script>window.MAGNOLIA_PREVIEW = true;</script>
-<script src="js/designer-preview.js?v=96"></script>
+<script src="js/designer-preview.js?v=97"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 (function () {
-  const W = 1024, H = 1536, TILE = 512, VER = '58';      // bump VER when tiles/maps/data change (defeats browser cache)
+  const W = 1024, H = 1536, TILE = 512, VER = '59';      // bump VER when tiles/maps/data change (defeats browser cache)
   const PX_PER_CM = 150 / 9.8;               // jacket pixels per cm of cloth on these mannequin photos
   const ANG = new Float32Array(16); ANG[2] = 0.30; ANG[3] = -0.30;   // lapel grain (part id in warp.blue)
   const LIN = new Float32Array(256); for (let i = 0; i < 256; i++) LIN[i] = Math.pow(i / 255, 2.2);
@@ -124,12 +124,12 @@
   const pocketLook = c => Object.keys(POCKET).find(k => POCKET[k].split(' ').includes(c)) || 'flap';
   const ticketLook = c => c === 'D' ? '' : 'F G H I J'.split(' ').includes(c) ? 'flap' : '25K 25Q EG YK'.split(' ').includes(c) ? 'card' : 'jet';
   const POCKET_FALLBACK = { jettab: 'jet', slantpatch: 'patch', roundpatch: 'patch', multipleat: 'patch', boxpleat: 'patch',  patchflap: 'patch', patchtab: 'patch', pleat: 'patch', slantjet: 'slant', hacking: 'slant' };   // views without that photo
-  const CHEST = { round: 'HXD G 233 BE C1', patchflap: '234', pleat: '235', barchetta: '237 238 I', none: 'H', curved: 'D E F J', jetted: 'BC', trapezoid: 'R' };
+  const CHEST = { round: 'HXD G', tulip: '233', flap2: '234', boxpleat: 'BE', multipleat: 'C1', pleat: '235', barchetta: '237 238 I', none: 'H', curved: 'D E F J', jetted: 'BC', trapezoid: 'R' };
   const chestLook = c => Object.keys(CHEST).find(k => CHEST[k].split(' ').includes(c)) || 'welt';
   // lapel width, shoulder and pick stitching: photos that show a specific one carry it as a 6th entry {w, sh, pick}
   function extrasWanted() {
     const cm = parseFloat(((choiceOf('lapelWidth') || {}).label || '')) || 7;
-    const sh = { A: 'natural', C: 'rollino', D: 'neapolitan', E: 'neapolitan' }[state.opts.shoulder || 'B'] || '';
+    const sh = { A: 'natural', C: 'rollino', D: 'neapolitan', E: 'shirthead' }[state.opts.shoulder || 'B'] || '';   // E: own photos since 25 Nov
     const ch = chestLook(state.opts.chestPocket || 'B');
     return { w: cm <= 6.5 ? 'narrow' : cm >= 9 ? 'wide' : '', sh, pick: (state.opts.pick || 'A') !== 'A' ? 'pick' : '', chest: ch === 'welt' ? '' : ch };
   }
@@ -220,13 +220,10 @@
     'side_peak_sb3r2', 'side_peak_db4', 'side_shawl_sb1', 'side_shawl_sb', 'side_shawl_sb3', 'side_shawl_sb3r2', 'side_shawl_db4', 'side_shawl_db']);
   const FRONTISH = ['front', 'three4', 'side'];
   const APPROX = [
-    ['chestPocket', FRONTISH, { 233: 'the tulip-shaped chest pocket', 234: 'two chest pockets with flaps', BE: 'the angled box-pleat chest pocket',
-      C1: 'the multi-pleated chest pocket' }],
     ['lowerPocket', FRONTISH, { 233: 'the tulip-shaped pockets', 235: 'the water-drop pockets', HMD: 'the water-drop pockets',
       236: 'the button on the pocket flaps', 237: 'the button on the pocket flaps', 19: 'the angled flaps with a button', DJ: 'the diagonal patch pockets',
       Y: 'this jetted pocket' }],
     ['lapel', FRONTISH, { 'HA279-118': 'the removable shawl lapel' }],
-    ['shoulder', FRONTISH, { E: 'the shirt-head shoulder' }],
     ['vent', ['three4', 'side', 'open'], { D: 'the inner belt (shown in the Back view)', F: 'the belt (shown in the Back view)' }],
     ['front', ['front'], { 6: 'the 4 roll 3 front', 9: 'the 4-button double-breasted (1 to close)', 13: 'the 6-button double-breasted (3 to close)' }],
     ['collarBack', ['front', 'three4', 'side'], { B: 'the collar turned back at the end' }],
@@ -354,7 +351,16 @@
       // a three-quarter photo, on the photos whose welt was located: chest.json "names")
       const C = PKC[state.view], pre = state.view === 'three4' ? 'chest3_' : 'chest_';
       const layer = C && C.patches.some(p => p[0] === chest) && (!C.names || C.names.includes(best.name));
-      if (best.e.chest === chest) { /* the photo shows this chest pocket */ } else if (layer) ck = `${pre}${chest}+${pre}welt`; else miss.push(['this chest pocket', ['chestPocket']]);
+      // 25 Nov: 233 / 234 / BE / C1 from the client's photos, front, three-quarter and side: tables "<view>2" (own region and
+      // welt patch) and "<view>2L" (234's second pocket: the other chest / the far chest), as 'table:donor+welt&table:donor'
+      const t2 = state.view + '2', N2 = PKC[t2], p2 = N2 && N2.patches.find(p => p[0] === chest);
+      const layer2 = p2 && (!N2.names || N2.names.includes(best.name));
+      if (best.e.chest === chest) { /* the photo shows this chest pocket */ }
+      else if (layer2) {
+        ck = `${t2}:${p2[2]}+${N2.patches.find(p => p[0] === 'welt')[2]}`;
+        const L = PKC[t2 + 'L'], pl = L && L.patches.find(p => p[0] === chest);
+        if (pl) ck += `&${t2}L:${pl[2]}`;
+      } else if (layer) ck = `${pre}${chest}+${pre}welt`; else miss.push(['this chest pocket', ['chestPocket']]);
     }
     if (best.l !== want.lapel) miss.push([`${want.lapel} lapel`, ['lapel', 'front']]);
     else if (!['BK', '20', 'D'].includes(state.opts.lapel || 'BK') && best.e.lap !== state.opts.lapel) miss.push(['this lapel shape', ['lapel']]);
@@ -987,6 +993,32 @@
   // the lapel's outer edge beside the chest pocket, per row (owner, 21 Nov: the lapel always sits above the chest pocket).
   // Photos with marked lapels: the rightmost pixel of the wearer's left lapel (part 2), which follows the lapel width.
   // Other photos: the lapel edge found as a straight diagonal dark line (RANSAC on line peaks), the rightmost such line.
+  // the lapel to the RIGHT of a chest pocket (25 Nov, 234's second pocket): front, the left lapel's part id (3) gives its
+  // outer edge (leftmost x per row); otherwise the leftmost good diagonal line running further right lower down (the far
+  // lapel in three-quarter)
+  function lapelEdgeR(st, x0, y0, w, h, view) {
+    const edge = new Map(); let marked = 0;
+    if (view === 'front') for (let y = Math.max(0, y0); y < Math.min(H, y0 + h); y++) {
+      for (let x = Math.max(0, x0); x < Math.min(W, x0 + w + 120); x++) if (st.Wp[(y * W + x) * 4 + 2] === 3) { edge.set(y, x); marked++; break; }
+    }
+    if (marked > h * 0.3) return y => { if (edge.has(y)) return edge.get(y); let best = null, bd = 1e9; for (const [yy, x] of edge) if (Math.abs(yy - y) < bd) { bd = Math.abs(yy - y); best = x; } return bd <= 40 ? best : null; };
+    const pts = [], xa = Math.max(8, x0 + Math.round(w * 0.3)), xb = Math.min(W - 9, x0 + w + 70);
+    for (let y = Math.max(1, y0); y < Math.min(H - 1, y0 + h); y += 2) {
+      const row = new Float64Array(W + 1); for (let x = 0; x < W; x++) row[x + 1] = row[x] + st.S[(y * W + x) * 4];
+      const ev = x => (row[x - 6] - row[x - 21]) / 15 - (row[x + 1] - row[x - 2]) / 3;   // a dark line with plain cloth to its left
+      for (let x = xa + 22; x < xb - 2; x++) { if (!st.A[y * W + x]) continue; const v = ev(x); if (v > 6 && v >= ev(x - 1) && v >= ev(x + 1)) pts.push([x, y]); }
+    }
+    let best = null;
+    for (let it = 0; it < 400 && pts.length > 20; it++) {
+      const p1 = pts[(it * 7919) % pts.length], p2 = pts[(it * 104729 + 13) % pts.length]; if (p1[1] === p2[1]) continue;
+      const b = (p2[0] - p1[0]) / (p2[1] - p1[1]); if (b < 0.15 || b > 1.6) continue;   // a diagonal: further right lower down
+      const a = p1[0] - b * p1[1]; let n = 0; for (const q of pts) if (Math.abs(q[0] - (a + b * q[1])) <= 2) n++;
+      if (n < Math.max(20, h / 8)) continue;
+      const xm = a + b * (y0 + h / 2);              // the leftmost good line is the lapel's outer edge
+      if (!best || xm < best.xm - 6 || (Math.abs(xm - best.xm) <= 6 && n > best.n)) best = { a, b, n, xm };
+    }
+    return best ? y => best.a + best.b * y : null;
+  }
   function lapelEdge(st, x0, y0, w, h) {
     const edge = new Map(); let marked = 0;
     for (let y = Math.max(0, y0); y < Math.min(H, y0 + h); y++) {
@@ -1016,23 +1048,36 @@
   // the old view's photo)
   const viewOfSt = st => { const n = (st && st.name) || ''; return n.startsWith('three4') ? 'three4' : n.startsWith('side') ? 'side' : n.startsWith('back') ? 'back' : n.startsWith('open') ? 'open' : 'front'; };
   async function patchView(st, pk, kind = 'pk') {
+    if (kind === 'pkc' && pk.includes('&')) { let s2 = st; for (const part of pk.split('&')) s2 = await patchView(s2, part, 'pkc'); return s2; }   // 234: two pockets
     const tkOnly = kind === 'tk'; if (tkOnly) kind = 'pk';      // only the ticket pocket: the rows above the lower pocket, on its side
+    let tab = null; if (kind === 'pkc' && pk.includes(':')) [tab, pk] = pk.split(':');   // a chest table of its own (25 Nov)
     const [pk0, kzs] = pk.split('*'), kz = +kzs || 1;                  // '*k': the curved welt drawn k times as deep (drawn sizes)
-    const view = viewOfSt(st), v = (kind === 'pkc' ? PKC : PK)[view], [pkf, sxs] = pk0.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
+    const view = viewOfSt(st), v = (kind === 'pkc' ? PKC : PK)[tab || view], [pkf, sxs] = pk0.split('@'), [dn, tn] = pkf.split('+'), [pw, ph] = v.size;
     const cv = kz !== 1 && SZ_CURVE[dn], poly = (c, x) => (c[0] * x + c[1]) * x + c[2];
     const mapY = (qy, xd) => {                         // donor row shown at row qy: the welt stretched from its top seam down
       if (!cv) return qy; const x = Math.max(cv.x[0], Math.min(cv.x[1], xd)), yt = poly(cv.t, x), yb = poly(cv.b, x), nb = yt + (yb - yt) * kz;
       return qy <= yt ? qy : qy <= nb ? yt + (qy - yt) / kz : qy - (nb - yb);
     };
-    const off = st.meta[kind] || [0, 0, 0], tdy = off[1], tdx = px => px < split ? off[0] : (off[2] ?? off[0]);
+    const off0 = st.meta[kind] || [0, 0, 0], off = v.mx ? [-off0[0], off0[1]] : [off0[0], off0[1], off0[2]], tdy = off[1], tdx = px => px < split ? off[0] : (off[2] ?? off[0]);   // mx: the other chest moves the mirrored way
     const sx = +sxs || 0, split = kind === 'pkc' ? 1e9 : view === 'front' ? pw / 2 : 209;   // left / right pocket (three-quarter: far / near)
     const dxOf = px => !sx ? 0 : px < split ? (view === 'front' ? -sx : 0) : sx;
     const Dp = v.patches.find(x => x[2] === dn), D = await pkImg(dn), Tp = tn && v.patches.find(x => x[2] === tn), T = Tp && await pkImg(tn);
     const ddx = (P, px) => px < split ? P[3][0] : (P[3][2] ?? P[3][0]);
+    const lapR = kind === 'pkc' && v.lap === 'R';    // this pocket lies left of its lapel (234's other chest pocket)
+    const lapf = kind === 'pkc' && tab && view === 'front' && st.meta.lapf;   // front: both lapels' outer edges (build/front_lapel_edge.py)
+    if (kind === 'pkc' && tab && Dp[4]) {             // 25 Nov (owner): the pocket kept off the lapel, and off any button (side,
+      let shiftX = 0; const [b0, b1, b2, b3] = Dp[4], dd = Dp[3][0];   // double-breasted): moved sideways, away from the front
+      const box = () => [b0 - dd + off[0] + shiftX, b1 + off[1], b2 - dd + off[0] + shiftX, b3 + off[1]];
+      if (lapf) { const [x0, y0, x1] = box(); shiftX += lapR ? Math.min(0, lapf[2] + lapf[3] * y0 - 6 - x1) : Math.max(0, lapf[0] + lapf[1] * y0 + 6 - x0); }
+      for (const b of (st.meta.body || [])) { const [x0, y0, x1, y1] = box();
+        if (b[1] + b[2] >= y0 - 4 && b[1] - b[2] <= y1 + 4 && b[0] + b[2] >= x0 - 6 && b[0] - b[2] <= x1 + 6) shiftX += lapR ? b[0] - b[2] - 6 - x1 : b[0] + b[2] + 6 - x0; }
+      off[0] += Math.round(Math.max(-80, Math.min(80, shiftX)));   // whole pixels (a fractional offset indexes no pixel)
+    }
     const S = st.S.slice(), Wp = st.Wp.slice(), U = st.U.slice(), V = st.V.slice(), SH = st.SH.slice();
     // per patch pixel: target index, donor value, weight = new pocket area + this photo's own pocket area
     const n = pw * ph, qys = new Int32Array(n), dsx = new Int32Array(n), idx = new Int32Array(n).fill(-1), w = new Float32Array(n), sd = new Float32Array(n), st0 = new Float32Array(n);
-    const lapX = kind === 'pkc' ? lapelEdge(st, v.at[0] + tdx(0), v.at[1] + tdy, pw, ph) : null;   // the chest pocket stays beside the lapel
+    const lapc = kind === 'pkc' && tab && st.meta.lapc;   // side: the lapel edge measured on the photo (build/side_lapel_edge.py)
+    const lapX = lapc ? (y => lapc[0] + lapc[1] * y) : lapf ? (lapR ? (y => lapf[2] + lapf[3] * y) : (y => lapf[0] + lapf[1] * y)) : kind === 'pkc' ? (lapR ? lapelEdgeR(st, v.at[0] + tdx(0), v.at[1] + tdy, pw, ph, view) : lapelEdge(st, v.at[0] + tdx(0), v.at[1] + tdy, pw, ph)) : null;   // the chest pocket stays beside the lapel
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
       const x = v.at[0] + tdx(px) + px, y = v.at[1] + tdy + py, k = py * pw + px;
       if (x < 0 || x >= W || y < 0 || y >= H) continue;
@@ -1041,8 +1086,9 @@
       if (kind === 'pkc' && st.lapM && st.lapM[i]) continue;   // a widened lapel lies over the chest pocket (three-quarter)
       let e = 1;                                        // fade out near the jacket outline (outlines differ per photo)
       for (let d = 4; d <= 28 && e > 0; d += 4) if (!st.A[i - d] || !st.A[i + d]) e = Math.min(e, (d - 4) / 24);
-      if (kind === 'pk' && st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
-      if (lapX) { const xe = lapX(y); if (xe != null) { e = Math.min(e, Math.max(0, Math.min(1, (x - xe - 3) / 4))); if (e <= 0) continue; } }   // the lapel lies over it
+      if (v.xmaxT) e = Math.min(e, Math.max(0, (v.xmaxT + off0[0] - x) / 4));   // side: the sleeve stays in front of the pocket
+      if ((kind === 'pk' || (tab && !lapR)) && st.meta.pkx) e = Math.min(e, Math.max(0, (st.meta.pkx - 6 - x) / 14));   // three-quarter: stop before the arm
+      if (lapX) { const xe = lapX(y); if (xe != null) { e = Math.min(e, Math.max(0, Math.min(1, ((lapR ? xe - x : x - xe) - 3) / 4))); if (e <= 0) continue; } }   // the lapel lies over it
       const qty = Tp ? py + Tp[3][1] : -1;           // each donor's pocket sits at its own offset
       const pxd = px - dxOf(px) + ddx(Dp, px), qdy = Math.round(mapY(py + Dp[3][1], pxd)), okd = pxd >= 0 && pxd < pw && qdy >= 0 && qdy < ph;
       qys[k] = qdy;
@@ -1057,7 +1103,18 @@
     // pockets (a local ratio picks up darts and folds and leaves bands)
     let s1 = 0, s2 = 0;
     for (let k = 0; k < n; k++) if (idx[k] >= 0 && w[k] < 0.05) { s1 += st0[k]; s2 += sd[k]; }
-    const g = Math.min(1.25, Math.max(0.8, (s1 + 1) / (s2 + 1)));
+    let g = Math.min(1.25, Math.max(0.8, (s1 + 1) / (s2 + 1)));
+    if (v.detail) {                                   // 25 Nov tables: the donor is detail only (128 = x1.0), laid onto this
+      g = 1;                                          // photo's own local light (its cloth blurred, radius 10, twice)
+      let a = new Float32Array(n), m = new Float32Array(n);
+      for (let k = 0; k < n; k++) if (idx[k] >= 0) { a[k] = st0[k]; m[k] = 1; }
+      const blur = (src, horiz) => { const out = new Float32Array(n), R = 10;
+        for (let o = 0; o < (horiz ? ph : pw); o++) { let acc = 0; const L = horiz ? pw : ph, at = j => horiz ? o * pw + j : j * pw + o;
+          for (let j = -R; j < L + R; j++) { if (j + R < L) acc += src[at(j + R)]; if (j - R - 1 >= 0) acc -= src[at(j - R - 1)]; if (j >= 0 && j < L) out[at(j)] = acc; } }
+        return out; };
+      for (let pass = 0; pass < 2; pass++) { a = blur(blur(a, true), false); m = blur(blur(m, true), false); for (let k = 0; k < n; k++) { a[k] = m[k] > 0 ? a[k] / m[k] : 0; m[k] = idx[k] >= 0 ? 1 : 0; a[k] *= m[k]; } }
+      for (let k = 0; k < n; k++) if (idx[k] >= 0) sd[k] = a[k] * sd[k] / 128;
+    }
     for (let py = 0; py < ph; py++) for (let px = 0; px < pw; px++) {
       const k = py * pw + px, i = idx[k]; if (i < 0 || w[k] <= 0) continue;
       const p = i * 4, ww = w[k];
